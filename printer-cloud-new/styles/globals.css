@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@font-face {
+  font-family: "Roboto Thin";
+  src: url("../fonts/Roboto/Roboto-Thin.ttf");
+}
+
+@font-face {
+  font-family: "Roboto Light";
+  src: url("../fonts/Roboto/Roboto-Light.ttf");
+}
+
+@font-face {
+  font-family: "Roboto Regular";
+  src: url("../fonts/Roboto/Roboto-Regular.ttf");
+}
+
+@font-face {
+  font-family: "Roboto Medium";
+  src: url("../fonts/Roboto/Roboto-Medium.ttf");
+}
+
+@font-face {
+  font-family: "Roboto Bold";
+  src: url("../fonts/Roboto/Roboto-Bold.ttf");
+}
+
+@font-face {
+  font-family: "Avenir Thin";
+  src: url("../fonts/Avenir/Avenir-35-Light.ttf");
+}
+
+@font-face {
+  font-family: "Avenir Light";
+  src: url("../fonts/Avenir/Avenir-45-Book.ttf");
+}
+
+@font-face {
+  font-family: "Avenir Regular";
+  src: url("../fonts/Avenir/Avenir-55-Roman.ttf");
+}
+
+@font-face {
+  font-family: "Avenir Medium";
+  src: url("../fonts/Avenir/Avenir-65-Medium.ttf");
+}
+
+@font-face {
+  font-family: "Avenir Bold";
+  src: url("../fonts/Avenir/Avenir-85-Heavy.ttf");
+}
+
+@font-face {
+  font-family: "Roboto Bold";
+  src: url("../fonts/Roboto/Roboto-Bold.ttf");
+}
+
+@font-face {
+  font-family: 'Jakarta Thin';
+  src: url('../fonts/PlusJakarta/PlusJakartaSans-ExtraLight.ttf');
+}
+
+@font-face {
+  font-family: 'Jakarta Light';
+  src: url('../fonts/PlusJakarta/PlusJakartaSans-Light.ttf');
+}
+@font-face {
+  font-family: 'Jakarta Regular';
+  src: url('../fonts/PlusJakarta/PlusJakartaSans-Regular.ttf');
+}
+@font-face {
+  font-family: 'Jakarta Medium';
+  src: url('../fonts/PlusJakarta/PlusJakartaSans-Medium.ttf');
+}
+@font-face {
+  font-family: 'Jakarta Bold';
+  src: url('../fonts/PlusJakarta/PlusJakartaSans-Bold.ttf');
+}
+
+.text-cidOrange::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(50%) sepia(100%) saturate(1000%) hue-rotate(342deg);
+}
+
+.text-cidGray::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(51%) saturate(100%);
+}
+
+.text-cidBlue::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(10%) sepia(78%) saturate(7750%) hue-rotate(250deg);
+}
+
+.text-cidMagenta::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(50%) sepia(60%) saturate(10000%) hue-rotate(326deg);
+}
+
+.text-cidPurple::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(22%) sepia(75%) saturate(2200%) hue-rotate(282deg);
+}
+
+.text-cidCyan::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(74%) sepia(100%) saturate(7000%) hue-rotate(168deg);
+}
+
+.text-cidGold::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(52%) sepia(100%) saturate(220%) hue-rotate(346deg);
+}
+
+.text-cidGreen::-webkit-calendar-picker-indicator {
+ filter: invert(1) brightness(43%) sepia(100%) saturate(500%) hue-rotate(110deg)
+    ;
+}
+
+.slideBottom {
+  animation-name: slide-bottom;
+  animation-duration: 1.3s;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  bottom: -100px;
+  left: 30px;
+  position: absolute;
+}
+
+@keyframes slide-bottom {
+  100% {bottom: 24px;}
+}
+
+/* clears the ‘X’ from Internet Explorer */
+input[type=search]::-ms-clear { display: none; width : 0; height: 0; }
+input[type=search]::-ms-reveal { display: none; width : 0; height: 0; }
+/* clears the ‘X’ from Chrome */
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration { display: none; }
+
+html {
+  overflow-y: overlay;
+}
+
+em {
+  background-color: yellow;
+}

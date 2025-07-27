@@ -1,0 +1,2 @@
+Shoryuken.sqs_client = Aws::SQS::Client.new(credentials: PrinterCloud::Aws.credentials)
+Shoryuken.sqs_client_receive_message_opts = { wait_time_seconds: 20 }

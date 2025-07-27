@@ -1,0 +1,91 @@
+<div id="content">
+<head>
+    <meta charset='utf-8' />
+    <% @procedure_info = PrinterFlow::ProcedureInfo.new(@procedure.id).get_procedure_attributes %>
+    <% @procedure_payload = PrinterFlow::ProcedureInfo.new(@procedure.id).payload %>
+</head>
+<body style="font-family: 'Plus Jakarta Sans', sans-serif;">
+  <div style="text-align: center;">
+    <h2 style="font-size: 20px;">Relatório do Processo</h2>
+  </div>
+  <div>
+    <div class="row">
+      <div class="column">
+        <br>
+        <p style="font-size: medium; line-height: 1.5;">
+          <b>Tipo de processo:</b> <%= @procedure_info[:procedure_template_name] %><br>
+          <b>Número do processo:</b> <%= @procedure_info[:process_number] %><br>
+          <b>Status do processo:</b> <%= @procedure_info[:status] %><br>
+          <b>Data de início:</b> <%= @procedure_info[:created_at] %><br>
+          <b>Atualizado em:</b> <%= @procedure_info[:updated_at] %><br>
+          <b>Visibilidade:</b> <%= @procedure_info[:visibility] %><br>
+          <b>Prazo:</b> <%= @procedure_info[:deadline] %><br>
+          <b>Origem:</b> <%= @procedure_info[:source] %><br>
+        </p>
+        <p style="font-size: medium; line-height: 1.5;">
+          <b>Solicitante:</b> <%= @procedure_info[:requester_name] %><br>
+          <b>Grupo responsável:</b> <%= @procedure_info[:responsible_group_name] %><br>
+          <b>Quantidade de documentos:</b> <%= @procedure_info[:documents_count] %><br>
+          <b>Lista de documentos:</b><br> <%= @procedure_info[:documents_list] %><br>
+        </p>
+        <p style="font-size: medium; line-height: 1.5;">
+          <% @procedure_info[:documents_list]%>
+        </p>
+          <p style="font-size: medium; line-height: 1.5;"><b>Quantidade de tarefas: </b><%= @procedure.tasks.count %><br>
+        </p>
+      </div>
+      <div class="row">
+        <div class="column" style="text-align: left; line-height: 1.5;">
+          <br>
+            <% @procedure_payload.each do |field| %>
+              <%= field %><br>
+            <% end %>
+        </div>
+      </div>
+      <p style='font-size: 12px;'>
+        <b>* A lista de paginação dos anexos do processo e das tarefas se encontra na última página do documento.</b>
+      </p>
+      <div>
+        <%= render "task" %>
+      </div>
+    </div>
+  </div>
+  <% if @procedure.justification_notes.count > 0 %>
+    <div style="page-break-before: always">
+      <p style="font-size: 17px">
+        <b>Histórico do processo </b>
+      </p>
+      <p>
+        <%= @procedure_info[:justification_notes] %>
+      </p>
+    </div>
+  <% end %>
+  <% if @procedure.signatures.refused.count > 0 %>
+    <hr>
+    <div style="font-size: 17px">
+      <p>
+        <b>Assinaturas recusadas: </b>
+      </p>
+      <p>
+        <%= @procedure_info[:refused_signatures] %>
+      </p>
+    </div>
+  <% end %>
+</body>
+
+<style>
+    {
+        box-sizing: border-box;
+    }
+
+    .column {
+        float: left;
+        width: 50%;
+    }
+
+    .row:after {
+        content: "";
+        display: table;
+        clear: both;
+    }
+</style>

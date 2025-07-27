@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificação de Assinatura - Ordoc-AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        .document-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .urgent {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Ordoc-AI</div>
+            <h1 class="title">Solicitação de Assinatura Digital</h1>
+        </div>
+
+        <div class="content">
+            <p>Olá <strong>{{ signer_name|default:"Usuário" }}</strong>,</p>
+            
+            <p>Você recebeu uma nova solicitação de assinatura digital através da plataforma Ordoc-AI.</p>
+
+            <div class="info-box">
+                <h3>Detalhes da Solicitação:</h3>
+                <ul>
+                    <li><strong>Título:</strong> {{ request_title|default:"Solicitação de Assinatura" }}</li>
+                    <li><strong>Documento:</strong> {{ document_name|default:"Documento" }}</li>
+                    <li><strong>Solicitante:</strong> {{ requester_name|default:"Sistema" }}</li>
+                    <li><strong>Organização:</strong> {{ organization_name|default:"Ordoc-AI" }}</li>
+                    {% if due_date %}
+                    <li><strong>Prazo:</strong> <span class="urgent">{{ due_date }}</span></li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            {% if document_description %}
+            <div class="document-info">
+                <h4>Descrição do Documento:</h4>
+                <p>{{ document_description }}</p>
+            </div>
+            {% endif %}
+
+            {% if signature_instructions %}
+            <div class="info-box">
+                <h4>Instruções para Assinatura:</h4>
+                <p>{{ signature_instructions }}</p>
+            </div>
+            {% endif %}
+
+            <div style="text-align: center;">
+                {% if access_url %}
+                <a href="{{ access_url }}" class="button">Acessar Documento para Assinatura</a>
+                {% else %}
+                <a href="{{ FRONTEND_URL|default:'#' }}/assinatura/{{ access_token|default:'' }}" class="button">Acessar Documento para Assinatura</a>
+                {% endif %}
+            </div>
+
+            {% if access_token %}
+            <div class="info-box">
+                <h4>Token de Acesso:</h4>
+                <p><code>{{ access_token }}</code></p>
+                <small>Use este token caso seja solicitado durante o processo de assinatura.</small>
+            </div>
+            {% endif %}
+
+            <div class="info-box">
+                <h4>Importante:</h4>
+                <ul>
+                    <li>Este link é pessoal e intransferível</li>
+                    <li>A assinatura deve ser realizada dentro do prazo estabelecido</li>
+                    <li>Certifique-se de ter seu certificado digital válido</li>
+                    <li>Em caso de dúvidas, entre em contato com o solicitante</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Esta é uma mensagem automática do sistema Ordoc-AI.</p>
+            <p>© {{ current_year|default:"2024" }} Ordoc-AI - Plataforma de Gestão Documental</p>
+            {% if organization_name %}
+            <p>{{ organization_name }}</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

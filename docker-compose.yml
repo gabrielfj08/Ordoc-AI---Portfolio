@@ -1,0 +1,206 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ordoc_postgres
+    environment:
+      POSTGRES_DB: ordoc_ai
+      POSTGRES_USER: ordoc_user
+      POSTGRES_PASSWORD: ordoc_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ordoc_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ordoc_user -d ordoc_ai"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ordoc_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ordoc_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Apache Solr Search Engine
+  solr:
+    image: solr:9.4-slim
+    container_name: ordoc_solr
+    ports:
+      - "8983:8983"
+    environment:
+      - SOLR_HEAP=512m
+    volumes:
+      - solr_data:/var/solr
+      - ./solr/configsets:/opt/solr/server/solr/configsets
+    networks:
+      - ordoc_network
+    command: >
+      bash -c "
+        solr-precreate ordoc_workflow /opt/solr/server/solr/configsets/ordoc_workflow &&
+        solr-precreate ordoc_documents /opt/solr/server/solr/configsets/ordoc_documents
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8983/solr/admin/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Django Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ordoc_backend
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgresql://ordoc_user:ordoc_password@postgres:5432/ordoc_ai
+      - REDIS_URL=redis://redis:6379/0
+      - SOLR_URL=http://solr:8983/solr/
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=ordoc_ai.settings
+      - PYTHONPATH=/app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ordoc_network
+    command: >
+      bash -c "
+        python manage.py collectstatic --noinput &&
+        python manage.py migrate &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ordoc_celery_worker
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgresql://ordoc_user:ordoc_password@postgres:5432/ordoc_ai
+      - REDIS_URL=redis://redis:6379/0
+      - SOLR_URL=http://solr:8983/solr/
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=ordoc_ai.settings
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    networks:
+      - ordoc_network
+    command: celery -A ordoc_ai worker -l info --concurrency=2
+    healthcheck:
+      test: ["CMD", "celery", "-A", "ordoc_ai", "inspect", "ping"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # Celery Beat (Scheduler)
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ordoc_celery_beat
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgresql://ordoc_user:ordoc_password@postgres:5432/ordoc_ai
+      - REDIS_URL=redis://redis:6379/0
+      - SOLR_URL=http://solr:8983/solr/
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=ordoc_ai.settings
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend:/app
+      - celery_beat_data:/app/celerybeat-schedule
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    networks:
+      - ordoc_network
+    command: celery -A ordoc_ai beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    healthcheck:
+      test: ["CMD", "test", "-f", "/app/celerybeat.pid"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: ordoc_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/sites-available:/etc/nginx/sites-available
+      - ./nginx/ssl:/etc/nginx/ssl
+      - static_files:/var/www/static
+      - media_files:/var/www/media
+    depends_on:
+      - backend
+    networks:
+      - ordoc_network
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  solr_data:
+    driver: local
+  media_files:
+    driver: local
+  static_files:
+    driver: local
+  celery_beat_data:
+    driver: local
+
+networks:
+  ordoc_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

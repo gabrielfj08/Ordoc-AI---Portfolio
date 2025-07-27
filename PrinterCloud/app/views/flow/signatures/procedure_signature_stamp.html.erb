@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset= 'utf-8' />
+  <style>
+    div {
+      display: inline;
+    }
+  </style>
+</head>
+<body>
+  <br>
+  <div>
+    <div style="border: 1px solid #E0E0E0; padding: 5px;">
+      <div>
+        <img src="https://staging.api.printercloud.com.br/img/flow-logo.svg" alt="logo" width="18"/>
+      </div>
+
+      <div style="margin-left: 0.5em;"> 
+        <b style="font-size: 12px">Flow Signature</b>
+      </div>
+
+      <div style="margin-left: 1.5em;">
+        <span style="font-size: 15px;"> 
+            Esse documento, <%= @signature.attachment.name %>, foi assinado eletrônicamente dia <%= @signature.created_at.strftime("%d/%m/%Y") %> <%= @signature.created_at.in_time_zone("America/Sao_Paulo").strftime("às %H:%M") %>, por <%= @signature.user.name %>.
+        </span>
+      </div>
+    </div>
+  </div>​
+</body>

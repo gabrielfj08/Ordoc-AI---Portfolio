@@ -1,0 +1,748 @@
+pt-BR:
+  date:
+    month_names:
+      [
+        ~,
+        janeiro,
+        fevereiro,
+        março,
+        abril,
+        maio,
+        junho,
+        julho,
+        agosto,
+        setembro,
+        outubro,
+        novembro,
+        dezembro,
+      ]
+  time:
+    formats:
+      default: '%d de %B de %Y'
+  printer_flow:
+    errors:
+      messages:
+        already_filled: já está sendo preenchido
+        cannot_be_blank: não pode ficar em branco
+        cannot_delete_group_requester: Não é possível deletar o grupo.
+        exceeds_long_text_character_limit: ultrapassa limite de caracteres aceitos
+        exceeds_short_text_character_limit: ultrapassa limite de 255 caracteres
+        field_value_option_must_be_present: está vazia e deve ser preenchida no tipo de processo/assunto.
+        field_type_is_not_attachment: Este tipo de campo não permite modelo de anexo.
+        format_invalid: por favor insira um formato válido
+        is_inactive: está inativo
+        invalid_attachment: contém anexo(s) inválido(s)
+        invalid_date: Data inválida
+        invalid_payload: devem corresponder aos campos do tipo de processo
+        invalid_signature_token: Não foi possível acessar as assinaturas, o token é inválido.
+        invalid_selected_option: selecionado(a) não é uma opção válido(a)
+        is_invalid: é inválido(a)
+        is_not_selectable_field: não é um campo selecionável
+        only_numeric: deve conter somente números
+        procedure_invalid_to_update: inválido para atualizar processo
+        procedure_must_be_started: Para solicitar assinatura o processo deve estar tramitando.
+        procedure_payload_has_empty_values: Preencha todos os campos obrigatórios do processo
+        procedure_template_is_inactive: Para realizar esta ação, o tipo de processo ou assunto deve estar ativo.
+        procedure_template_must_not_have_children: Não é possível atualizar visibilidade, tipo de processo contém assuntos.
+        requester_has_procedure_template_linked: Grupo solicitante tem assunto de tipo de processo vinculado.
+        set_at_least_one_document: Selecione ao menos um documento para solicitar assinatura(s).
+        task_of_task_document_must_be_in_draft: Para deletar um documento assinado, a tarefa deveria estar em rascunho.
+        unauthorized_to_set_assignee: Use a rota de reatribuir destino, para alterá-lo mediante a justificativa
+        unauthorized: Você não tem permissão para realizar esta ação.
+    success:
+      external_requester:
+        messages:
+          one_time_password_sent: Por favor, verifique a caixa de mensagem de %{attribute} (%{notification}).
+  printer_air:
+    errors:
+      messages:
+        unauthorized: Você não tem permissão para realizar esta ação.
+        unauthorized_to_delete: 'Você não tem permissão para deletar: %{attribute}'
+        unauthorized_to_download: 'Você não tem permissão para fazer download do item: %{attribute}'
+        unauthorized_to_restore: 'Você não tem permissão para restaurar: %{attribute}'
+        unauthorized_to_share: 'Você não tem permissão para compartilhar: %{attribute}'
+        unauthorized_to_update: 'Você não tem permissão para atualizar: %{attribute}'
+        unshare_object: Descompartilhe para realizar a ação
+  printer_cloud:
+    actions:
+      resources:
+        user: Usuários
+        user_group: Grupos
+        organization: Instituições
+        policy: Permissões
+        report: Relatórios
+        directory: Pastas
+        requester: Solicitantes
+        procedure_template: Tipos de Processo
+    errors:
+      messages:
+        can_not_change: não pode ser alterado
+        can_not_delete_policy: Você não pode alterar permissões de negação gerenciadas pelo Printer Cloud.
+        forbidden: Acesso negado.
+        invalid_confirmation_token: Não foi possível confirmar a conta.
+        invalid_current_password: Senha atual inválida.
+        invalid_destination_path: O destino é inválido.
+        invalid_operation: Operação inválida.
+        invalid_password: 'Senha incorreta. Tentativas restantes: %{attribute}'
+        module_not_defined: Módulo não definido.
+        must_be_uniq: deve ser único.
+        passwords_do_not_match: Senhas não conferem.
+        phone_blank: Telefone não informado.
+        unauthorized: Você não tem permissão para realizar esta ação.
+        unauthorized_to_attach_policy_to_user: 'Você não tem permissão para adicionar o usuário %{attribute}'
+        unauthorized_to_attach_policy_to_user_group: 'Você não tem permissão para adicionar o grupo %{attribute}'
+        user_blocked: Usuário bloqueado. Recupere sua senha para desbloquear sua conta.
+        user_group_is_inactive: está inativo
+    success:
+      user:
+        messages:
+          one_time_password_sent: Seu código de recuperação de senha foi enviado via %{attribute}.
+    messages:
+      shareable_link_destroyed: O link foi deletado com sucesso!
+  activerecord:
+    models:
+      flow/archiving_note:
+        one: Nota de arquivamento
+        event_type:
+          archive: Arquivado
+          unarchive: Desarquivado
+      flow/partaker:
+        one: Requerente/Beneficiário
+        other: Requerentes/Beneficiários
+      flow/procedure:
+        one: Processo
+        other: Processos
+        status:
+          draft: Rascunho
+          started: Tramitando
+          finished: Concluído
+      flow/procedure_attachment:
+        one: Anexo
+        other: Anexos
+      flow/procedure_attachment_signature:
+        one: Assinatura
+        other: Assinaturas
+      flow/procedure_pdf:
+        one: Relatório de processo
+      flow/procedure_template:
+        one: Tipo de processo
+      flow/procedure_template_attachment:
+        one: Anexo
+        other: Anexos
+      flow/task:
+        one: Tarefa
+        other: Tarefas
+        status:
+          draft: Rascunho
+          started: Tramitando
+          review: Em análise
+          finished: Finalizada
+      flow/task_attachment:
+        one: Anexo
+        other: Anexos
+      flow/task_attachment_signature:
+        one: Assinatura
+        other: Assinaturas
+      flow/task_comment:
+        one: Comentário
+      flow/user_group:
+        one: Grupo
+      printer_cloud/policy:
+        one: Política de permissão
+        other: Políticas de permissão
+      printer_cloud/policy_action:
+        one: Ação
+        other: Ações
+      printer_cloud/theme:
+        one: Tema
+      printer_cloud/decree:
+        one: Decreto
+      printer_cloud/user:
+        one: Usuário
+      printer_cloud/user_group:
+        one: Grupo de usuários do Printer Cloud
+        other: Grupos de usuários do Printer Cloud
+      printer_air/document:
+        one: Arquivo
+      printer_air/directory:
+        one: Pasta
+      printer_air/directory_info:
+        one: Informação da pasta
+      printer_air/shareable_link:
+        one: Link compartilhável
+      printer_flow/external/procedure_report:
+        one: Relatório externo do processo
+        other: Relatórios externos do processo
+      printer_flow/external/shared_procedure:
+        one: Processo compartilhado
+        other: Processos compartilhados
+      printer_flow/external/report:
+        one: Dashboard externo
+        other: Dashboards externos
+      printer_flow/field:
+        one: Campo
+        other: Campos
+      printer_flow/field_attachments:
+        one: Anexo de campo
+      printer_flow/field_document_templates:
+        one: Modelo de documento de campo
+      printer_flow/field_value_option:
+        one: Opção do campo
+        other: Opções do campo
+      printer_flow/internal_requester:
+        one: Solicitante interno
+      printer_flow/justification_note:
+        one: Nota de justificativa
+      printer_flow/procedure:
+        one: Processo
+        other: Processos
+      printer_flow/procedure_document:
+        one: Documento do processo
+        other: Documentos do processo
+      printer_flow/procedure_report:
+        one: Relatório do processo
+        other: Relatórios do processo
+      printer_flow/procedure_template:
+        one: Tipo de processo
+        other: Tipos de processo
+      printer_flow/procedure_template_document:
+        one: Documento do tipo de processo
+        other: Documentos do tipo de processo
+      printer_flow/requester:
+        one: Solicitante
+      printer_sign/signature:
+        one: Assinatura
+      printer_flow/task:
+        one: Tarefa
+        other: Tarefas
+      printer_flow/task_attachment:
+        one: Menção
+        other: Menções
+      printer_flow/task_comment:
+        one: Comentário
+        other: Comentários
+      printer_flow/task_document:
+        one: Documento de tarefa
+        other: Documento de tarefa
+      printer_flow/task_field:
+        one: Campo de tarefa
+        other: Campos de tarefa
+      printer_flow/task_template:
+        one: Tipo de tarefa
+        other: Tipos de tarefa
+      attachment:
+        one: Anexo
+        other: Anexos
+      address:
+        one: Endereço
+        other: Endereços
+      app:
+        one: Aplicativo
+        other: Aplicativos
+      batch_operation:
+        one: Operação de lote
+      contact_information:
+        one: Informação de contato
+      department:
+        one: Departamento
+        other: Departamentos
+      destroy_shareable_link:
+        one: Solicitação de exclusão de link compartilhável
+      directory:
+        one: Diretório
+        other: Diretórios
+      directory_info:
+        one: Informação de diretório
+      directory_upload:
+        one: Upload de diretório
+      document:
+        one: Documento
+        other: Documentos
+      download_link:
+        one: Link de download
+      inbox:
+        one: Inbox
+      organization:
+        one: Organização
+        other: Organizações
+      permission:
+        one: Permissão de compartilhamento
+      recent_document:
+        one: Documento recente
+      recycle_bin:
+        one: Lixeira
+      report:
+        one: relatório
+        other: relatórios
+      role:
+        one: Cargo de usuário
+      shareable_link:
+        one: Link compartilhável
+      user:
+        one: Usuário
+        other: Usuários
+    attributes:
+      flow/procedure:
+        description: descrição
+        document_number: número do documento
+        internal_process_number: número do processo
+        name: nome
+      flow/partaker:
+        address: endereço
+        email: email
+        name: nome
+        phone: telefone
+        cpf_cnpj: CPF/CNPJ
+      flow/archiving_note:
+        body: justificativa
+      flow/procedure_attachment_signature:
+        procedure_attachment: anexo
+        user: usuário
+      printer_cloud/policy:
+        effect: efeito
+        name: nome
+        organization: instituição
+        organization_id: instituição
+        resource: recurso
+        description: descrição
+        service: serviço
+        source: origem
+      printer_cloud/policy_action:
+        access_level: nível de acesso
+        action: ação
+        resource: recurso
+        service: serviço
+      printer_cloud/policy_attachment:
+        policy: política
+        policy_attachable: usuário ou grupo
+        user: usuário
+        user_group: grupo
+      printer_cloud/theme:
+        background_url: url do plano de fundo
+        color: cor
+        image_url: url da imagem
+        organization: instituição
+        organization_id: instituição
+      printer_cloud/decree:
+        decree_date: data do Decreto
+        decree_number: número do Decreto
+        decree_url: url do Decreto
+        body: texto
+        law_number: número da Lei
+        law_date: data da Lei
+        law_url: url da Lei
+      printer_cloud/user:
+        avatar: imagem
+        cpf: cpf
+        date_of_birth: data de nascimento
+        email: email
+        name: nome
+        organization: instituição
+        password: senha
+        phone: telefone
+        prn: prn
+        username: nome de usuário
+      printer_cloud/user_group:
+        description: descrição
+        name: nome
+        organization: instituição
+        status: status
+        user: usuário
+      printer_cloud/user_group_assignment:
+        user: usuário
+      printer_air/directory:
+        created_by: criador
+        description: descrição
+        name: nome
+        organization: instituição
+        parent_directory: pasta destino
+        prn: nome
+      printer_air/directory_info:
+        created_by_id: criador
+        directory_id: pasta
+        status: status
+      printer_air/document:
+        created_by_id: criador
+        description: descrição
+        directory_id: pasta destino
+        original_filename: nome
+        prn: nome
+      printer_air/shareable_link:
+        created_at: criado em
+        created_by: criado por
+        document_prn: arquivo
+        expires_at: expira em
+        expires_in: expira em
+        updated_at: atualizado em
+      printer_air/shared_object:
+        created_by: criado por
+        directory: pasta
+        document: arquivo
+        organization: instituição
+        object_prn: recurso
+        parent_shared: permissão pai
+        prn: prn
+        record_type: recurso
+        user: usuário
+      printer_flow/external_requester:
+        address: endereço
+        birth_date: data de nascimento/abertura
+        blocked: bloqueado
+        changed_password: alteração de senha
+        cpf_cnpj: cpf/cnpj
+        email: email
+        name: nome
+        notification: notificações
+        password: senha
+        phone: telefone
+        occupation: ocupação
+        one_time_password: código de acesso
+        optional_phone: telefone opcional
+        optional_email: email opcional
+        organization_id: instituição
+        organization: instituição
+        status: status
+      printer_flow/external/procedure_report:
+        document_id: documento
+        document_url: url do documento
+        procedure_id: processo
+        procedure: processo
+        procedure_status: status do processo
+        status: status
+      printer_flow/external/shared_procedure:
+        created_by_id: Criador
+        external_requester: Solicitante
+        external_requester_id: Solicitante
+        procedure_id: Processo
+        procedure: Processo
+        status: status
+      printer_flow/external/report:
+        external_requester: Solicitante
+        procedures_running_count: número de processos em análise
+        procedures_started_count: número de processos tramitando
+        shared_procedures_pending_count: número de processos compartilhados pendentes
+        signatures_pending_count: número de assinaturas pendentes
+        status: status
+        tasks_running_count: número de tarefas aguardando
+      printer_flow/field:
+        field_type: tipo de campo
+        label: nome
+        required: obrigatório
+      printer_flow/field_attachments:
+        field: campo
+        field_document_template: modelo de anexo de campo
+      printer_flow/field_document_templates:
+        document: documento
+        name: nome
+        organization: instituição
+        s3_key: s3 key
+        status: status
+      printer_flow/field_value_option:
+        value: valor
+      printer_flow/group_requester:
+        code: código
+        parent_group: grupo pai
+      printer_flow/internal_requester:
+        address: endereço
+        birth_date: data de nascimento
+        email: email
+        phone: telefone
+        occupation: profissão/atividade
+        optional_phone: telefone opcional
+        optional_email: email opcional
+      printer_flow/justification_note:
+        action: ação
+        actions:
+          archive: Arquivar
+          create: criado
+          finish: finalizado(a)
+          refuse: recusado(a)
+          reset_assignee: reatribuída
+          unarchive: Desarquivar
+        archive: arquivado
+        created_by_id: criador
+        finished: finalizado
+        note: nota de justificativa
+        unarchive: desarquivado
+      printer_flow/procedure:
+        created_by_id: criador
+        deadline: prazo
+        field_value_option: Opção do campo
+        organization: instituição
+        payload: campos customizáveis
+        priority: prioridade
+        private: privado
+        procedure_template: tipo de processo
+        process_number: número do processo
+        responsible_group: grupo responsável
+        requester: solicitante
+        source: origem
+        source_options:
+          internal: interno
+          external: externo
+        status: status
+        statuses:
+          archived: arquivado
+          draft: rascunho
+          finished: finalizado
+          running: em análise
+          started: tramitando
+        visibility:
+          true: privado
+          false: público
+      printer_flow/procedure_document:
+        created_by_id: criador
+        document_id: documento
+        document: documento
+        name: nome
+        procedure_id: processo
+        s3_key: documento
+        status: status
+        signed_document_id: documento assinado
+        uuid: chave de indentificação
+      printer_flow/procedure_template:
+        group_requester_id: grupo solicitante
+        name: nome
+        source: tipo de solicitante
+      printer_flow/procedure_template_document:
+        created_by: criador
+        document_id: documento
+        document: documento
+        name: nome
+        procedure_template: tipo de processo
+        s3_key: s3 key
+        status: status
+      printer_flow/requester:
+        address: endereço
+        cpf_cnpj: cpf/cnpj
+        name: nome
+        organization: instituição
+        status: status
+      printer_flow/requester_assignment:
+        user: usuário
+        requester: solicitante
+      printer_sign/signature:
+        created_by: criador
+        procedure: processo
+        requester: solicitante
+        requester_id: solicitante
+        signable: assinável
+        signable_id: id do documento
+        signable_type: tipo de documento
+        status: status
+      printer_flow/task:
+        assignee: solicitante
+        created_by_id: criador
+        deadline: prazo
+        description: descrição
+        group_assignee: grupo responsável
+        name: nome
+        priority: prioridade
+        procedure: processo
+        task_template: tipo de tarefa
+        status: status
+        statuses:
+          refused: recusada
+          draft: rascunho
+          started: em andamento
+          finished: finalizada
+          running: tramitando
+      printer_flow/task_attachment:
+        attachable: mencionável
+        attachable_id: documento
+        attachable_type: tipo de documento
+        task: tarefa
+        task_id: tarefa
+      printer_flow/task_comment:
+        body: comentário
+        created_by: criador
+        created_by_id: criador
+        task: tarefa
+      printer_flow/task_document:
+        created_by: criador
+        created_by_id: criador
+        document_id: documento
+        document: documento
+        name: nome
+        s3_key: documento
+        status: status
+        signed_document_id: documento assinado
+        task_id: tarefa
+        uuid: chave de indentificação
+      printer_flow/task_field:
+        array_values: valor
+        created_by: criador
+        created_by_id: criador
+        field_type: tipo de campo
+        fieldable_id: id do campo
+        fieldable_type: tipo de campo
+        label: nome
+        options: opções
+        status: status
+        value: valor
+      printer_flow/task_template:
+        description: descrição
+        name: nome
+        organization_id: organização
+        prn: prn
+        status: status
+      user_group:
+        name: nome
+        notes: obeservações
+        organization_id: organização
+      download_link:
+        targets: diretório(s) ou documento(s)
+        name: nome
+        user_id: usuário
+        jid: trabalho em segundo plano
+      report:
+        name: nome
+        data: dado
+        organization: organização
+      role:
+        name: nome
+        type: cargo
+        user_id: usuário
+        organization_id: organização
+        department_id: departamento
+        department: departamento
+        organization: organização
+      permission:
+        user_id: usuário
+        user: usuário
+        attributes: diretório ou documento
+      user:
+        avatar: imagem
+        date_of_birth: data de nascimento
+        department_id: departamento
+        name: nome
+        organization_id: organização
+        phone: telefone
+        password: senha
+        profiles:
+          administrator: Administrador
+          manager: Gerente
+          member: Usuário
+      address:
+        number: número
+        city: cidade
+        neighborhood: bairro
+        postal_code: CEP
+        state: estado
+        street: rua
+        complement: complemento
+      department:
+        name: nome
+        organization_id: organização
+      directory:
+        name: nome
+        department: departamento
+        parent_directory_id: diretório pai
+      document:
+        created_by_id: criador
+        description: descrição
+        directory_id: diretório
+        location: localização
+        original_filename: nome
+        recycle_bin: lixeira
+      organization:
+        cnpj: CNPJ
+        contact_name: responsável
+        contact_phone: telefone do responsável
+        corporate_name: nome corporativo
+        email: email
+        logo: imagem
+        phone: telefone
+        site: site
+        status: status
+        subdomain: subdomínio
+        storage_limit: limite de armazenamento
+        logo_url: logo da instituição
+    errors:
+      messages:
+        task_must_be_draft_or_started: Só pode incluir documentos, com tarefas em rascunho ou em andamento.
+        task_must_be_started: A tarefa deve estar iniciada.
+        finished_or_archived: Está finalizado ou arquivado.
+        signature_must_be_pending: Para realizar esta ação, o documento não deve estar assinado.
+        task_can_not_be_edited_or_deleted: Tarefas que não são rascunhos não podem ser editadas ou apagadas
+        must_be_in_group_assignee: Você não pertence ao grupo para qual a tarefa é destinada.
+        already_added: já adicionado
+        task_already_ended: tarefa já finalizada
+        record_not_found: '%{model} não encontrado(a)'
+        attribute_required: '%{attribute} é obrigatório'
+        content_type: não está em um formato válido
+        unaccessible: não acessível
+        attachment_signature_pending: Há documentos com assinatura(s) pendente(s)
+        invalid: inválido(a)
+        document_not_attached: O documento não existe
+        invalid_file_format: Formato de arquivo inválido
+        resource_not_supported: Recurso não suportado
+        invalid_directory_error: Destino inválido
+        invalid_password_error: Senha inválida. Para resetar sua senha, contate o responsável pela sua instituição
+        invalid_transition: Transição inválida
+        parameter_missing: Preencha todos os campos obrigatórios
+        procedure_template_in_procedures_cannot_be_deleted: Tipos de processos que estão sendo utilizados não podem ser excluídos
+        partaker_must_not_be_in_any_procedure: Para realizar esta ação o requerente/beneficiário não deve estar cadastrado em processos
+        can_not_delete_current_version: Esse arquivo possui somente esta versão. Para deletá-la, utilize o end-point de deletar arquivo
+        permanent_link_already_exists: já possui link permanente
+        procedure_need_accepted_tasks_to_finish: O processo não pode ser finalizado. Tente arquivá-lo ou verifique suas tarefas.
+        procedure_is_finished_or_archived: Esta ação não pode ser executada, pois o processo está finalizado ou arquivado.
+        must_be_at_the_same_organization: deve estar na mesma instituição
+        group_must_be_active: Não é possível criar processo para grupos inativos
+        requester_must_be_active: está inativo. Para reativá-lo, por favor, entre em contato com, %{attribute}
+        task_template_is_archived: está inativo.
+        only_internal_procedures_can_have_task_with_template: só pode ser adicionado em tarefas de processos internos.
+        task_must_be_finished: Esta ação não pode ser executada, pois existem tarefas tramitando e/ou assinaturas pendentes.
+        task_has_attachment_or_comment: A tarefa só poderá ser finalizada se tiver ao menos um comentário.
+        task_has_task_fields_filled: A tarefa só poderá ser finalizada se todos os campos estiverem preenchidos.
+        invalid_password: Senha inválida. Você tem mais %{attribute} tentativas antes do bloqueio de sua conta.
+        external_requester_blocked: Usuário bloqueado. Clique no botão “desbloquear conta” e efetue os passos.
+        invalid_one_time_password: Código de confirmação inválido. Por favor, confira se o código de confirmação é o mesmo enviado.
+        ensure_procedure_template_has_parent: deve ter um assunto
+      models:
+        directory:
+          attributes:
+            parent_directory_id:
+              parent_must_be_in_the_same_department_as_child: deve estar no mesmo departamento do diretório filho
+        permission:
+          attributes:
+            user:
+              unique: já está em uso
+              not_organization_member: deve ser membro da organização
+        download_link:
+          attributes:
+            jid:
+              not_enqueued: não foi enfileirado
+            targets:
+              unaccessible: não acessível
+        organization:
+          attributes:
+            logo:
+              byte_size: deve ter um tamanho entre 20 KB e 5 MB.
+        printer_air/shared_object:
+          attributes:
+            user:
+              unique: já está em uso
+              not_organization_member: deve ser membro da organização
+        printer_cloud/policy:
+          attributes:
+            name:
+              must_be_alphanumeric: não deve conter espaços ou caracteres especiais, exceto - ou _
+        printer_cloud/policy_attachment:
+          attributes:
+            user_group:
+              must_be_equal: deve ser da mesma organização da permissão.
+            user:
+              must_be_added_in_organization: deve estar adicionado à organização da permissão.
+        printer_cloud/user_group:
+          attributes:
+            user:
+              must_be_added_in_organization: deve estar inserido na organização do grupo.
+            name:
+              must_be_alphanumeric: não deve conter espaços ou caracteres especiais, exceto - ou _
+        user:
+          attributes:
+            avatar:
+              byte_size: deve ter um tamanho entre 20 KB e 5 MB.
+            email:
+              already_confirmed: já confirmado

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<schema name="ordoc_workflow" version="1.6">
+
+  <!-- Field Types -->
+  <fieldType name="string" class="solr.StrField" sortMissingLast="true" />
+  <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true"/>
+  <fieldType name="int" class="solr.IntPointField" docValues="true"/>
+  <fieldType name="long" class="solr.LongPointField" docValues="true"/>
+  <fieldType name="float" class="solr.FloatPointField" docValues="true"/>
+  <fieldType name="double" class="solr.DoublePointField" docValues="true"/>
+  <fieldType name="date" class="solr.DatePointField" docValues="true"/>
+  
+  <!-- Text field types -->
+  <fieldType name="text_general" class="solr.TextField" positionIncrementGap="100">
+    <analyzer type="index">
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" />
+      <filter class="solr.LowerCaseFilterFactory"/>
+    </analyzer>
+    <analyzer type="query">
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt" />
+      <filter class="solr.SynonymGraphFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+    </analyzer>
+  </fieldType>
+  
+  <!-- Portuguese text analysis -->
+  <fieldType name="text_pt" class="solr.TextField" positionIncrementGap="100">
+    <analyzer type="index">
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+      <filter class="solr.StopFilterFactory" ignoreCase="true" words="lang/stopwords_pt.txt" />
+      <filter class="solr.PortugueseLightStemFilterFactory"/>
+    </analyzer>
+    <analyzer type="query">
+      <tokenizer class="solr.StandardTokenizerFactory"/>
+      <filter class="solr.LowerCaseFilterFactory"/>
+      <filter class="solr.StopFilterFactory" ignoreCase="true" words="lang/stopwords_pt.txt" />
+      <filter class="solr.PortugueseLightStemFilterFactory"/>
+    </analyzer>
+  </fieldType>
+
+  <!-- Multi-valued string for tags -->
+  <fieldType name="strings" class="solr.StrField" sortMissingLast="true" multiValued="true"/>
+
+  <!-- Fields -->
+  
+  <!-- Required fields -->
+  <field name="id" type="string" indexed="true" stored="true" required="true" multiValued="false" />
+  <field name="_version_" type="long" indexed="false" stored="false"/>
+  
+  <!-- Content identification -->
+  <field name="content_type" type="string" indexed="true" stored="true" required="true"/>
+  <field name="object_id" type="string" indexed="true" stored="true" required="true"/>
+  <field name="organization_id" type="string" indexed="true" stored="true" required="true"/>
+  
+  <!-- Main content fields -->
+  <field name="title" type="text_pt" indexed="true" stored="true"/>
+  <field name="description" type="text_pt" indexed="true" stored="true"/>
+  <field name="content" type="text_pt" indexed="true" stored="true"/>
+  <field name="searchable_text" type="text_pt" indexed="true" stored="false"/>
+  
+  <!-- Metadata fields -->
+  <field name="status" type="string" indexed="true" stored="true"/>
+  <field name="priority" type="string" indexed="true" stored="true"/>
+  <field name="source" type="string" indexed="true" stored="true"/>
+  <field name="private" type="boolean" indexed="true" stored="true"/>
+  
+  <!-- Date fields -->
+  <field name="created_at" type="date" indexed="true" stored="true"/>
+  <field name="updated_at" type="date" indexed="true" stored="true"/>
+  <field name="deadline" type="date" indexed="true" stored="true"/>
+  
+  <!-- User fields -->
+  <field name="created_by" type="string" indexed="true" stored="true"/>
+  <field name="requester_name" type="string" indexed="true" stored="true"/>
+  <field name="assignee_name" type="string" indexed="true" stored="true"/>
+  <field name="responsible_group" type="string" indexed="true" stored="true"/>
+  <field name="group_assignee" type="string" indexed="true" stored="true"/>
+  
+  <!-- Procedure specific fields -->
+  <field name="process_number" type="string" indexed="true" stored="true"/>
+  <field name="procedure_id" type="string" indexed="true" stored="true"/>
+  <field name="procedure_number" type="string" indexed="true" stored="true"/>
+  <field name="procedure_template" type="string" indexed="true" stored="true"/>
+  <field name="template_name" type="string" indexed="true" stored="true"/>
+  <field name="template_source" type="string" indexed="true" stored="true"/>
+  <field name="parent_template" type="string" indexed="true" stored="true"/>
+  <field name="group_requester" type="string" indexed="true" stored="true"/>
+  
+  <!-- Content fields -->
+  <field name="prn" type="string" indexed="true" stored="true"/>
+  <field name="payload_text" type="text_pt" indexed="true" stored="true"/>
+  <field name="comments_text" type="text_pt" indexed="true" stored="true"/>
+  <field name="fields_text" type="text_pt" indexed="true" stored="true"/>
+  <field name="schema_text" type="text_general" indexed="true" stored="true"/>
+  
+  <!-- Multi-valued fields -->
+  <field name="tags" type="strings" indexed="true" stored="true"/>
+  
+  <!-- Dynamic fields for custom attributes -->
+  <dynamicField name="*_s" type="string" indexed="true" stored="true"/>
+  <dynamicField name="*_i" type="int" indexed="true" stored="true"/>
+  <dynamicField name="*_l" type="long" indexed="true" stored="true"/>
+  <dynamicField name="*_t" type="text_general" indexed="true" stored="true"/>
+  <dynamicField name="*_b" type="boolean" indexed="true" stored="true"/>
+  <dynamicField name="*_f" type="float" indexed="true" stored="true"/>
+  <dynamicField name="*_d" type="double" indexed="true" stored="true"/>
+  <dynamicField name="*_dt" type="date" indexed="true" stored="true"/>
+  <dynamicField name="*_ss" type="strings" indexed="true" stored="true"/>
+
+  <!-- Copy fields for better search -->
+  <copyField source="title" dest="searchable_text"/>
+  <copyField source="description" dest="searchable_text"/>
+  <copyField source="content" dest="searchable_text"/>
+  <copyField source="payload_text" dest="searchable_text"/>
+  <copyField source="comments_text" dest="searchable_text"/>
+  <copyField source="fields_text" dest="searchable_text"/>
+  <copyField source="process_number" dest="searchable_text"/>
+  <copyField source="created_by" dest="searchable_text"/>
+  <copyField source="requester_name" dest="searchable_text"/>
+  <copyField source="assignee_name" dest="searchable_text"/>
+
+  <!-- Unique key -->
+  <uniqueKey>id</uniqueKey>
+
+</schema>

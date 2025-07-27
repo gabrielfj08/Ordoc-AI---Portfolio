@@ -1,0 +1,176 @@
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.conf import settings
+import logging
+
+from .models import Procedure, Task, ProcedureTemplate
+from .search import workflow_solr_service
+
+logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender=Procedure)
+def procedure_post_save(sender, instance, created, **kwargs):
+    """
+    Signal para indexar procedimento no Solr após salvar.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True):
+        try:
+            workflow_solr_service.index_procedure(instance)
+            logger.info(f"Procedimento {instance.process_number} indexado automaticamente")
+        except Exception as e:
+            logger.error(f"Erro ao indexar procedimento {instance.id}: {str(e)}")
+
+
+@receiver(post_delete, sender=Procedure)
+def procedure_post_delete(sender, instance, **kwargs):
+    """
+    Signal para remover procedimento do Solr após deletar.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True):
+        try:
+            workflow_solr_service.delete_by_object('procedure', instance.id)
+            logger.info(f"Procedimento {instance.process_number} removido do índice")
+        except Exception as e:
+            logger.error(f"Erro ao remover procedimento {instance.id} do índice: {str(e)}")
+
+
+@receiver(post_save, sender=Task)
+def task_post_save(sender, instance, created, **kwargs):
+    """
+    Signal para indexar tarefa no Solr após salvar.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True):
+        try:
+            workflow_solr_service.index_task(instance)
+            logger.info(f"Tarefa {instance.name} indexada automaticamente")
+        except Exception as e:
+            logger.error(f"Erro ao indexar tarefa {instance.id}: {str(e)}")
+
+
+@receiver(post_delete, sender=Task)
+def task_post_delete(sender, instance, **kwargs):
+    """
+    Signal para remover tarefa do Solr após deletar.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True):
+        try:
+            workflow_solr_service.delete_by_object('task', instance.id)
+            logger.info(f"Tarefa {instance.name} removida do índice")
+        except Exception as e:
+            logger.error(f"Erro ao remover tarefa {instance.id} do índice: {str(e)}")
+
+
+@receiver(post_save, sender=ProcedureTemplate)
+def procedure_template_post_save(sender, instance, created, **kwargs):
+    """
+    Signal para indexar template no Solr após salvar.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True):
+        try:
+            workflow_solr_service.index_procedure_template(instance)
+            logger.info(f"Template {instance.name} indexado automaticamente")
+        except Exception as e:
+            logger.error(f"Erro ao indexar template {instance.id}: {str(e)}")
+
+
+@receiver(post_delete, sender=ProcedureTemplate)
+def procedure_template_post_delete(sender, instance, **kwargs):
+    """
+    Signal para remover template do Solr após deletar.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True):
+        try:
+            workflow_solr_service.delete_by_object('procedure_template', instance.id)
+            logger.info(f"Template {instance.name} removido do índice")
+        except Exception as e:
+            logger.error(f"Erro ao remover template {instance.id} do índice: {str(e)}")
+
+
+# Signals para reindexação quando objetos relacionados mudam
+
+@receiver(post_save, sender='ordoc_flow.TaskComment')
+def task_comment_post_save(sender, instance, created, **kwargs):
+    """
+    Reindexa a tarefa quando um comentário é adicionado/modificado.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True) and instance.task:
+        try:
+            workflow_solr_service.index_task(instance.task)
+            logger.info(f"Tarefa {instance.task.name} reindexada após comentário")
+        except Exception as e:
+            logger.error(f"Erro ao reindexar tarefa após comentário: {str(e)}")
+
+
+@receiver(post_save, sender='ordoc_flow.TaskField')
+def task_field_post_save(sender, instance, created, **kwargs):
+    """
+    Reindexa o objeto relacionado quando um campo customizado é modificado.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True) and instance.content_object:
+        try:
+            if isinstance(instance.content_object, Task):
+                workflow_solr_service.index_task(instance.content_object)
+                logger.info(f"Tarefa reindexada após modificação de campo")
+            elif isinstance(instance.content_object, Procedure):
+                workflow_solr_service.index_procedure(instance.content_object)
+                logger.info(f"Procedimento reindexado após modificação de campo")
+        except Exception as e:
+            logger.error(f"Erro ao reindexar após modificação de campo: {str(e)}")
+
+
+@receiver(post_save, sender='ordoc_flow.Field')
+def field_post_save(sender, instance, created, **kwargs):
+    """
+    Reindexa o template quando um campo é modificado.
+    """
+    if getattr(settings, 'SOLR_ENABLED', True) and instance.procedure_template:
+        try:
+            workflow_solr_service.index_procedure_template(instance.procedure_template)
+            logger.info(f"Template reindexado após modificação de campo")
+        except Exception as e:
+            logger.error(f"Erro ao reindexar template após modificação de campo: {str(e)}")
+
+
+# Função para reindexação em massa
+def reindex_all_workflow_data(organization=None):
+    """
+    Reindexa todos os dados do workflow.
+    Útil para migrações ou reconstrução do índice.
+    """
+    logger.info("Iniciando reindexação em massa do workflow")
+    
+    try:
+        # Filtros por organização se especificado
+        procedure_filter = {}
+        task_filter = {}
+        template_filter = {}
+        
+        if organization:
+            procedure_filter['organization'] = organization
+            task_filter['procedure__organization'] = organization
+            template_filter['organization'] = organization
+        
+        # Reindexa procedimentos
+        procedures = Procedure.objects.filter(**procedure_filter)
+        for procedure in procedures:
+            workflow_solr_service.index_procedure(procedure)
+        logger.info(f"Reindexados {procedures.count()} procedimentos")
+        
+        # Reindexa tarefas
+        tasks = Task.objects.filter(**task_filter)
+        for task in tasks:
+            workflow_solr_service.index_task(task)
+        logger.info(f"Reindexadas {tasks.count()} tarefas")
+        
+        # Reindexa templates
+        templates = ProcedureTemplate.objects.filter(**template_filter)
+        for template in templates:
+            workflow_solr_service.index_procedure_template(template)
+        logger.info(f"Reindexados {templates.count()} templates")
+        
+        logger.info("Reindexação em massa concluída com sucesso")
+        
+    except Exception as e:
+        logger.error(f"Erro durante reindexação em massa: {str(e)}")
+        raise

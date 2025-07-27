@@ -1,0 +1,253 @@
+from django.db import models
+from django.contrib.auth.models import User
+from django.core.validators import FileExtensionValidator
+from django_fsm import FSMField, transition
+from guardian.shortcuts import assign_perm
+import uuid
+import os
+
+
+class Organization(models.Model):
+    """Modelo para organizações - equivalente ao Organization do Rails"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    corporate_name = models.CharField(max_length=255, verbose_name="Razão Social")
+    cnpj = models.CharField(max_length=14, unique=True, verbose_name="CNPJ")
+    email = models.EmailField(verbose_name="Email")
+    phone = models.CharField(max_length=20, verbose_name="Telefone")
+    contact_name = models.CharField(max_length=255, verbose_name="Nome do Contato")
+    contact_phone = models.CharField(max_length=20, verbose_name="Telefone do Contato")
+    site = models.URLField(blank=True, null=True, verbose_name="Site")
+    subdomain = models.CharField(max_length=100, unique=True, verbose_name="Subdomínio")
+    prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    # Relations
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_organizations')
+    
+    class Meta:
+        verbose_name = "Organização"
+        verbose_name_plural = "Organizações"
+        ordering = ['corporate_name']
+    
+    def __str__(self):
+        return self.corporate_name
+
+
+class Department(models.Model):
+    """Modelo para departamentos dentro de organizações"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name="Nome")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+    prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    
+    # Relations
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='departments')
+    parent_department = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subdepartments')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = "Departamento"
+        verbose_name_plural = "Departamentos"
+        ordering = ['name']
+        unique_together = ['organization', 'name']
+    
+    def __str__(self):
+        return f"{self.organization.corporate_name} - {self.name}"
+
+
+class Directory(models.Model):
+    """Modelo para diretórios - estrutura hierárquica de pastas"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name="Nome")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+    path = models.TextField(verbose_name="Caminho")
+    prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    
+    # Relations
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='directories')
+    parent_directory = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subdirectories')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    # User tracking
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_directories')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_directories')
+    
+    class Meta:
+        verbose_name = "Diretório"
+        verbose_name_plural = "Diretórios"
+        ordering = ['path', 'name']
+    
+    def __str__(self):
+        return f"{self.path}/{self.name}"
+    
+    def get_full_path(self):
+        """Retorna o caminho completo do diretório"""
+        if self.parent_directory:
+            return f"{self.parent_directory.get_full_path()}/{self.name}"
+        return f"/{self.department.name}/{self.name}"
+
+
+def document_upload_path(instance, filename):
+    """Função para definir o caminho de upload dos documentos"""
+    return f"documents/{instance.directory.department.organization.id}/{instance.directory.id}/{filename}"
+
+
+class Document(models.Model):
+    """Modelo principal para documentos - equivalente ao Document do Rails"""
+    
+    # Status choices - equivalente ao enum do Rails
+    STATUS_CHOICES = [
+        ('created', 'Criado'),
+        ('enqueued', 'Na Fila'),
+        ('processed', 'Processado'),
+        ('failed', 'Falhou'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    original_filename = models.CharField(max_length=500, verbose_name="Nome Original")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+    file_size = models.BigIntegerField(null=True, blank=True, verbose_name="Tamanho do Arquivo")
+    content_type = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tipo de Conteúdo")
+    prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
+    
+    # FSM Status field - equivalente ao AASM do Rails
+    status = FSMField(default='created', choices=STATUS_CHOICES, verbose_name="Status")
+    
+    # File fields
+    file = models.FileField(
+        upload_to=document_upload_path,
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png'])],
+        verbose_name="Arquivo"
+    )
+    processed_file = models.FileField(
+        upload_to=document_upload_path,
+        blank=True,
+        null=True,
+        verbose_name="Arquivo Processado"
+    )
+    
+    # OCR and search fields
+    extracted_text = models.TextField(blank=True, null=True, verbose_name="Texto Extraído")
+    ocr_confidence = models.FloatField(null=True, blank=True, verbose_name="Confiança OCR")
+    
+    # Relations
+    directory = models.ForeignKey(Directory, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
+    head_document = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='versions')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    # User tracking
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_documents')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_documents')
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deleted_documents')
+    
+    class Meta:
+        verbose_name = "Documento"
+        verbose_name_plural = "Documentos"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['original_filename']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['directory']),
+        ]
+    
+    def __str__(self):
+        return self.original_filename
+    
+    # FSM Transitions - equivalente ao AASM do Rails
+    @transition(field=status, source='created', target='enqueued')
+    def enqueue(self):
+        """Enfileira o documento para processamento"""
+        # Aqui seria chamado o job de OCR
+        pass
+    
+    @transition(field=status, source=['enqueued', 'failed'], target='processed')
+    def process(self):
+        """Marca o documento como processado"""
+        pass
+    
+    @transition(field=status, source=['enqueued', 'processed'], target='failed')
+    def fail(self):
+        """Marca o documento como falhou"""
+        pass
+    
+    def get_file_extension(self):
+        """Retorna a extensão do arquivo"""
+        return os.path.splitext(self.original_filename)[1].lower()
+    
+    def is_image(self):
+        """Verifica se o documento é uma imagem"""
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        return self.get_file_extension() in image_extensions
+    
+    def is_pdf(self):
+        """Verifica se o documento é um PDF"""
+        return self.get_file_extension() == '.pdf'
+
+
+class ShareableLink(models.Model):
+    """Modelo para links compartilháveis de documentos"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token = models.CharField(max_length=100, unique=True, verbose_name="Token")
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Expira em")
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+    access_count = models.PositiveIntegerField(default=0, verbose_name="Contador de Acessos")
+    max_access_count = models.PositiveIntegerField(null=True, blank=True, verbose_name="Máximo de Acessos")
+    
+    # Relations
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='shareable_links')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_links')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Link Compartilhável"
+        verbose_name_plural = "Links Compartilháveis"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Link para {self.document.original_filename}"
+
+
+class RecentDocument(models.Model):
+    """Modelo para rastrear documentos acessados recentemente"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Relations
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recent_documents')
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='recent_accesses')
+    
+    # Timestamps
+    accessed_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Documento Recente"
+        verbose_name_plural = "Documentos Recentes"
+        ordering = ['-accessed_at']
+        unique_together = ['user', 'document']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.document.original_filename}"

@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset= 'utf-8' />
+  <% @summary = PrinterFlow::Summary.new(@procedure.id) %>
+  <% @sections = @summary.sections %>
+</head>
+<body style= "font-family: 'Plus Jakarta Sans', sans-serif;">
+  <h1 align='center' style='padding: 0.5em; font-size: 20px;'>Lista de anexos</h1>
+  <div style="line-height: 1.5;">
+    <% @sections.each do |items| %>
+      <div>
+        <h2 style="font-size: 15px;"><%= items.first.dig(:reference) %></h2>
+        <% items.each do |item| %>
+          <%= item.dig(:title) %> - página &nbsp;<b><%= item.dig(:start_page) %></b> à <b><%= item.dig(:end_page) %></b><br>
+        <% end %>
+      </div><br>
+    <% end %>
+  </div>
+</body>
