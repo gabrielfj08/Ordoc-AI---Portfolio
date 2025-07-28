@@ -15,7 +15,11 @@ npm install
 
 ## Variáveis de Ambiente
 
-Copie o arquivo `.env.example` para `.env` e ajuste os valores conforme o ambiente (desenvolvimento ou produção). O principal parâmetro é `NEXT_PUBLIC_API_URL`, que define o endereço base da API utilizada pelo frontend.
+Copie o arquivo `.env.example` para `.env` e ajuste os valores conforme o ambiente (desenvolvimento ou produção). Os parâmetros mais comuns são:
+
+- `NEXT_PUBLIC_API_URL`: endereço base da API utilizada pelo frontend. Padrão `http://localhost:8000`.
+- `NEXT_PUBLIC_DEFAULT_SUBDOMAIN`: subdomínio exibido quando a URL não define uma organização. Padrão `demo`.
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: chave pública do Cloudflare Turnstile para validação de formulários. Padrão `1x00000000000000000000AA`.
 
 ## Desenvolvimento
 
