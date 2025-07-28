@@ -15,7 +15,7 @@
 - **OrdocCloud:** 80% ✅
 - **OrdocAir:** 60% ✅
 - **OrdocReports:** 60% ✅
-- **OrdocSign:** 0% (placeholder frontend) ❌
+- **OrdocSign:** 10% (listagem e assinatura básica) ✅
 
 ---
 
@@ -199,21 +199,23 @@
 
 ---
 
-### ✍️ **6. ORDOCSIGN - ASSINATURA DIGITAL (0% MIGRADO)**
-*Status do frontend:* existe apenas um componente **placeholder** sem lógica de assinatura.
+### ✍️ **6. ORDOCSIGN - ASSINATURA DIGITAL (10% MIGRADO)**
+*Status do frontend:* páginas iniciais de listagem e assinatura criadas.
 
-#### ❌ **COMPLETAMENTE NÃO MIGRADO:**
+#### ✅ **JÁ IMPLEMENTADO:**
 ```
-❌ Sistema de assinatura digital
-❌ Certificados digitais
-❌ Workflow de assinatura
-❌ Validação de assinaturas
+✅ Serviço `signature.ts` consumindo rotas do backend
+✅ Página de listagem de documentos pendentes
+✅ Página para assinar documento
+```
+
+#### ❌ **AINDA NÃO MIGRADO:**
+```
+❌ Fluxo completo de criação de solicitações
+❌ Upload e gestão de certificados
+❌ Validação avançada e auditoria
 ❌ Integração com ICP-Brasil
 ❌ Assinatura em lote
-❌ Histórico de assinaturas
-❌ Verificação de integridade
-❌ Carimbos de tempo
-❌ Políticas de assinatura
 ```
 
 #### 📁 **ARQUIVOS ORIGINAIS IDENTIFICADOS:**
