@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import SimpleUserManagement from '@/components/dashboard/SimpleUserManagement';
 import SimpleOrganizationManagement from '@/components/dashboard/SimpleOrganizationManagement';
+import statsService from '@/services/stats';
 
 interface DashboardStats {
   totalUsers: number;
@@ -29,15 +30,18 @@ export default function AdminDashboard() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      
-      // For now, we'll use mock data since the statistics endpoints aren't implemented yet
-      // TODO: Implement getUserStatistics and getOrganizationStatistics in services
+
+      const [userStats, orgStats] = await Promise.all([
+        statsService.getUserStatistics(),
+        statsService.getOrganizationStatistics(),
+      ]);
+
       setStats({
-        totalUsers: 0,
-        activeUsers: 0,
-        totalOrganizations: 0,
-        activeOrganizations: 0,
-        usersNeedingPasswordChange: 0,
+        totalUsers: userStats.total_users,
+        activeUsers: userStats.active_users,
+        totalOrganizations: orgStats.total_organizations,
+        activeOrganizations: orgStats.active_organizations,
+        usersNeedingPasswordChange: userStats.users_needing_password_change,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
