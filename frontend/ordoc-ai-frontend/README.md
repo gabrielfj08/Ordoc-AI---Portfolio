@@ -59,3 +59,6 @@ De acordo com o relatório de migração, já existem partes do frontend para:
 - **OrdocReports** (iniciado, ~20% concluído)
 
 O módulo **OrdocSign** ainda não foi migrado.
+Uma rota temporária foi criada em `src/app/dashboard/ordoc-sign/page.tsx` que
+exibe a mensagem *"Módulo OrdocSign em desenvolvimento"* para evitar erros
+404 enquanto a migração não é finalizada.
