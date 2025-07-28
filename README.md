@@ -32,11 +32,12 @@ ordoc-ai/
 │   └── ordoc_reports/      # Relatórios e analytics
 ├── frontend/               # Next.js Frontend
 │   └── ordoc-ai-frontend/  # Aplicação React
-├── printer-cloud-new/     # Frontend legado (migração)
 ├── PrinterCloud/          # Backend legado (Rails)
 ├── docker-compose.yml     # Orquestração de containers
 └── nginx/                 # Configuração de proxy
 ```
+
+> **Nota:** o antigo frontend localizado em `printer-cloud-new/` foi migrado para `frontend/ordoc-ai-frontend`.
 
 ## 🔧 Módulos Principais
 
