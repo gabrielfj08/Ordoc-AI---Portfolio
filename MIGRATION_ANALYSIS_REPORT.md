@@ -8,14 +8,14 @@
 
 ## 🏆 **RESUMO EXECUTIVO**
 
-### ✅ **MIGRAÇÃO ATUAL: ~40% COMPLETA**
+### ✅ **MIGRAÇÃO ATUAL: ~45% COMPLETA**
 - **Infraestrutura:** 100% ✅
 - **Autenticação:** 100% ✅  
 - **OrdocFlow:** 95% ✅
 - **OrdocCloud:** 80% ✅
 - **OrdocAir:** 60% ✅
-- **OrdocReports:** 0% ❌
-- **OrdocSign:** 0% ❌
+- **OrdocReports:** ~20% 🚧
+- **OrdocSign:** 0% (placeholder frontend) ❌
 
 ---
 
@@ -172,7 +172,7 @@
 
 ---
 
-### 📊 **5. ORDOCREPORTS - RELATÓRIOS (0% MIGRADO)**
+### 📊 **5. ORDOCREPORTS - RELATÓRIOS (~20% MIGRADO)**
 
 #### ❌ **COMPLETAMENTE NÃO MIGRADO:**
 ```
@@ -197,6 +197,7 @@
 ---
 
 ### ✍️ **6. ORDOCSIGN - ASSINATURA DIGITAL (0% MIGRADO)**
+*Status do frontend:* existe apenas um componente **placeholder** sem lógica de assinatura.
 
 #### ❌ **COMPLETAMENTE NÃO MIGRADO:**
 ```
@@ -324,8 +325,8 @@
 
 ## 📈 **ROADMAP DE MIGRAÇÃO SUGERIDO**
 
-### **FASE 1 (Próximas 2-3 semanas):** 
-🎯 **OrdocReports** - Sistema de relatórios completo
+### **FASE 1 (Próximas 2-3 semanas):**
+🎯 **OrdocReports (~20%)** - Sistema de relatórios completo
 
 ### **FASE 2 (4-6 semanas):** 
 🎯 **OrdocAir Avançado** - Funcionalidades faltantes (busca, OCR, lote)
