@@ -34,6 +34,9 @@ poetry install
 cp .env.example .env
 # Editar .env com suas configurações
 ```
+Os principais parâmetros incluem:
+
+- `TURNSTILE_SECRET_KEY`: chave secreta do Cloudflare Turnstile usada para validar formulários. Padrão `1x0000000000000000000000000000000AA`.
 
 ### 3. Configurar banco de dados PostgreSQL
 ```bash
