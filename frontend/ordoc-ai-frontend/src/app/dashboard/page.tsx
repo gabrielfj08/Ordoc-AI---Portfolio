@@ -117,7 +117,7 @@ function DashboardContent() {
       title: 'OrdocSign',
       description: 'Sistema de assinatura digital com certificados A1/A3 e auditoria completa.',
       icon: <SignIcon />,
-      href: '/ordoc-sign',
+      href: '/dashboard/ordoc-sign',
       colorClass: 'bg-gradient-to-br from-purple-500 to-purple-600'
     },
     {
