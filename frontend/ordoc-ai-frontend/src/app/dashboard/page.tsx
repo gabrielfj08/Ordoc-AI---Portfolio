@@ -124,7 +124,7 @@ function DashboardContent() {
       title: 'OrdocReports',
       description: 'Relatórios personalizáveis e dashboard executivo com métricas em tempo real.',
       icon: <ReportsIcon />,
-      href: '/ordoc-reports',
+      href: '/dashboard/ordoc-reports',
       colorClass: 'bg-gradient-to-br from-orange-500 to-orange-600'
     },
     {
