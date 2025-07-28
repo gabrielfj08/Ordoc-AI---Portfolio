@@ -51,8 +51,10 @@ api.interceptors.request.use((config) => {
     }
   }
   
-  // TEMPORARY: Add hardcoded subdomain for testing
-  config.headers['X-Api-Subdomain'] = 'demo';
+  // Optional override for development via environment variable
+  if (!config.headers['X-Api-Subdomain'] && process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN) {
+    config.headers['X-Api-Subdomain'] = process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN;
+  }
   
   // Add auth token if available
   const token = localStorage.getItem('ordoc_token');
