@@ -100,10 +100,18 @@ docker-compose up -d
 # Verificar status
 docker-compose ps
 ```
+> **Nota:** o `docker-compose.yml` atual nao inicia o frontend automaticamente.
+> Para acessar a interface web, execute em outro terminal:
+> ```bash
+> cd frontend/ordoc-ai-frontend
+> npm install
+> npm run dev
+> ```
+> Isso iniciara http://localhost:3000.
 
 ### **3. Acessar a Aplicação**
 - **Backend API**: http://localhost:8000
-- **Frontend**: http://localhost:3000
+- **Frontend**: http://localhost:3000 (execute `npm run dev`)
 - **Admin Django**: http://localhost:8000/admin
 
 ### **4. Credenciais Padrão**
@@ -160,7 +168,7 @@ npm run lint
 - **backend**: API Django
 - **celery_worker**: Processamento assíncrono
 - **celery_beat**: Tarefas agendadas
-- **frontend**: Aplicação Next.js (em desenvolvimento)
+- **frontend**: Aplicacao Next.js (execute `npm run dev` em http://localhost:3000)
 
 ### **Comandos Úteis**
 ```bash
