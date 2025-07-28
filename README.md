@@ -82,7 +82,7 @@ ordoc-ai/
 ### **Pré-requisitos**
 - Docker e Docker Compose
 - Git
-- Node.js 16+ (para desenvolvimento frontend)
+ - Node.js 18+ (para desenvolvimento frontend)
 - Python 3.12+ (para desenvolvimento backend)
 
 ### **1. Clone o Repositório**
@@ -148,7 +148,7 @@ poetry run python manage.py test
 ### **Frontend**
 ```bash
 cd frontend/ordoc-ai-frontend
-npm test
+npm run lint
 ```
 
 ## 🐳 Docker
