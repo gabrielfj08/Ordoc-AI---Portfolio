@@ -1,4 +1,5 @@
 # 🚀 Ordoc-AI - Plataforma de Gestão Documental e Workflow Empresarial
+[![CI](https://github.com/Adsumtec/ordoc-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Adsumtec/ordoc-ai/actions/workflows/ci.yml)
 
 ## 📋 Visão Geral
 
@@ -158,6 +159,13 @@ poetry run python manage.py test
 ```bash
 cd frontend/ordoc-ai-frontend
 npm run lint
+```
+
+### **Scripts de Integração**
+```bash
+for f in test_*.py; do
+    python "$f"
+done
 ```
 
 ## 🐳 Docker
