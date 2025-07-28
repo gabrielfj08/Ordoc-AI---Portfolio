@@ -14,7 +14,7 @@
 - **OrdocFlow:** 95% ✅
 - **OrdocCloud:** 80% ✅
 - **OrdocAir:** 60% ✅
-- **OrdocReports:** ~20% 🚧
+- **OrdocReports:** 60% ✅
 - **OrdocSign:** 0% (placeholder frontend) ❌
 
 ---
@@ -172,21 +172,24 @@
 
 ---
 
-### 📊 **5. ORDOCREPORTS - RELATÓRIOS (~20% MIGRADO)**
+### 📊 **5. ORDOCREPORTS - RELATÓRIOS (60% MIGRADO)**
 
-#### ❌ **COMPLETAMENTE NÃO MIGRADO:**
+#### ✅ **JÁ IMPLEMENTADO:**
 ```
-❌ Modelo de relatórios
-❌ Geração de relatórios customizados
-❌ Dashboard de métricas
+✅ Templates de relatórios
+✅ Geração de relatórios customizados
+✅ Dashboard de métricas
+✅ Relatórios agendados
+✅ Compartilhamento de relatórios
+```
+
+#### ❌ **AINDA NÃO MIGRADO:**
+```
 ❌ Exportação de dados (PDF, Excel, CSV)
-❌ Relatórios agendados
 ❌ Gráficos e visualizações
 ❌ Filtros avançados de relatórios
-❌ Templates de relatórios
 ❌ Sistema de assinatura de relatórios
 ❌ Histórico de relatórios
-❌ Compartilhamento de relatórios
 ```
 
 #### 📁 **ARQUIVOS ORIGINAIS IDENTIFICADOS:**

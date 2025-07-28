@@ -33,6 +33,10 @@ export default function OrdocReportsPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-6 flex space-x-4">
+            <Link href="/dashboard/ordoc-reports/create" className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm">Novo Relatório</Link>
+            <Link href="/dashboard/ordoc-reports/dashboard" className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm">Dashboard</Link>
+          </div>
           {isLoading ? (
             <p>Carregando...</p>
           ) : hasTemplates ? (
