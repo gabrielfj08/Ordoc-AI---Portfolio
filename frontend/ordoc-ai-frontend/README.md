@@ -52,5 +52,6 @@ De acordo com o relatório de migração, já existem partes do frontend para:
 - **Autenticação e OrdocFlow** (95% concluído)
 - **OrdocCloud** (80% concluído) – gestão de organizações, usuários e políticas
 - **OrdocAir** (60% concluído)
+- **OrdocReports** (iniciado, ~20% concluído)
 
-Os módulos **OrdocReports** e **OrdocSign** ainda não foram migrados.
+O módulo **OrdocSign** ainda não foi migrado.
