@@ -13,6 +13,10 @@ Instale as dependências executando:
 npm install
 ```
 
+## Variáveis de Ambiente
+
+Copie o arquivo `.env.example` para `.env` e ajuste os valores conforme o ambiente (desenvolvimento ou produção). O principal parâmetro é `NEXT_PUBLIC_API_URL`, que define o endereço base da API utilizada pelo frontend.
+
 ## Desenvolvimento
 
 Para iniciar o servidor de desenvolvimento:
