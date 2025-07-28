@@ -198,6 +198,14 @@ docker-compose build --no-cache
 - **Validação rigorosa** de senhas
 - **Permissões granulares** com django-guardian
 
+### Atualização de Dependências
+Para minimizar vulnerabilidades, execute auditorias frequentes nas dependências do projeto:
+```bash
+pip install pip-audit && pip-audit
+npm audit --audit-level=high
+```
+Mantenha as bibliotecas sempre atualizadas.
+
 ## 📈 Performance
 
 - **Cache Redis** para otimização
