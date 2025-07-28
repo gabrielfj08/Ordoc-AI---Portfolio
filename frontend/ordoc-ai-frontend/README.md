@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ordoc-AI Frontend
 
-## Getting Started
+Este diretório contém a aplicação web desenvolvida em **Next.js 15**.
 
-First, run the development server:
+## Requisitos
+
+- **Node.js 18+**
+- Gerenciador de pacotes `npm` (ou `yarn`/`pnpm`)
+
+Instale as dependências executando:
+
+```bash
+npm install
+```
+
+## Desenvolvimento
+
+Para iniciar o servidor de desenvolvimento:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse `http://localhost:3000` no navegador.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Build de Produção
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Gere os arquivos otimizados com:
 
-## Learn More
+```bash
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+Depois execute a versão compilada:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Testes e Lint
 
-## Deploy on Vercel
+Ainda não há uma suíte de testes automatizados. Utilize o lint para verificar o código:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run lint
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Módulos Migrados
+
+De acordo com o relatório de migração, já existem partes do frontend para:
+
+- **Autenticação e OrdocFlow** (95% concluído)
+- **OrdocCloud** (80% concluído) – gestão de organizações, usuários e políticas
+- **OrdocAir** (60% concluído)
+
+Os módulos **OrdocReports** e **OrdocSign** ainda não foram migrados.
