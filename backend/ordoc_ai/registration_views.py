@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from ordoc_cloud.models import OrdocUser, Organization
 from ordoc_flow.models import ExternalRequester
+from .password_validator import PasswordValidator
 import uuid
 import re
 
@@ -42,10 +43,17 @@ def register_user(request):
                 'status': 400
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate password strength
-        if len(password) < 6:
+        # Validate password strength using custom validator
+        user_info = {
+            'name': name,
+            'email': email
+        }
+        is_valid, errors = PasswordValidator.validate_password(password, user_info)
+
+        if not is_valid:
             return Response({
-                'error': 'Password must be at least 6 characters long',
+                'error': 'Password does not meet security requirements',
+                'details': errors,
                 'status': 400
             }, status=status.HTTP_400_BAD_REQUEST)
         

@@ -8,6 +8,11 @@ import requests
 import json
 import time
 from datetime import datetime
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parent / "backend"))
+from ordoc_ai.password_validator import PasswordValidator
 
 # Configurações
 BASE_URL = "http://localhost:8000"
@@ -139,6 +144,15 @@ def test_with_fake_token():
                 log(f"   Resposta: {response.text[:100]}")
     except Exception as e:
         log(f"❌ Erro no teste com token fake: {e}", "ERROR")
+
+
+def test_password_validation():
+    """Verifica se o PasswordValidator rejeita senhas fracas"""
+    weak_password = "abc123"
+    user_info = {"name": "Test User", "email": "test@example.com"}
+    is_valid, errors = PasswordValidator.validate_password(weak_password, user_info)
+    assert not is_valid
+    assert errors
 
 if __name__ == "__main__":
     success = test_manual_authentication()
