@@ -84,6 +84,8 @@ jobs:
         run: |
           pip install pip-audit
           cd backend
+          # Install poetry export plugin
+          poetry self add poetry-plugin-export
           poetry export --format=requirements.txt --output=temp-requirements.txt --without-hashes
           pip-audit --requirement temp-requirements.txt --format=json --output=audit-report.json || true
           rm temp-requirements.txt
