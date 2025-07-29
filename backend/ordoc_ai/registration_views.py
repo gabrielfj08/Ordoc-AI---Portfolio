@@ -7,12 +7,15 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.db import transaction, IntegrityError
+import logging
 from ordoc_cloud.models import OrdocUser, Organization
 from ordoc_flow.models import ExternalRequester
 from .password_validator import PasswordValidator
 import uuid
 import re
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(['POST'])
@@ -126,9 +129,16 @@ def register_user(request):
             'status': 201
         }, status=status.HTTP_201_CREATED)
         
-    except Exception as e:
+    except IntegrityError as e:
+        logger.exception("Database error during user registration")
         return Response({
-            'error': f'Registration failed: {str(e)}',
+            'error': 'Registration failed due to database error',
+            'status': 500
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.exception("Unexpected error during user registration")
+        return Response({
+            'error': 'Registration failed',
             'status': 500
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -216,9 +226,16 @@ def register_external_requester(request):
             'status': 201
         }, status=status.HTTP_201_CREATED)
         
-    except Exception as e:
+    except IntegrityError as e:
+        logger.exception("Database error during external requester registration")
         return Response({
-            'error': f'Registration failed: {str(e)}',
+            'error': 'Registration failed due to database error',
+            'status': 500
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.exception("Unexpected error during external requester registration")
+        return Response({
+            'error': 'Registration failed',
             'status': 500
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -288,8 +305,15 @@ def create_demo_organization(request):
             'status': 201
         }, status=status.HTTP_201_CREATED)
         
-    except Exception as e:
+    except IntegrityError as e:
+        logger.exception("Database error during demo organization creation")
         return Response({
-            'error': f'Organization creation failed: {str(e)}',
+            'error': 'Organization creation failed due to database error',
+            'status': 500
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.exception("Unexpected error during demo organization creation")
+        return Response({
+            'error': 'Organization creation failed',
             'status': 500
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
