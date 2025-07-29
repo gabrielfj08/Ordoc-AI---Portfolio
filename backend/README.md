@@ -126,6 +126,20 @@ poetry run isort .
 poetry run flake8
 ```
 
+## 🔐 Migração de Chaves Privadas
+
+Com a introdução da criptografia para o campo `private_key` do modelo
+`DigitalCertificate`, é necessário executar uma nova migração para que as chaves
+existentes sejam protegidas. Após atualizar o código, execute:
+
+```bash
+poetry run python manage.py migrate
+```
+
+Essa migração irá criptografar todas as chaves privadas já salvas no banco de
+dados utilizando a chave definida em `PRIVATE_KEY_ENCRYPTION_KEY` (ou o
+`SECRET_KEY` caso a variável não esteja definida).
+
 ## 📝 Próximos Passos
 
 1. Implementar ViewSets e Serializers para OrdocAir

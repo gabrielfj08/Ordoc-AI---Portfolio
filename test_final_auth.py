@@ -7,12 +7,13 @@ Este script demonstra que a autenticação JWT real está funcionando
 perfeitamente com todas as principais APIs do OrdocFlow.
 """
 
+import os
 import requests
 import json
 
 # Configurações
 BASE_URL = "http://localhost:8000"
-TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0IiwiZW1haWwiOiJ0ZXN0ZUBvcmRvY2Zsb3cuY29tIiwibmFtZSI6IlVzdVx1MDBlMXJpbyBUZXN0ZSIsImV4cCI6MTc1MzE5NDczMSwiaWF0IjoxNzUzMTUxNTMxfQ.TQB0PMBw8zFRKc1Nifq4w5bav6MdTAW4_ZoWGs75XdU"
+TOKEN = os.environ.get("TEST_AUTH_TOKEN", "dummy-token")
 
 def test_api(endpoint, description):
     """Testa uma API específica com autenticação"""

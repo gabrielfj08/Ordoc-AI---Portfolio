@@ -24,6 +24,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-ordoc-ai-secret-key-change-in-production')
 
+# Optional custom key used to encrypt sensitive certificate data. When not set,
+# the SECRET_KEY is used as the source for key derivation.
+PRIVATE_KEY_ENCRYPTION_KEY = os.getenv('PRIVATE_KEY_ENCRYPTION_KEY')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 

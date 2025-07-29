@@ -5,10 +5,12 @@ Sistema de assinatura digital do Ordoc-AI
 
 import json
 import uuid
+import os
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.test import TestCase
 from django.urls import reverse
+TEST_PASSWORD = os.environ.get("TEST_USER_PASSWORD", "changeme123")
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from django.contrib.auth import get_user_model
@@ -47,7 +49,7 @@ class OrdocSignTestCase(APITestCase):
         self.user = User.objects.create_user(
             username="teste@ordocsign.com",
             email="teste@ordocsign.com",
-            password="senha123"
+            password=TEST_PASSWORD
         )
         
         # Criar OrdocUser associado
@@ -71,7 +73,7 @@ class OrdocSignTestCase(APITestCase):
         # Fazer login e obter token JWT
         login_response = self.client.post('/api/auth/login/', {
             'email': 'teste@ordocsign.com',
-            'password': 'senha123',
+            'password': TEST_PASSWORD,
             'user_type': 'internal'
         }, HTTP_X_API_SUBDOMAIN='teste')
         
@@ -489,7 +491,7 @@ class SignatureServiceTest(TestCase):
         self.user = User.objects.create_user(
             username="teste@service.com",
             email="teste@service.com",
-            password="senha123"
+            password=TEST_PASSWORD
         )
         
         self.ordoc_user = OrdocUser.objects.create(
@@ -612,7 +614,7 @@ class CertificateServiceTest(TestCase):
         self.user = User.objects.create_user(
             username="cert@service.com",
             email="cert@service.com",
-            password="senha123"
+            password=TEST_PASSWORD
         )
         
         self.ordoc_user = OrdocUser.objects.create(

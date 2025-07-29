@@ -116,8 +116,35 @@ docker-compose ps
 - **Admin Django**: http://localhost:8000/admin
 
 ### **4. Credenciais Padrão**
-- **Admin**: admin@ordoc.ai / admin123
-- **Usuário Demo**: teste@ordocflow.com / 123456
+Defina as credenciais de desenvolvimento através de variáveis de ambiente ou de
+um arquivo `.env`. Os scripts de teste esperam os valores abaixo:
+
+- `ADMIN_EMAIL` e `ADMIN_PASSWORD`
+- `DEMO_USER_EMAIL` e `DEMO_USER_PASSWORD`
+
+Exemplo:
+
+```bash
+export ADMIN_EMAIL=admin@example.com
+export ADMIN_PASSWORD=adminpass
+export DEMO_USER_EMAIL=demo@example.com
+export DEMO_USER_PASSWORD=demopass
+```
+
+Para rodar os testes automatizados configure também:
+
+- `TEST_AUTH_TOKEN` – token JWT usado em `test_final_auth.py`
+- `TEST_PASSWORD`/`TEST_USER_PASSWORD` – senha padrão dos usuários de teste
+
+```bash
+export TEST_AUTH_TOKEN=seu_token_jwt
+export TEST_PASSWORD=demopass
+```
+
+> **Importante:** essas credenciais são usadas apenas para **desenvolvimento local**.
+> Em ambientes de produção forneça valores seguros por meio de variáveis de
+> ambiente. Utilize o arquivo `.env.example` como referência para configurar
+> suas próprias credenciais.
 
 ## 🛠️ Desenvolvimento
 

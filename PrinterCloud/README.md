@@ -79,6 +79,8 @@ In order to index and query documents locally, you need to install [Solr v8.11.x
 ## Pre requisites
 
 - Java v1.8 or higher (preferably v1.8.0_312)
+- [Apache Tika CLI 2.6.0](https://archive.apache.org/dist/tika/2.6.0/tika-app-2.6.0.jar)
+  - download the JAR and save it as `tika-app.jar` in the project root
 
 ## Installing Solr
 

@@ -4,6 +4,7 @@ Script de teste para funcionalidades avançadas do OrdocAir
 Testa Batch Operations, OCR e integração com Solr
 """
 
+import os
 import requests
 import json
 import time
@@ -35,8 +36,8 @@ def print_test_result(test_name, success, details=None):
 def login():
     """Faz login e obtém token JWT"""
     login_data = {
-        "email": "teste@ordocflow.com",
-        "password": "123456",
+        "email": os.environ.get("TEST_USER_EMAIL", "user@example.com"),
+        "password": os.environ.get("TEST_USER_PASSWORD", "changeme123"),
         "user_type": "internal"
     }
     
