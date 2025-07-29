@@ -4,6 +4,7 @@ Script de teste para validar as APIs do módulo OrdocReports
 Testa autenticação JWT e funcionalidades principais do sistema de relatórios
 """
 
+import os
 import requests
 import json
 import sys
@@ -13,10 +14,9 @@ from datetime import datetime
 BASE_URL = "http://localhost:8000"
 API_BASE = f"{BASE_URL}/api/v1/ordoc-reports/api"
 
-# Credenciais de teste
 TEST_USER = {
-    "email": "teste@ordocflow.com",
-    "password": "senha123",
+    "email": os.environ.get("TEST_USER_EMAIL", "user@example.com"),
+    "password": os.environ.get("TEST_USER_PASSWORD", "changeme123"),
     "user_type": "internal"
 }
 

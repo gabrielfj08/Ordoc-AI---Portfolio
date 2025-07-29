@@ -93,7 +93,7 @@ def test_manual_authentication():
     log("   import uuid")
     log("   ")
     log("   # Criar usuário Django")
-    log("   user = User.objects.create_user('teste@ordocflow.com', 'teste@ordocflow.com', 'senha123')")
+    log("   user = User.objects.create_user('teste@ordocflow.com', 'teste@ordocflow.com', '<PASSWORD>')")
     log("   user.first_name = 'Usuário'")
     log("   user.last_name = 'Teste'")
     log("   user.save()")
@@ -106,7 +106,7 @@ def test_manual_authentication():
     log("🔑 5. Teste de login manual:")
     log("   curl -X POST http://localhost:8000/api/auth/login/ \\")
     log("        -H 'Content-Type: application/json' \\")
-    log("        -d '{\"email\":\"teste@ordocflow.com\",\"password\":\"senha123\"}'")
+    log("        -d '{\"email\":\"teste@ordocflow.com\",\"password\":\"<PASSWORD>\"}'")
     
     # Resumo
     log("\n" + "=" * 60)
