@@ -2,9 +2,19 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import signatureService, { SignatureAssignment } from '@/services/signature';
+import AssignmentList from '@/components/ordoc-sign/AssignmentList';
 
 export default function OrdocSignPage() {
+  const { data: assignments, isLoading } = useQuery<SignatureAssignment[]>({
+    queryKey: ['my-signature-assignments'],
+    queryFn: () => signatureService.getMyAssignments(),
+  });
+
+  const hasAssignments = (assignments && assignments.length > 0) || false;
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -23,9 +33,15 @@ export default function OrdocSignPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-20">
-            <p className="text-gray-500 text-lg">Módulo OrdocSign em desenvolvimento</p>
-          </div>
+          {isLoading ? (
+            <p>Carregando...</p>
+          ) : hasAssignments ? (
+            <AssignmentList assignments={assignments as SignatureAssignment[]} />
+          ) : (
+            <div className="text-center py-20">
+              <p className="text-gray-500 text-lg">Nenhuma assinatura pendente</p>
+            </div>
+          )}
         </div>
       </div>
     </ProtectedRoute>
