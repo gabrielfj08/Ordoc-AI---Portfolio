@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { reportsService, DashboardMetrics } from '@/services/reports';
+import { reportsService, type DashboardMetrics } from '@/services/reports';
 
 export default function DashboardMetrics() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);

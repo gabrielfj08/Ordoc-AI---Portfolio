@@ -94,10 +94,10 @@ export default function SignDocumentPage() {
             </div>
             <button
               type="submit"
-              disabled={mutation.isLoading}
+              disabled={mutation.isPending}
               className="px-4 py-2 bg-blue-600 text-white rounded-md"
             >
-              {mutation.isLoading ? 'Enviando...' : 'Assinar'}
+              {mutation.isPending ? 'Enviando...' : 'Assinar'}
             </button>
           </form>
         </div>
