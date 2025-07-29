@@ -14,6 +14,9 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: ordoc_ai
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -21,6 +24,8 @@ jobs:
           --health-retries 5
       redis:
         image: redis:7
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -45,10 +50,12 @@ jobs:
         run: |
           cd backend
           echo "DEBUG=False" > .env
-          echo "SECRET_KEY=test-secret-key-for-ci" >> .env
-          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/ordoc_ai" >> .env
-          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          echo "SECRET_KEY=test-secret-key-for-ci-workflow-ordoc-ai-2025" >> .env
+          echo "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/ordoc_ai" >> .env
+          echo "REDIS_URL=redis://127.0.0.1:6379/0" >> .env
           echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+          echo "CELERY_BROKER_URL=redis://127.0.0.1:6379/0" >> .env
+          echo "CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0" >> .env
       - name: Run Django migrations
         run: |
           cd backend
