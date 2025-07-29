@@ -118,6 +118,10 @@ docker-compose ps
 ### **4. Credenciais Padrão**
 - **Admin**: admin@ordoc.ai / admin123
 - **Usuário Demo**: teste@ordocflow.com / 123456
+> **Importante:** essas credenciais existem apenas para **desenvolvimento local**.
+> Em ambientes de produção, defina valores seguros por meio de variáveis de
+> ambiente. Utilize o arquivo `.env.example` como referência para configurar
+> suas próprias credenciais.
 
 ## 🛠️ Desenvolvimento
 
