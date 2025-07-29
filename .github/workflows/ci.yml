@@ -46,29 +46,40 @@ jobs:
           cd backend
           poetry config virtualenvs.create false
           poetry install --only=main --no-root
-      - name: Set up environment variables
-        run: |
-          cd backend
-          echo "DEBUG=False" > .env
-          echo "SECRET_KEY=test-secret-key-for-ci-workflow-ordoc-ai-2025" >> .env
-          echo "DB_ENGINE=django.db.backends.postgresql" >> .env
-          echo "DB_NAME=ordoc_ai" >> .env
-          echo "DB_USER=postgres" >> .env
-          echo "DB_PASSWORD=postgres" >> .env
-          echo "DB_HOST=127.0.0.1" >> .env
-          echo "DB_PORT=5432" >> .env
-          echo "REDIS_URL=redis://127.0.0.1:6379/0" >> .env
-          echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
-          echo "CELERY_BROKER_URL=redis://127.0.0.1:6379/0" >> .env
-          echo "CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0" >> .env
       - name: Run Django migrations
         run: |
           cd backend
           python manage.py migrate --noinput
+        env:
+          DEBUG: 'False'
+          SECRET_KEY: 'test-secret-key-for-ci-workflow-ordoc-ai-2025'
+          DB_ENGINE: 'django.db.backends.postgresql'
+          DB_NAME: 'ordoc_ai'
+          DB_USER: 'postgres'
+          DB_PASSWORD: 'postgres'
+          DB_HOST: '127.0.0.1'
+          DB_PORT: '5432'
+          REDIS_URL: 'redis://127.0.0.1:6379/0'
+          ALLOWED_HOSTS: 'localhost,127.0.0.1'
+          CELERY_BROKER_URL: 'redis://127.0.0.1:6379/0'
+          CELERY_RESULT_BACKEND: 'redis://127.0.0.1:6379/0'
       - name: Run Django checks
         run: |
           cd backend
           python manage.py check --deploy
+        env:
+          DEBUG: 'False'
+          SECRET_KEY: 'test-secret-key-for-ci-workflow-ordoc-ai-2025'
+          DB_ENGINE: 'django.db.backends.postgresql'
+          DB_NAME: 'ordoc_ai'
+          DB_USER: 'postgres'
+          DB_PASSWORD: 'postgres'
+          DB_HOST: '127.0.0.1'
+          DB_PORT: '5432'
+          REDIS_URL: 'redis://127.0.0.1:6379/0'
+          ALLOWED_HOSTS: 'localhost,127.0.0.1'
+          CELERY_BROKER_URL: 'redis://127.0.0.1:6379/0'
+          CELERY_RESULT_BACKEND: 'redis://127.0.0.1:6379/0'
       - name: Run backend security audit
         run: |
           pip install pip-audit
