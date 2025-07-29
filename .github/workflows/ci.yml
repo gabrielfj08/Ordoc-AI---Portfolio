@@ -40,7 +40,7 @@ jobs:
         run: |
           cd backend
           poetry config virtualenvs.create false
-          poetry install --no-dev
+          poetry install --only=main
       - name: Set up environment variables
         run: |
           cd backend
