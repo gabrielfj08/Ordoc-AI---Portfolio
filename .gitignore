@@ -175,3 +175,6 @@ test_results_*.json
 # Backup files
 *.bak
 *.backup
+
+# Ignore Java archives
+*.jar
