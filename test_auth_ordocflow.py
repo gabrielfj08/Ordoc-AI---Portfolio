@@ -4,6 +4,7 @@ Script de teste completo para autenticação real e APIs do OrdocFlow
 Testa o fluxo completo: registro, login, e uso das APIs com JWT real
 """
 
+import os
 import requests
 import json
 import time
@@ -15,6 +16,9 @@ import uuid
 BASE_URL = "http://localhost:8000"
 AUTH_BASE = f"{BASE_URL}/api/auth"
 API_BASE = f"{BASE_URL}/api/v1/ordoc-flow/api"
+
+# Senha padrão para os usuários de teste
+TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "changeme123")
 
 # Headers padrão
 HEADERS = {
@@ -91,7 +95,7 @@ class OrdocFlowAuthTester:
         timestamp = int(time.time())
         user_data = {
             "email": f"teste{timestamp}@ordocflow.com",
-            "password": "senha123",
+            "password": TEST_PASSWORD,
             "name": f"Usuário Teste {timestamp}",
             "subdomain": "demo"
         }
@@ -130,7 +134,7 @@ class OrdocFlowAuthTester:
         
         login_data = {
             "email": self.user_data['email'],
-            "password": "senha123",
+            "password": TEST_PASSWORD,
             "user_type": "internal"
         }
         

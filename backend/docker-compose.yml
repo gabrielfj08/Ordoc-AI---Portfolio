@@ -73,9 +73,9 @@ services:
       ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,backend"
       
       # Superuser
-      DJANGO_SUPERUSER_USERNAME: admin
-      DJANGO_SUPERUSER_EMAIL: admin@ordoc.ai
-      DJANGO_SUPERUSER_PASSWORD: admin123
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-changeme}
       
       # AWS (for development, use local storage)
       USE_S3: "False"
