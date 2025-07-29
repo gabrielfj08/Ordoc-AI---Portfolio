@@ -8,6 +8,24 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ordoc_ai
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -19,6 +37,18 @@ jobs:
           python -m pip install --upgrade pip
           cd backend
           pip install -r requirements.txt
+      - name: Set up environment variables
+        run: |
+          cd backend
+          echo "DEBUG=False" > .env
+          echo "SECRET_KEY=test-secret-key-for-ci" >> .env
+          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/ordoc_ai" >> .env
+          echo "REDIS_URL=redis://localhost:6379/0" >> .env
+          echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+      - name: Run Django migrations
+        run: |
+          cd backend
+          python manage.py migrate --noinput
       - name: Run Django checks
         run: |
           cd backend
