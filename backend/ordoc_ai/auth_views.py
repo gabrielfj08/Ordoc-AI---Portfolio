@@ -223,6 +223,7 @@ def login_internal_user(email: str, password: str, organization: Organization = 
         })
         
     except Exception as e:
+        logger.exception("Unexpected error during internal user login")
         return Response({
             'error': 'Login failed',
             'status': 500
@@ -275,7 +276,7 @@ def me(request):
         })
         
     except Exception as e:
-        logger.error(f"Error in /api/auth/me/ endpoint: {str(e)}")
+        logger.exception("Error in /api/auth/me/ endpoint")
         return Response({
             'error': 'Failed to get user data',
             'status': 500
@@ -381,7 +382,18 @@ def refresh_token(request):
             'expires_at': JWTService.expiration_time().isoformat(),
         })
         
+    except (User.DoesNotExist, OrdocUser.DoesNotExist, ExternalRequester.DoesNotExist):
+        return Response({
+            'error': 'User not found',
+            'status': 404
+        }, status=status.HTTP_404_NOT_FOUND)
+    except JWTError as e:
+        return Response({
+            'error': str(e),
+            'status': 401
+        }, status=status.HTTP_401_UNAUTHORIZED)
     except Exception as e:
+        logger.exception("Unexpected error during token refresh")
         return Response({
             'error': 'Token refresh failed',
             'status': 401
@@ -482,7 +494,7 @@ def change_password(request):
         })
         
     except Exception as e:
-        logger.error(f"Error in password change for IP {client_ip}: {str(e)}")
+        logger.exception(f"Error in password change for IP {client_ip}")
         return Response({
             'error': 'Erro interno do servidor',
             'status': 500

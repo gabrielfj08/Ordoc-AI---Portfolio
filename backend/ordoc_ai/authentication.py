@@ -6,11 +6,14 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import User
 from django.http import HttpRequest
+import logging
 from ordoc_cloud.models import OrdocUser
 from ordoc_flow.models import ExternalRequester
 from ordoc_air.models import Organization
 from .jwt_service import JWTService, JWTError
 from typing import Tuple, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 class JWTAuthentication(BaseAuthentication):
@@ -55,7 +58,8 @@ class JWTAuthentication(BaseAuthentication):
         except JWTError as e:
             raise AuthenticationFailed(str(e))
         except Exception as e:
-            raise AuthenticationFailed('Authentication failed')
+            logger.exception("Unexpected authentication error")
+            raise AuthenticationFailed('Authentication failed') from e
     
     def get_token_from_header(self, request: HttpRequest) -> Optional[str]:
         """
