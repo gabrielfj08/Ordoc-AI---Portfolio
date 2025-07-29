@@ -13,6 +13,8 @@ import hashlib
 import json
 from datetime import timedelta
 
+from .encryption import EncryptedTextField
+
 User = get_user_model()
 
 
@@ -46,7 +48,7 @@ class DigitalCertificate(models.Model):
     # Dados do certificado
     certificate_data = models.TextField(help_text="Certificado em formato PEM")
     public_key = models.TextField(help_text="Chave pública em formato PEM")
-    private_key = models.TextField(blank=True, null=True, help_text="Chave privada (apenas para A1)")
+    private_key = EncryptedTextField(blank=True, null=True, help_text="Chave privada (apenas para A1)")
     
     # Validade
     valid_from = models.DateTimeField()
