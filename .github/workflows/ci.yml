@@ -51,7 +51,12 @@ jobs:
           cd backend
           echo "DEBUG=False" > .env
           echo "SECRET_KEY=test-secret-key-for-ci-workflow-ordoc-ai-2025" >> .env
-          echo "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/ordoc_ai" >> .env
+          echo "DB_ENGINE=django.db.backends.postgresql" >> .env
+          echo "DB_NAME=ordoc_ai" >> .env
+          echo "DB_USER=postgres" >> .env
+          echo "DB_PASSWORD=postgres" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=5432" >> .env
           echo "REDIS_URL=redis://127.0.0.1:6379/0" >> .env
           echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
           echo "CELERY_BROKER_URL=redis://127.0.0.1:6379/0" >> .env
