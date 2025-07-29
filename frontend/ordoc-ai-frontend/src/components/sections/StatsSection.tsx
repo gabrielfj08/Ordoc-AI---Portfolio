@@ -61,7 +61,7 @@ export const StatsSection: React.FC = () => {
         <div className="text-center mt-16">
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 max-w-4xl mx-auto">
             <h3 className="text-2xl font-bold text-white mb-4">
-              "Ordoc-AI revolucionou minha clínica. Agora posso focar 100% nos meus pacientes."
+              &quot;Ordoc-AI revolucionou minha clínica. Agora posso focar 100% nos meus pacientes.&quot;
             </h3>
             <p className="text-white/90 mb-4">
               Dr. Maria Silva, Cardiologista - Hospital São Paulo

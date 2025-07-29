@@ -183,7 +183,7 @@ export default function LoginPage() {
         console.log('⏰ Executing router.push after timeout');
         router.push('/transition');
       }, 100);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Login failed:', error);
       
       // Security: Handle failed login attempt

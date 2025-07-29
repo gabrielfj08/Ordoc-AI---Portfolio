@@ -281,7 +281,7 @@ function DashboardContent() {
                 <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600">
-                    <span className="font-semibold text-gray-900">Documento "Contrato_2024.pdf"</span> foi aprovado por João Silva
+                    <span className="font-semibold text-gray-900">Documento &quot;Contrato_2024.pdf&quot;</span> foi aprovado por João Silva
                   </p>
                   <span className="text-xs text-gray-400">há 2 horas</span>
                 </div>
@@ -290,7 +290,7 @@ function DashboardContent() {
                 <div className="w-3 h-3 bg-blue-500 rounded-full flex-shrink-0"></div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600">
-                    <span className="font-semibold text-gray-900">Novo workflow</span> "Aprovação de Despesas" foi criado
+                    <span className="font-semibold text-gray-900">Novo workflow</span> &quot;Aprovação de Despesas&quot; foi criado
                   </p>
                   <span className="text-xs text-gray-400">há 4 horas</span>
                 </div>
@@ -299,7 +299,7 @@ function DashboardContent() {
                 <div className="w-3 h-3 bg-purple-500 rounded-full flex-shrink-0"></div>
                 <div className="flex-1">
                   <p className="text-sm text-gray-600">
-                    <span className="font-semibold text-gray-900">Assinatura digital</span> foi concluída no documento "Termo_Aditivo.pdf"
+                    <span className="font-semibold text-gray-900">Assinatura digital</span> foi concluída no documento &quot;Termo_Aditivo.pdf&quot;
                   </p>
                   <span className="text-xs text-gray-400">há 6 horas</span>
                 </div>

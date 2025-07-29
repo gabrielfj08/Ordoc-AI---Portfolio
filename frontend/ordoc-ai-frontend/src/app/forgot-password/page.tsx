@@ -29,8 +29,8 @@ export default function ForgotPasswordPage() {
     try {
       await authService.requestPasswordReset(email);
       setIsSubmitted(true);
-    } catch (error: any) {
-      setError(error.message || 'Erro ao solicitar recuperação de senha');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Erro ao solicitar recuperação de senha');
     } finally {
       setIsSubmitting(false);
     }

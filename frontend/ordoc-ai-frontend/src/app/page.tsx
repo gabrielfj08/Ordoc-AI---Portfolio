@@ -439,7 +439,7 @@ export default function Home() {
               cada minuto desperdiçado na busca de informações representa oportunidades que nunca voltarão.
             </p>
             <div className="revelation-emphasis">
-              "O tempo que você perde hoje é o crescimento que não terá amanhã."
+              &quot;O tempo que você perde hoje é o crescimento que não terá amanhã.&quot;
             </div>
           </div>
         </section>
@@ -454,7 +454,7 @@ export default function Home() {
               já estão operando com desvantagem competitiva irreversível.
             </p>
             <div className="revelation-emphasis">
-              "A transformação digital não é uma escolha. É uma questão de sobrevivência."
+              &quot;A transformação digital não é uma escolha. É uma questão de sobrevivência.&quot;
             </div>
           </div>
         </section>
@@ -470,7 +470,7 @@ export default function Home() {
               trabalha para você.
             </p>
             <div className="revelation-emphasis">
-              "A decisão que você tomar hoje definirá onde sua empresa estará em 5 anos."
+              &quot;A decisão que você tomar hoje definirá onde sua empresa estará em 5 anos.&quot;
             </div>
           </div>
         </section>

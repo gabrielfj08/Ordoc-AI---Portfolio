@@ -153,7 +153,7 @@ const UserSelect = ({
             <div className="px-4 py-3 text-center text-gray-500">
               {query ? (
                 <div>
-                  <p>Nenhum usuário encontrado para "{query}"</p>
+                  <p>Nenhum usuário encontrado para &quot;{query}&quot;</p>
                   <p className="text-xs mt-1">Tente buscar por nome, email ou departamento</p>
                 </div>
               ) : (
