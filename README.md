@@ -117,7 +117,9 @@ docker-compose ps
 
 ### **4. Credenciais Padrão**
 Defina as credenciais de desenvolvimento através de variáveis de ambiente ou de
-um arquivo `.env`. Os scripts de teste esperam os valores abaixo:
+um arquivo `.env`. Um exemplo dessas variáveis está disponível em `.env.example`.
+Copie esse arquivo para `.env` (`cp .env.example .env`) e ajuste os valores
+antes de executar os testes de integração. Os scripts de teste esperam os valores abaixo:
 
 - `ADMIN_EMAIL` e `ADMIN_PASSWORD`
 - `DEMO_USER_EMAIL` e `DEMO_USER_PASSWORD`
