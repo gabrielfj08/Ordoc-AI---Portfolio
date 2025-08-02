@@ -18,6 +18,7 @@ from django.contrib.auth.hashers import check_password
 import logging
 import requests
 from django.conf import settings
+from jwt.exceptions import InvalidTokenError as JWTError
 
 # Configure logger for security events
 logger = logging.getLogger('ordoc_ai.security')
