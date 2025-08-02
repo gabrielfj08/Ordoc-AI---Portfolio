@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { reportsService, ReportTemplate, GenerateReportData } from '@/services/reports';
+import { reportsService } from '@/services/reports';
+import { ReportTemplate, GenerateReportData } from '@/types/ordoc-reports';
 
 interface Props {
   templates: ReportTemplate[];
@@ -23,7 +24,7 @@ export default function CreateReportForm({ templates }: Props) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev: GenerateReportData) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

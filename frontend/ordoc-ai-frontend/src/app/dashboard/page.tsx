@@ -103,14 +103,14 @@ function DashboardContent() {
       title: 'OrdocAir',
       description: 'Gestão completa de documentos com OCR, versionamento e busca avançada.',
       icon: <DocumentIcon />,
-      href: '/ordoc-air',
+      href: '/dashboard/ordoc-air',
       colorClass: 'bg-gradient-to-br from-blue-500 to-blue-600'
     },
     {
       title: 'OrdocFlow',
       description: 'Workflow empresarial avançado com aprovações multi-etapas e automação.',
       icon: <WorkflowIcon />,
-      href: '/ordoc-flow',
+      href: '/dashboard/ordoc-flow',
       colorClass: 'bg-gradient-to-br from-green-500 to-green-600'
     },
     {
@@ -138,7 +138,7 @@ function DashboardContent() {
       title: 'Usuários',
       description: 'Gestão de usuários, departamentos e controle de acesso granular.',
       icon: <UsersIcon />,
-      href: '/users',
+      href: '/dashboard/users',
       colorClass: 'bg-gradient-to-br from-indigo-500 to-indigo-600'
     }
   ];

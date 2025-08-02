@@ -5,14 +5,15 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import signatureService, { DigitalCertificate, SignatureAssignment, SignDocumentPayload } from '@/services/signature';
+import signatureService from '@/services/signature';
+import { DigitalCertificate, SignatureRequestSigner, SignDocumentPayload } from '@/types/ordoc-sign';
 
 export default function SignDocumentPage() {
   const params = useParams();
   const router = useRouter();
   const signerId = params.id as string;
 
-  const { data: assignment, isLoading } = useQuery<SignatureAssignment>({
+  const { data: assignment, isLoading } = useQuery<SignatureRequestSigner>({
     queryKey: ['signature-assignment', signerId],
     queryFn: () => signatureService.getAssignment(signerId),
     enabled: !!signerId,

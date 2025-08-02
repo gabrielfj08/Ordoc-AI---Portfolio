@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { 
   ProcedureTemplate, 
   FilterProcedureTemplatesParams, 
@@ -6,12 +6,10 @@ import {
   ApiResponse 
 } from '@/types/ordoc-flow';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export const procedureTemplatesService = {
   // Get all procedure templates with pagination and filters
   async getProcedureTemplates(params: FilterProcedureTemplatesParams): Promise<PaginatedResponse<ProcedureTemplate>> {
-    const response = await axios.get(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/`, {
+    const response = await api.get(`/api/v1/ordoc-flow/api/procedure-templates/`, {
       params: {
         page: params.page,
         per_page: params.perPage,
@@ -33,14 +31,14 @@ export const procedureTemplatesService = {
 
   // Get single procedure template by ID
   async getProcedureTemplate(id: number): Promise<ProcedureTemplate> {
-    const response = await axios.get(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/${id}/`);
+    const response = await api.get(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`);
     return response.data;
   },
 
   // Create new procedure template
   async createProcedureTemplate(data: Partial<ProcedureTemplate>): Promise<ApiResponse<ProcedureTemplate>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/`, data);
+      const response = await api.post(`/api/v1/ordoc-flow/api/procedure-templates/`, data);
       return {
         success: true,
         data: response.data,
@@ -58,7 +56,7 @@ export const procedureTemplatesService = {
   // Update procedure template
   async updateProcedureTemplate(id: number, data: Partial<ProcedureTemplate>): Promise<ApiResponse<ProcedureTemplate>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/${id}/`, data);
+      const response = await api.put(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -76,7 +74,7 @@ export const procedureTemplatesService = {
   // Delete procedure template
   async deleteProcedureTemplate(id: number): Promise<ApiResponse> {
     try {
-      await axios.delete(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`);
       return {
         success: true,
         message: 'Template de procedimento excluído com sucesso',
@@ -93,7 +91,7 @@ export const procedureTemplatesService = {
   // Activate/Deactivate procedure template
   async toggleProcedureTemplateStatus(id: number, status: 'active' | 'inactive'): Promise<ApiResponse<ProcedureTemplate>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/${id}/`, {
+      const response = await api.patch(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`, {
         status,
       });
       return {
@@ -113,7 +111,7 @@ export const procedureTemplatesService = {
   // Clone procedure template
   async cloneProcedureTemplate(id: number, name: string): Promise<ApiResponse<ProcedureTemplate>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/ordoc-flow/procedure-templates/${id}/clone/`, {
+      const response = await api.post(`/api/v1/ordoc-flow/api/procedure-templates/${id}/clone/`, {
         name,
       });
       return {

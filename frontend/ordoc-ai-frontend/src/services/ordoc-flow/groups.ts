@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { 
   Group, 
   FilterGroupsParams, 
@@ -6,12 +6,10 @@ import {
   ApiResponse 
 } from '@/types/ordoc-flow';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 export const groupsService = {
   // Get all groups with pagination and filters
   async getGroups(params: FilterGroupsParams): Promise<PaginatedResponse<Group>> {
-    const response = await axios.get(`${API_BASE_URL}/api/ordoc-flow/groups/`, {
+    const response = await api.get('/api/v1/ordoc-flow/api/group-requesters/', {
       params: {
         page: params.page,
         per_page: params.perPage,
@@ -30,16 +28,30 @@ export const groupsService = {
     };
   },
 
+  // Export groups
+  async exportGroups(params: FilterGroupsParams): Promise<Blob> {
+    const response = await api.get('/api/v1/ordoc-flow/api/group-requesters/export/', {
+      params: {
+        page: params.page,
+        per_page: params.perPage,
+        ordering: params.direction === 'desc' ? `-${params.order}` : params.order,
+        search: params.q,
+      },
+    });
+    
+    return response.data;
+  },
+
   // Get single group by ID
   async getGroup(id: number): Promise<Group> {
-    const response = await axios.get(`${API_BASE_URL}/api/ordoc-flow/groups/${id}/`);
+    const response = await api.get(`/api/v1/ordoc-flow/api/group-requesters/${id}/`);
     return response.data;
   },
 
   // Create new group
   async createGroup(data: Partial<Group>): Promise<ApiResponse<Group>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/ordoc-flow/groups/`, data);
+      const response = await api.post('/api/v1/ordoc-flow/api/group-requesters/', data);
       return {
         success: true,
         data: response.data,
@@ -54,10 +66,10 @@ export const groupsService = {
     }
   },
 
-  // Update group
+  // Update existing group
   async updateGroup(id: number, data: Partial<Group>): Promise<ApiResponse<Group>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/api/ordoc-flow/groups/${id}/`, data);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/group-requesters/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -75,7 +87,7 @@ export const groupsService = {
   // Delete group
   async deleteGroup(id: number): Promise<ApiResponse> {
     try {
-      await axios.delete(`${API_BASE_URL}/api/ordoc-flow/groups/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/group-requesters/${id}/`);
       return {
         success: true,
         message: 'Grupo excluído com sucesso',
@@ -92,7 +104,7 @@ export const groupsService = {
   // Activate/Deactivate group
   async toggleGroupStatus(id: number, status: 'active' | 'inactive'): Promise<ApiResponse<Group>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/api/ordoc-flow/groups/${id}/`, {
+      const response = await api.patch(`/api/v1/ordoc-flow/api/group-requesters/${id}/`, {
         status,
       });
       return {
@@ -111,16 +123,14 @@ export const groupsService = {
 
   // Get group requesters
   async getGroupRequesters(groupId: number): Promise<any[]> {
-    const response = await axios.get(`${API_BASE_URL}/api/ordoc-flow/groups/${groupId}/requesters/`);
+    const response = await api.get('/api/v1/ordoc-flow/api/group-requesters/', {});
     return response.data.results || response.data;
   },
 
   // Add requester to group
   async addRequesterToGroup(groupId: number, requesterId: number): Promise<ApiResponse> {
     try {
-      await axios.post(`${API_BASE_URL}/api/ordoc-flow/groups/${groupId}/requesters/`, {
-        requester_id: requesterId,
-      });
+      await api.post('/api/v1/ordoc-flow/api/group-requesters/bulk-delete/', { requester_id: requesterId });
       return {
         success: true,
         message: 'Requerente adicionado ao grupo com sucesso',
@@ -137,7 +147,7 @@ export const groupsService = {
   // Remove requester from group
   async removeRequesterFromGroup(groupId: number, requesterId: number): Promise<ApiResponse> {
     try {
-      await axios.delete(`${API_BASE_URL}/api/ordoc-flow/groups/${groupId}/requesters/${requesterId}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/group-requesters/${requesterId}/`);
       return {
         success: true,
         message: 'Requerente removido do grupo com sucesso',

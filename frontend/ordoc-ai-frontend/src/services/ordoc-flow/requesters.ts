@@ -1,12 +1,10 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { Requester, FilterRequestersParams, PaginatedResponse, ApiResponse } from '@/types/ordoc-flow';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const requestersService = {
   async getRequesters(params: FilterRequestersParams): Promise<PaginatedResponse<Requester>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/external-requesters/`, {
+      const response = await api.get(`/api/v1/ordoc-flow/api/external-requesters/`, {
         params: {
           page: params.page,
           per_page: params.perPage,
@@ -32,7 +30,7 @@ export const requestersService = {
 
   async getRequester(id: number): Promise<ApiResponse<Requester>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/external-requesters/${id}/`);
+      const response = await api.get(`/api/v1/ordoc-flow/api/external-requesters/${id}/`);
       return {
         success: true,
         data: response.data,
@@ -49,7 +47,7 @@ export const requestersService = {
 
   async createRequester(data: Partial<Requester>): Promise<ApiResponse<Requester>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/ordoc_flow/api/external-requesters/`, data);
+      const response = await api.post(`/api/v1/ordoc-flow/api/external-requesters/`, data);
       return {
         success: true,
         data: response.data,
@@ -66,7 +64,7 @@ export const requestersService = {
 
   async updateRequester(id: number, data: Partial<Requester>): Promise<ApiResponse<Requester>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/ordoc_flow/api/external-requesters/${id}/`, data);
+      const response = await api.put(`/api/v1/ordoc-flow/api/external-requesters/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -83,7 +81,7 @@ export const requestersService = {
 
   async deleteRequester(id: number): Promise<ApiResponse<void>> {
     try {
-      await axios.delete(`${API_BASE_URL}/ordoc_flow/api/external-requesters/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/external-requesters/${id}/`);
       return {
         success: true,
         message: 'Requerente excluído com sucesso',
@@ -99,7 +97,7 @@ export const requestersService = {
 
   async toggleRequesterStatus(id: number): Promise<ApiResponse<Requester>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/ordoc_flow/api/external-requesters/${id}/toggle_status/`);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/external-requesters/${id}/toggle_status/`);
       return {
         success: true,
         data: response.data,

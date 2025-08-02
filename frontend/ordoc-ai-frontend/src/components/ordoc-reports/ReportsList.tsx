@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatDate } from '@/lib/utils';
 import { reportsService } from '@/services/reports';
+import ReportsFilters, { ReportsFilters as FiltersType } from './ReportsFilters';
 
 // Interface para um relatório gerado
 interface GeneratedReport {
@@ -74,14 +75,141 @@ const formatFileSize = (bytes?: number) => {
 export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState<FiltersType>({
+    search: '',
+    status: '',
+    format: '',
+    dateRange: '',
+    customDateFrom: '',
+    customDateTo: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc',
+  });
   
   // Normalizar dados - pode vir como array direto ou objeto com results
   const reportsList = Array.isArray(reports) ? reports : (reports?.results || []);
   const totalCount = Array.isArray(reports) ? reports.length : (reports?.count || 0);
 
+  // Aplicar filtros e ordenação
+  const filteredAndSortedReports = useMemo(() => {
+    let filtered = [...reportsList];
+
+    // Filtro por busca de texto
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(report => 
+        report.title.toLowerCase().includes(searchLower) ||
+        (report.description && report.description.toLowerCase().includes(searchLower)) ||
+        (report.template_name && report.template_name.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Filtro por status
+    if (filters.status) {
+      filtered = filtered.filter(report => report.status === filters.status);
+    }
+
+    // Filtro por formato
+    if (filters.format) {
+      filtered = filtered.filter(report => report.format.toLowerCase() === filters.format.toLowerCase());
+    }
+
+    // Filtro por data
+    if (filters.dateRange) {
+      const now = new Date();
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
+
+      switch (filters.dateRange) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          endDate = now;
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          endDate = now;
+          break;
+        case 'quarter':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+          endDate = now;
+          break;
+        case 'custom':
+          if (filters.customDateFrom) {
+            startDate = new Date(filters.customDateFrom);
+          }
+          if (filters.customDateTo) {
+            endDate = new Date(filters.customDateTo);
+            endDate.setHours(23, 59, 59, 999); // Incluir o dia inteiro
+          }
+          break;
+      }
+
+      if (startDate || endDate) {
+        filtered = filtered.filter(report => {
+          const reportDate = new Date(report.created_at);
+          if (startDate && reportDate < startDate) return false;
+          if (endDate && reportDate > endDate) return false;
+          return true;
+        });
+      }
+    }
+
+    // Ordenação
+    filtered.sort((a, b) => {
+      let aValue: any = a[filters.sortBy as keyof GeneratedReport];
+      let bValue: any = b[filters.sortBy as keyof GeneratedReport];
+
+      // Tratamento especial para diferentes tipos de dados
+      if (filters.sortBy === 'created_at' || filters.sortBy === 'completed_at') {
+        aValue = new Date(aValue || 0).getTime();
+        bValue = new Date(bValue || 0).getTime();
+      } else if (filters.sortBy === 'file_size') {
+        aValue = aValue || 0;
+        bValue = bValue || 0;
+      } else if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = (bValue || '').toLowerCase();
+      }
+
+      if (aValue < bValue) return filters.sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return filters.sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [reportsList, filters]);
+
+  const filteredCount = filteredAndSortedReports.length;
+
+  // Handlers para filtros
+  const handleFiltersChange = (newFilters: FiltersType) => {
+    setFilters(newFilters);
+    // Limpar seleções quando filtros mudarem
+    setSelectedReports([]);
+  };
+
+  const handleClearFilters = () => {
+    const clearedFilters: FiltersType = {
+      search: '',
+      status: '',
+      format: '',
+      dateRange: '',
+      customDateFrom: '',
+      customDateTo: '',
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+    };
+    setFilters(clearedFilters);
+    setSelectedReports([]);
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedReports(reportsList.map(r => r.id));
+      setSelectedReports(filteredAndSortedReports.map(r => r.id));
     } else {
       setSelectedReports([]);
     }
@@ -165,23 +293,63 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
     }
   };
 
+  // Estado vazio - nenhum relatório
   if (reportsList.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="text-gray-400 mb-4">
-          <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+      <>
+        <ReportsFilters
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onClearFilters={handleClearFilters}
+          totalCount={totalCount}
+          filteredCount={filteredCount}
+        />
+        <div className="text-center py-12">
+          <div className="text-gray-400 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum relatório encontrado</h3>
+          <p className="text-gray-600 mb-4">Você ainda não gerou nenhum relatório.</p>
+          <a
+            href="/dashboard/ordoc-reports/create"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Gerar primeiro relatório
+          </a>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum relatório encontrado</h3>
-        <p className="text-gray-600 mb-4">Você ainda não gerou nenhum relatório.</p>
-        <a
-          href="/dashboard/ordoc-reports/create"
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Gerar primeiro relatório
-        </a>
-      </div>
+      </>
+    );
+  }
+
+  // Estado filtrado vazio - há relatórios mas nenhum passa pelos filtros
+  if (filteredAndSortedReports.length === 0) {
+    return (
+      <>
+        <ReportsFilters
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onClearFilters={handleClearFilters}
+          totalCount={totalCount}
+          filteredCount={filteredCount}
+        />
+        <div className="text-center py-12">
+          <div className="text-gray-400 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum relatório encontrado</h3>
+          <p className="text-gray-600 mb-4">Nenhum relatório corresponde aos filtros aplicados.</p>
+          <button
+            onClick={handleClearFilters}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Limpar filtros
+          </button>
+        </div>
+      </>
     );
   }
 
@@ -230,7 +398,7 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
               <th className="px-6 py-3 text-left">
                 <input
                   type="checkbox"
-                  checked={selectedReports.length === reportsList.length && reportsList.length > 0}
+                  checked={selectedReports.length === filteredAndSortedReports.length && filteredAndSortedReports.length > 0}
                   onChange={(e) => handleSelectAll(e.target.checked)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
@@ -256,7 +424,7 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {reportsList.map((report) => (
+            {filteredAndSortedReports.map((report) => (
               <tr key={report.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <input
@@ -319,7 +487,7 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
                       className="text-red-600 hover:text-red-900"
                       title="Excluir"
                     >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
