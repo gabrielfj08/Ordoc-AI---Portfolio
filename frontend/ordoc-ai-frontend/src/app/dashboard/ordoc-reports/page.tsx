@@ -8,12 +8,10 @@ import { reportsService, ReportTemplate } from '@/services/reports';
 import TemplateList from '@/components/ordoc-reports/TemplateList';
 
 export default function OrdocReportsPage() {
-  const { data: templatesResponse, isLoading } = useQuery({
+  const { data: templates = [], isLoading } = useQuery({
     queryKey: ['report-templates'],
     queryFn: () => reportsService.getTemplates(),
   });
-
-  const templates = templatesResponse?.results || [];
   const hasTemplates = templates.length > 0;
 
   return (
