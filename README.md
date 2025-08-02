@@ -5,6 +5,12 @@
 
 O **Ordoc-AI** é uma plataforma completa de gestão documental e workflow empresarial que combina tecnologias modernas para oferecer uma solução robusta e escalável para organizações de todos os tamanhos.
 
+### ✨ Principais Características
+- 🚀 Interface moderna e intuitiva
+- 🔒 Segurança empresarial robusta
+- 📱 Responsivo para todos os dispositivos
+- ⚡ Performance otimizada
+
 ## 🏗️ Arquitetura do Projeto
 
 ### **Backend (Django)**
