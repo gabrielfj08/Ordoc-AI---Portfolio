@@ -165,3 +165,12 @@ class ReportsService {
 
 export const reportsService = new ReportsService();
 export default reportsService;
+
+export type {
+  ReportTemplate,
+  Report,
+  ReportSchedule,
+  ReportShare,
+  ReportMetric,
+  DashboardMetrics
+} from '@/types/ordoc-reports';

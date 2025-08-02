@@ -258,3 +258,13 @@ class SignatureService {
 
 export const signatureService = new SignatureService();
 export default signatureService;
+
+export type { 
+  DigitalCertificate,
+  SignatureTemplate,
+  SignatureRequest,
+  SignatureRequestSigner as SignatureAssignment,
+  DocumentSignature,
+  SignatureBatch,
+  SignatureAuditLog
+} from '@/types/ordoc-sign';
