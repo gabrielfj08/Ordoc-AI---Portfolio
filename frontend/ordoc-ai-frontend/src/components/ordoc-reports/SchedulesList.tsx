@@ -280,10 +280,8 @@ export default function SchedulesList({ schedules, onRefresh }: SchedulesListPro
                         <div className="text-sm text-gray-500">{schedule.description}</div>
                       )}
                       <div className="text-xs text-gray-400 mt-1">
-                        Horário: {schedule.run_time}
-                        {schedule.created_by_name && (
-                          <span className="ml-2">• Criado por: {schedule.created_by_name}</span>
-                        )}
+                        Frequência: {schedule.frequency}
+                        <span className="ml-2">• ID: {schedule.created_by_id}</span>
                       </div>
                     </div>
                   </td>

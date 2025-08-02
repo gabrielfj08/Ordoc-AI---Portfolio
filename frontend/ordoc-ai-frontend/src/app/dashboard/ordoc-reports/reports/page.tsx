@@ -20,7 +20,7 @@ export default function ReportsListPage() {
     queryFn: () => reportsService.getReports(filters),
   });
 
-  const reports = reportsData?.results || [];
+  const reports = reportsData || [];
 
   return (
     <ProtectedRoute>
@@ -55,9 +55,8 @@ export default function ReportsListPage() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <ReportsFilter 
-            filters={filters} 
-            onFiltersChange={setFilters} 
-            loading={isLoading} 
+            onFilterChange={setFilters} 
+            initialFilters={filters} 
           />
           
           {isLoading ? (
