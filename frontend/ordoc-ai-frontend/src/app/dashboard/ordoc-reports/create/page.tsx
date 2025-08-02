@@ -8,10 +8,12 @@ import { reportsService, ReportTemplate } from '@/services/reports';
 import CreateReportForm from '@/components/ordoc-reports/CreateReportForm';
 
 export default function CreateReportPage() {
-  const { data: templates, isLoading } = useQuery<ReportTemplate[]>({
+  const { data: templatesResponse, isLoading } = useQuery({
     queryKey: ['report-templates'],
     queryFn: () => reportsService.getTemplates(),
   });
+
+  const templates = templatesResponse?.results || [];
 
   return (
     <ProtectedRoute>

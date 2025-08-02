@@ -266,5 +266,9 @@ export type {
   SignatureRequestSigner as SignatureAssignment,
   DocumentSignature,
   SignatureBatch,
-  SignatureAuditLog
+  SignatureAuditLog,
+  SignDocumentPayload,
+  UploadCertificateData,
+  CreateSignatureRequestData,
+  CreateSignatureBatchData
 } from '@/types/ordoc-sign';

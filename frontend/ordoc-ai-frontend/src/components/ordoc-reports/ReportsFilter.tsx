@@ -5,24 +5,25 @@ import { Search, Filter } from 'lucide-react';
 import { FilterReportsParams } from '@/types/ordoc-reports';
 
 interface ReportsFilterProps {
-  onFilterChange: (filters: FilterReportsParams) => void;
-  initialFilters?: FilterReportsParams;
+  filters?: FilterReportsParams;
+  onFiltersChange: (filters: FilterReportsParams) => void;
+  loading?: boolean;
 }
 
-export default function ReportsFilter({ onFilterChange, initialFilters = {} }: ReportsFilterProps) {
-  const [filters, setFilters] = useState<FilterReportsParams>(initialFilters);
+export default function ReportsFilter({ filters: externalFilters = {}, onFiltersChange, loading = false }: ReportsFilterProps) {
+  const [filters, setFilters] = useState<FilterReportsParams>(externalFilters);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleFilterChange = (key: keyof FilterReportsParams, value: any) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
-    onFilterChange(newFilters);
+    onFiltersChange(newFilters);
   };
 
   const clearFilters = () => {
     const clearedFilters: FilterReportsParams = { page: 1, page_size: 20 };
     setFilters(clearedFilters);
-    onFilterChange(clearedFilters);
+    onFiltersChange(clearedFilters);
   };
 
   return (
