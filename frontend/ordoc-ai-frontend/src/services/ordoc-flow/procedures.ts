@@ -1,12 +1,10 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { Procedure, FilterProceduresParams, PaginatedResponse, ApiResponse } from '@/types/ordoc-flow';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const proceduresService = {
   async getProcedures(params: FilterProceduresParams): Promise<PaginatedResponse<Procedure>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/procedures/`, {
+      const response = await api.get('/api/v1/ordoc-flow/api/procedures/', {
         params: {
           page: params.page,
           per_page: params.perPage,
@@ -33,7 +31,7 @@ export const proceduresService = {
 
   async getProcedure(id: number): Promise<ApiResponse<Procedure>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/procedures/${id}/`);
+      const response = await api.get(`/api/v1/ordoc-flow/api/procedures/${id}/`);
       return {
         success: true,
         data: response.data,
@@ -50,7 +48,7 @@ export const proceduresService = {
 
   async createProcedure(data: Partial<Procedure>): Promise<ApiResponse<Procedure>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/ordoc_flow/api/procedures/`, data);
+      const response = await api.post('/api/v1/ordoc-flow/api/procedures/', data);
       return {
         success: true,
         data: response.data,
@@ -67,7 +65,7 @@ export const proceduresService = {
 
   async updateProcedure(id: number, data: Partial<Procedure>): Promise<ApiResponse<Procedure>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/ordoc_flow/api/procedures/${id}/`, data);
+      const response = await api.put(`/api/v1/ordoc-flow/api/procedures/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -84,7 +82,7 @@ export const proceduresService = {
 
   async deleteProcedure(id: number): Promise<ApiResponse<void>> {
     try {
-      await axios.delete(`${API_BASE_URL}/ordoc_flow/api/procedures/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/procedures/${id}/`);
       return {
         success: true,
         message: 'Procedimento excluído com sucesso',
@@ -100,7 +98,7 @@ export const proceduresService = {
 
   async toggleProcedureStatus(id: number): Promise<ApiResponse<Procedure>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/ordoc_flow/api/procedures/${id}/toggle_status/`);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/procedures/${id}/toggle_status/`);
       return {
         success: true,
         data: response.data,

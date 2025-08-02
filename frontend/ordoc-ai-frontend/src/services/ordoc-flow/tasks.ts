@@ -1,12 +1,10 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { Task, FilterTasksParams, PaginatedResponse, ApiResponse } from '@/types/ordoc-flow';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const tasksService = {
   async getTasks(params: FilterTasksParams): Promise<PaginatedResponse<Task>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/tasks/`, {
+      const response = await api.get(`/api/v1/ordoc-flow/api/tasks/`, {
         params: {
           page: params.page,
           per_page: params.perPage,
@@ -34,7 +32,7 @@ export const tasksService = {
 
   async getTask(id: number): Promise<ApiResponse<Task>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/tasks/${id}/`);
+      const response = await api.get(`/api/v1/ordoc-flow/api/tasks/${id}/`);
       return {
         success: true,
         data: response.data,
@@ -51,7 +49,7 @@ export const tasksService = {
 
   async createTask(data: Partial<Task>): Promise<ApiResponse<Task>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/ordoc_flow/api/tasks/`, data);
+      const response = await api.post(`/api/v1/ordoc-flow/api/tasks/`, data);
       return {
         success: true,
         data: response.data,
@@ -68,7 +66,7 @@ export const tasksService = {
 
   async updateTask(id: number, data: Partial<Task>): Promise<ApiResponse<Task>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/ordoc_flow/api/tasks/${id}/`, data);
+      const response = await api.put(`/api/v1/ordoc-flow/api/tasks/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -85,7 +83,7 @@ export const tasksService = {
 
   async deleteTask(id: number): Promise<ApiResponse<void>> {
     try {
-      await axios.delete(`${API_BASE_URL}/ordoc_flow/api/tasks/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/tasks/${id}/`);
       return {
         success: true,
         message: 'Tarefa excluída com sucesso',
@@ -101,7 +99,7 @@ export const tasksService = {
 
   async toggleTaskStatus(id: number): Promise<ApiResponse<Task>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/ordoc_flow/api/tasks/${id}/toggle_status/`);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/tasks/${id}/toggle_status/`);
       return {
         success: true,
         data: response.data,

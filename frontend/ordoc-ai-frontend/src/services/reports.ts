@@ -61,7 +61,12 @@ class ReportsService {
     return response.data;
   }
 
-  async updateSchedule(id: string, data: Record<string, any>): Promise<ReportSchedule> {
+  async getSchedule(id: string): Promise<any> {
+    const response = await api.get(`${this.base}/schedules/${id}/`);
+    return response.data;
+  }
+
+  async updateSchedule(id: string, data: any): Promise<any> {
     const response = await api.put(`${this.base}/schedules/${id}/`, data);
     return response.data;
   }
@@ -71,18 +76,13 @@ class ReportsService {
     return response.data;
   }
 
-  async activateSchedule(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/schedules/${id}/activate/`);
+  async toggleScheduleStatus(id: string, status: 'active' | 'paused' | 'inactive'): Promise<any> {
+    const response = await api.patch(`${this.base}/schedules/${id}/`, { status });
     return response.data;
   }
 
-  async pauseSchedule(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/schedules/${id}/pause/`);
-    return response.data;
-  }
-
-  async runScheduleNow(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/schedules/${id}/run_now/`);
+  async bulkUpdateSchedules(ids: string[], data: any): Promise<any> {
+    const response = await api.post(`${this.base}/schedules/bulk_update/`, { ids, data });
     return response.data;
   }
 

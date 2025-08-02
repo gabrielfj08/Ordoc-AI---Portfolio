@@ -1,12 +1,10 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { TaskTemplate, FilterTaskTemplatesParams, PaginatedResponse, ApiResponse } from '@/types/ordoc-flow';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const taskTemplatesService = {
   async getTaskTemplates(params: FilterTaskTemplatesParams): Promise<PaginatedResponse<TaskTemplate>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/task-templates/`, {
+      const response = await api.get('/api/v1/ordoc-flow/api/procedure-templates/', {
         params: {
           page: params.page,
           per_page: params.perPage,
@@ -32,7 +30,7 @@ export const taskTemplatesService = {
 
   async getTaskTemplate(id: number): Promise<ApiResponse<TaskTemplate>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/task-templates/${id}/`);
+      const response = await api.get(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`);
       return {
         success: true,
         data: response.data,
@@ -49,7 +47,7 @@ export const taskTemplatesService = {
 
   async createTaskTemplate(data: Partial<TaskTemplate>): Promise<ApiResponse<TaskTemplate>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/ordoc_flow/api/task-templates/`, data);
+      const response = await api.post('/api/v1/ordoc-flow/api/procedure-templates/', data);
       return {
         success: true,
         data: response.data,
@@ -66,7 +64,7 @@ export const taskTemplatesService = {
 
   async updateTaskTemplate(id: number, data: Partial<TaskTemplate>): Promise<ApiResponse<TaskTemplate>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/ordoc_flow/api/task-templates/${id}/`, data);
+      const response = await api.put(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -83,7 +81,7 @@ export const taskTemplatesService = {
 
   async deleteTaskTemplate(id: number): Promise<ApiResponse<void>> {
     try {
-      await axios.delete(`${API_BASE_URL}/ordoc_flow/api/task-templates/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/procedure-templates/${id}/`);
       return {
         success: true,
         message: 'Template de tarefa excluído com sucesso',
@@ -99,7 +97,7 @@ export const taskTemplatesService = {
 
   async toggleTaskTemplateStatus(id: number): Promise<ApiResponse<TaskTemplate>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/ordoc_flow/api/task-templates/${id}/toggle_status/`);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/procedure-templates/${id}/toggle_status/`);
       return {
         success: true,
         data: response.data,

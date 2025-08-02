@@ -1,12 +1,10 @@
-import axios from 'axios';
+import api from '@/services/auth';
 import { Signature, FilterSignaturesParams, PaginatedResponse, ApiResponse } from '@/types/ordoc-flow';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const signaturesService = {
   async getSignatures(params: FilterSignaturesParams): Promise<PaginatedResponse<Signature>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/approval-instances/`, {
+      const response = await api.get(`/api/v1/ordoc-flow/api/approval-instances/`, {
         params: {
           page: params.page,
           per_page: params.perPage,
@@ -34,7 +32,7 @@ export const signaturesService = {
 
   async getSignature(id: number): Promise<ApiResponse<Signature>> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ordoc_flow/api/approval-instances/${id}/`);
+      const response = await api.get(`/api/v1/ordoc-flow/api/approval-instances/${id}/`);
       return {
         success: true,
         data: response.data,
@@ -51,7 +49,7 @@ export const signaturesService = {
 
   async createSignature(data: Partial<Signature>): Promise<ApiResponse<Signature>> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/ordoc_flow/api/approval-instances/`, data);
+      const response = await api.post('/api/v1/ordoc-flow/api/approval-instances/', data);
       return {
         success: true,
         data: response.data,
@@ -68,7 +66,7 @@ export const signaturesService = {
 
   async updateSignature(id: number, data: Partial<Signature>): Promise<ApiResponse<Signature>> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/ordoc_flow/api/approval-instances/${id}/`, data);
+      const response = await api.put(`/api/v1/ordoc-flow/api/approval-instances/${id}/`, data);
       return {
         success: true,
         data: response.data,
@@ -85,7 +83,7 @@ export const signaturesService = {
 
   async deleteSignature(id: number): Promise<ApiResponse<void>> {
     try {
-      await axios.delete(`${API_BASE_URL}/ordoc_flow/api/approval-instances/${id}/`);
+      await api.delete(`/api/v1/ordoc-flow/api/approval-instances/${id}/`);
       return {
         success: true,
         message: 'Assinatura excluída com sucesso',
@@ -101,7 +99,7 @@ export const signaturesService = {
 
   async approveSignature(id: number): Promise<ApiResponse<Signature>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/ordoc_flow/api/approval-instances/${id}/approve/`);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/approval-instances/${id}/approve/`);
       return {
         success: true,
         data: response.data,
@@ -118,7 +116,7 @@ export const signaturesService = {
 
   async rejectSignature(id: number): Promise<ApiResponse<Signature>> {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/ordoc_flow/api/approval-instances/${id}/reject/`);
+      const response = await api.patch(`/api/v1/ordoc-flow/api/approval-instances/${id}/reject/`);
       return {
         success: true,
         data: response.data,
