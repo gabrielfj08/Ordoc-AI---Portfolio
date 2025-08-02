@@ -12,8 +12,7 @@ export default function OrdocReportsPage() {
     queryKey: ['report-templates'],
     queryFn: () => reportsService.getTemplates(),
   });
-
-  const hasTemplates = (templates && templates.length > 0) || false;
+  const hasTemplates = templates.length > 0;
 
   return (
     <ProtectedRoute>
@@ -41,7 +40,7 @@ export default function OrdocReportsPage() {
           {isLoading ? (
             <p>Carregando...</p>
           ) : hasTemplates ? (
-            <TemplateList templates={templates as ReportTemplate[]} />
+            <TemplateList templates={templates} />
           ) : (
             <div className="text-center py-20">
               <p className="text-gray-500 text-lg">Em construção</p>

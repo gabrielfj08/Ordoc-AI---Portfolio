@@ -172,5 +172,12 @@ export type {
   ReportSchedule,
   ReportShare,
   ReportMetric,
-  DashboardMetrics
+  DashboardMetrics,
+  GenerateReportData,
+  CreateReportScheduleData,
+  CreateReportShareData,
+  FilterReportTemplatesParams,
+  FilterReportsParams,
+  FilterReportSchedulesParams,
+  FilterReportSharesParams
 } from '@/types/ordoc-reports';
