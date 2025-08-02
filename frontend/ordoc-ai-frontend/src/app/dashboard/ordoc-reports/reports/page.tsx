@@ -1,17 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { reportsService } from '@/services/reports';
 import ReportsList from '@/components/ordoc-reports/ReportsList';
+import ReportsFilter from '@/components/ordoc-reports/ReportsFilter';
+import { FilterReportsParams } from '@/types/ordoc-reports';
 
 export default function ReportsListPage() {
-  const { data: reports, isLoading, error, refetch } = useQuery({
-    queryKey: ['reports-list'],
-    queryFn: () => reportsService.getReports(),
+  const [filters, setFilters] = useState<FilterReportsParams>({
+    page: 1,
+    page_size: 20
   });
+
+  const { data: reportsData, isLoading, error, refetch } = useQuery({
+    queryKey: ['reports-list', filters],
+    queryFn: () => reportsService.getReports(filters),
+  });
+
+  const reports = reportsData?.results || [];
 
   return (
     <ProtectedRoute>
@@ -45,6 +54,12 @@ export default function ReportsListPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <ReportsFilter 
+            filters={filters} 
+            onFiltersChange={setFilters} 
+            loading={isLoading} 
+          />
+          
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { formatDate } from '@/lib/utils';
+import { reportsService } from '@/services/reports';
 
 // Interface para um relatório gerado
 interface GeneratedReport {
@@ -72,6 +73,7 @@ const formatFileSize = (bytes?: number) => {
 
 export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
   
   // Normalizar dados - pode vir como array direto ou objeto com results
   const reportsList = Array.isArray(reports) ? reports : (reports?.results || []);
@@ -90,6 +92,40 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
       setSelectedReports(prev => [...prev, reportId]);
     } else {
       setSelectedReports(prev => prev.filter(id => id !== reportId));
+    }
+  };
+
+  const handleBatchDownload = async () => {
+    if (selectedReports.length === 0) return;
+    
+    setLoading(true);
+    try {
+      const result = await reportsService.exportReports(selectedReports, 'zip');
+      if (result.download_url) {
+        window.open(result.download_url, '_blank');
+      }
+    } catch (error) {
+      console.error('Erro ao fazer download em lote:', error);
+      alert('Erro ao fazer download dos relatórios. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedReports.length === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir ${selectedReports.length} relatório(s)?`)) return;
+    
+    setLoading(true);
+    try {
+      await Promise.all(selectedReports.map(id => reportsService.deleteReport(id)));
+      setSelectedReports([]);
+      onRefresh();
+    } catch (error) {
+      console.error('Erro ao excluir relatórios em lote:', error);
+      alert('Erro ao excluir relatórios. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,14 +204,16 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
           {selectedReports.length > 0 && (
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => alert('Funcionalidade de download em lote será implementada')}
-                className="px-3 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                onClick={handleBatchDownload}
+                disabled={loading}
+                className="px-3 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50"
               >
                 Download Selecionados
               </button>
               <button
-                onClick={() => alert('Funcionalidade de exclusão em lote será implementada')}
-                className="px-3 py-2 text-sm text-red-700 bg-red-100 rounded-md hover:bg-red-200"
+                onClick={handleBatchDelete}
+                disabled={loading}
+                className="px-3 py-2 text-sm text-red-700 bg-red-100 rounded-md hover:bg-red-200 disabled:opacity-50"
               >
                 Excluir Selecionados
               </button>
