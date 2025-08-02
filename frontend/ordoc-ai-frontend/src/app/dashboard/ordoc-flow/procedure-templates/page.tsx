@@ -79,7 +79,8 @@ const ProcedureTemplatesPage = () => {
 
   const handleToggleStatus = async (template: ProcedureTemplate) => {
     try {
-      await procedureTemplatesService.toggleProcedureTemplateStatus(template.id);
+      const newStatus = template.status === 'active' ? 'inactive' : 'active';
+      await procedureTemplatesService.toggleProcedureTemplateStatus(template.id, newStatus);
       loadProcedureTemplates();
     } catch (error) {
       console.error('Erro ao alterar status do template:', error);
