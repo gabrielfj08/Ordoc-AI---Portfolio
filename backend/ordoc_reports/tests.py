@@ -61,6 +61,11 @@ class BaseAPITestCase(APITestCase):
             HTTP_X_API_SUBDOMAIN=self.organization.subdomain,
         )
 
+    def unauthenticated_client(self):
+        client = self.client_class()
+        client.credentials(HTTP_X_API_SUBDOMAIN=self.organization.subdomain)
+        return client
+
 
 class ReportTemplateAPITests(BaseAPITestCase):
     """CRUD tests for ReportTemplate endpoints."""
@@ -120,6 +125,12 @@ class ReportTemplateAPITests(BaseAPITestCase):
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 404)
 
+    def test_templates_requires_authentication(self):
+        url = "/api/v1/ordoc-reports/api/templates/"
+        client = self.unauthenticated_client()
+        response = client.get(url)
+        self.assertEqual(response.status_code, 401)
+
 
 class ReportGenerationAPITests(BaseAPITestCase):
     """Tests for report generation endpoint."""
@@ -168,6 +179,21 @@ class ReportGenerationAPITests(BaseAPITestCase):
         }
         response = self.client.post(url, payload, format="json")
         self.assertEqual(response.status_code, 404)
+
+    def test_generate_report_requires_authentication(self):
+        template = self._create_template()
+        url = "/api/v1/ordoc-reports/api/reports/generate/"
+        payload = {
+            "template_id": str(template.id),
+            "title": "Report 1",
+            "format": "json",
+            "filters": {},
+            "parameters": {},
+            "expires_in_days": 1,
+        }
+        client = self.unauthenticated_client()
+        response = client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 401)
 
 
 class ReportScheduleAPITests(BaseAPITestCase):
@@ -245,6 +271,12 @@ class ReportScheduleAPITests(BaseAPITestCase):
         # Ensure deleted
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 404)
+
+    def test_schedules_requires_authentication(self):
+        url = "/api/v1/ordoc-reports/api/schedules/"
+        client = self.unauthenticated_client()
+        response = client.get(url)
+        self.assertEqual(response.status_code, 401)
 
 
 class ReportShareAPITests(BaseAPITestCase):
