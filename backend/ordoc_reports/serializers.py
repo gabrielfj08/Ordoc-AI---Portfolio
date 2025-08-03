@@ -173,25 +173,35 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"Email inválido: {email}")
         
         return value
-    
+
     def validate_default_filters(self, value):
         """Valida os filtros padrão"""
         if not isinstance(value, dict):
             raise serializers.ValidationError("Filtros padrão devem ser um objeto JSON válido")
-        
+
         return value
-    
+
+    def validate_next_run(self, value):
+        """Garante que a próxima execução não esteja no passado"""
+        if value and value < timezone.now():
+            raise serializers.ValidationError(
+                "Próxima execução deve ser uma data futura"
+            )
+        return value
+
     def validate_cron_expression(self, value):
         """Valida a expressão cron (básica)"""
-        if value and self.initial_data.get('frequency') == 'custom':
-            # Validação básica da expressão cron (5 campos separados por espaço)
-            if not value.strip():
-                raise serializers.ValidationError("Expressão cron é obrigatória para frequência personalizada")
-            
+        if self.initial_data.get('frequency') == 'custom':
+            if not value or not value.strip():
+                raise serializers.ValidationError(
+                    "Expressão cron é obrigatória para frequência personalizada"
+                )
             parts = value.strip().split()
             if len(parts) != 5:
-                raise serializers.ValidationError("Expressão cron deve ter 5 campos (minuto hora dia mês dia_semana)")
-        
+                raise serializers.ValidationError(
+                    "Expressão cron deve ter 5 campos (minuto hora dia mês dia_semana)"
+                )
+
         return value
 
 
