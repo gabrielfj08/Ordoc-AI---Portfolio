@@ -6,9 +6,10 @@ import { SignatureAssignment } from '@/services/signature';
 
 interface AssignmentListProps {
   assignments: SignatureAssignment[];
+  onSign?: (id: string) => void;
 }
 
-export default function AssignmentList({ assignments }: AssignmentListProps) {
+export default function AssignmentList({ assignments, onSign }: AssignmentListProps) {
   if (!assignments.length) {
     return (
       <p className="text-gray-500">Nenhuma assinatura pendente.</p>
@@ -40,12 +41,21 @@ export default function AssignmentList({ assignments }: AssignmentListProps) {
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                 {assignment.can_sign ? (
-                  <Link
-                    href={`/dashboard/ordoc-sign/sign/${assignment.id}`}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    Assinar
-                  </Link>
+                  onSign ? (
+                    <button
+                      onClick={() => onSign(assignment.id)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Assinar
+                    </button>
+                  ) : (
+                    <Link
+                      href={`/dashboard/ordoc-sign/sign/${assignment.id}`}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Assinar
+                    </Link>
+                  )
                 ) : (
                   <span className="text-gray-400">-</span>
                 )}
