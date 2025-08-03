@@ -252,7 +252,7 @@ class OCRResultViewSet(BaseViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'engine', 'language']
-    search_fields = ['document__original_filename', 'extracted_text']
+    search_fields = ['document__name', 'extracted_text']
     ordering_fields = ['created_at', 'processed_at', 'confidence_score']
     ordering = ['-created_at']
     
@@ -388,7 +388,7 @@ class SolrIndexViewSet(BaseViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status']
-    search_fields = ['document__original_filename', 'solr_id']
+    search_fields = ['document__name', 'solr_id']
     ordering_fields = ['created_at', 'indexed_at', 'last_sync_at']
     ordering = ['-created_at']
     

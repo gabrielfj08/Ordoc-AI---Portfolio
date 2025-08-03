@@ -41,7 +41,7 @@ def process_document_ocr(self, document_id):
         from .models import Document
         
         document = Document.objects.get(id=document_id)
-        logger.info(f"Iniciando processamento OCR para documento: {document.original_filename}")
+        logger.info(f"Iniciando processamento OCR para documento: {document.name}")
         
         extracted_text = ""
         
@@ -60,7 +60,7 @@ def process_document_ocr(self, document_id):
             pass
         document.save()
         
-        logger.info(f"OCR concluído para documento: {document.original_filename}")
+        logger.info(f"OCR concluído para documento: {document.name}")
         
         # Indexar no Solr (será implementado posteriormente)
         # index_document_in_solr.delay(document_id)
@@ -139,15 +139,15 @@ def index_document_in_solr(document_id):
         from .models import Document
 
         document = Document.objects.get(id=document_id)
-        logger.info(f"Indexando documento no Solr: {document.original_filename}")
+        logger.info(f"Indexando documento no Solr: {document.name}")
 
         solr = SolrService()
         doc_data = {
             'id': str(document.id),
             'extracted_text': document.extracted_text or '',
             'metadata': {
-                'filename': document.original_filename,
-                'content_type': document.content_type or '',
+                'filename': document.name,
+                'content_type': document.mime_type or '',
                 'file_size': document.file_size or 0,
             }
         }
@@ -231,11 +231,11 @@ def generate_document_thumbnail(document_id):
             # Salvar thumbnail (implementar campo thumbnail no modelo)
             # thumbnail_io = io.BytesIO()
             # image.save(thumbnail_io, format='JPEG')
-            # document.thumbnail.save(f"thumb_{document.original_filename}.jpg", thumbnail_io)
+        # document.thumbnail.save(f"thumb_{document.name}.jpg", thumbnail_io)
             
             document.file.close()
         
-        logger.info(f"Thumbnail gerado para: {document.original_filename}")
+        logger.info(f"Thumbnail gerado para: {document.name}")
         
         return {
             'document_id': str(document_id),

@@ -9,7 +9,7 @@ from ordoc_air.models import Document
 def test_document_enqueue_schedules_task_and_records_user(django_user_model):
     user = django_user_model.objects.create(username="tester")
     doc = Document.objects.create(
-        original_filename="doc.pdf",
+        name="doc.pdf",
         file=SimpleUploadedFile("doc.pdf", b"data"),
         prn="prn-1",
     )
@@ -25,7 +25,7 @@ def test_document_enqueue_schedules_task_and_records_user(django_user_model):
 @pytest.mark.django_db
 def test_process_document_ocr_success_marks_processed():
     doc = Document.objects.create(
-        original_filename="doc.pdf",
+        name="doc.pdf",
         file=SimpleUploadedFile("doc.pdf", b"data"),
         prn="prn-2",
     )
@@ -43,7 +43,7 @@ def test_process_document_ocr_success_marks_processed():
 @pytest.mark.django_db
 def test_process_document_ocr_failure_marks_failed():
     doc = Document.objects.create(
-        original_filename="doc.pdf",
+        name="doc.pdf",
         file=SimpleUploadedFile("doc.pdf", b"data"),
         prn="prn-3",
     )
@@ -62,11 +62,11 @@ def test_process_document_ocr_failure_marks_failed():
 @pytest.mark.django_db
 def test_index_document_in_solr_success_marks_processed():
     doc = Document.objects.create(
-        original_filename="doc.pdf",
+        name="doc.pdf",
         file=SimpleUploadedFile("doc.pdf", b"data"),
         prn="prn-4",
         file_size=4,
-        content_type="application/pdf",
+        mime_type="application/pdf",
     )
     with patch("ordoc_air.tasks.process_document_ocr.delay"):
         doc.enqueue()
@@ -93,11 +93,11 @@ def test_index_document_in_solr_success_marks_processed():
 @pytest.mark.django_db
 def test_index_document_in_solr_failure_marks_failed():
     doc = Document.objects.create(
-        original_filename="doc.pdf",
+        name="doc.pdf",
         file=SimpleUploadedFile("doc.pdf", b"data"),
         prn="prn-5",
         file_size=4,
-        content_type="application/pdf",
+        mime_type="application/pdf",
     )
     with patch("ordoc_air.tasks.process_document_ocr.delay"):
         doc.enqueue()

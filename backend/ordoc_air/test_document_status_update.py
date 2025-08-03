@@ -23,7 +23,7 @@ def test_update_status_valid_transitions(django_user_model):
     client = APIClient()
     client.force_authenticate(user=user)
     doc = Document.objects.create(
-        original_filename='doc.pdf',
+        name='doc.pdf',
         file=SimpleUploadedFile('doc.pdf', b'file', content_type='application/pdf'),
         prn='doc-prn',
         directory=directory,
@@ -60,7 +60,7 @@ def test_update_status_invalid_transition(django_user_model):
     client = APIClient()
     client.force_authenticate(user=user)
     doc = Document.objects.create(
-        original_filename='doc.pdf',
+        name='doc.pdf',
         file=SimpleUploadedFile('doc.pdf', b'file', content_type='application/pdf'),
         prn='doc-prn',
         directory=directory,

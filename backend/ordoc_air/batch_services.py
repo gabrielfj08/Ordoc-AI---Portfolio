@@ -133,7 +133,7 @@ class BatchOperationService:
                 # Copiar documento
                 original_doc = item.document
                 new_doc = Document.objects.create(
-                    original_filename=f"Cópia de {original_doc.original_filename}",
+                    name=f"Cópia de {original_doc.name}",
                     file=original_doc.file,
                     mime_type=original_doc.mime_type,
                     file_size=original_doc.file_size,
@@ -179,7 +179,7 @@ class BatchOperationService:
                 
                 item.complete_processing({
                     'deleted_type': 'soft' if soft_delete else 'hard',
-                    'filename': item.document.original_filename
+                    'filename': item.document.name
                 })
                 
                 self._update_progress()
@@ -605,9 +605,9 @@ class SolrService:
         doc_data = {
             'id': f"doc_{document.id}",
             'document_id': str(document.id),
-            'filename': document.original_filename,
+            'filename': document.name,
             'content': extracted_text,
-            'mime_type': getattr(document, 'content_type', '') or '',
+            'mime_type': getattr(document, 'mime_type', '') or '',
             'file_size': document.file_size or 0,
             'status': document.status,
             'directory_id': str(document.directory.id) if document.directory else '',

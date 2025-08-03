@@ -185,7 +185,7 @@ class BatchOperation(models.Model):
             
             if 'file_types' in self.filters:
                 queryset = queryset.filter(
-                    original_filename__iregex=r'\.(' + '|'.join(self.filters['file_types']) + ')$'
+                    name__iregex=r'\.(' + '|'.join(self.filters['file_types']) + ')$'
                 )
             
             if 'date_range' in self.filters:
@@ -265,7 +265,7 @@ class BatchOperationItem(models.Model):
         unique_together = ['batch_operation', 'document']
     
     def __str__(self):
-        return f"{self.batch_operation.name} - {self.document.original_filename}"
+        return f"{self.batch_operation.name} - {self.document.name}"
     
     def start_processing(self):
         """Marca o item como em processamento"""
@@ -395,7 +395,7 @@ class OCRResult(models.Model):
         ]
     
     def __str__(self):
-        return f"OCR: {self.document.original_filename} ({self.get_status_display()})"
+        return f"OCR: {self.document.name} ({self.get_status_display()})"
     
     def get_text_preview(self, max_length=100):
         """Retorna uma prévia do texto extraído"""
@@ -493,7 +493,7 @@ class SolrIndex(models.Model):
         ]
     
     def __str__(self):
-        return f"Solr: {self.document.original_filename} ({self.get_status_display()})"
+        return f"Solr: {self.document.name} ({self.get_status_display()})"
     
     def mark_as_outdated(self):
         """Marca o índice como desatualizado"""

@@ -117,7 +117,7 @@ class BatchOperationItemSerializer(serializers.ModelSerializer):
     """
     Serializer para itens de operação em lote
     """
-    document_name = serializers.CharField(source='document.original_filename', read_only=True)
+    document_name = serializers.CharField(source='document.name', read_only=True)
     document_size = serializers.IntegerField(source='document.file_size', read_only=True)
     processing_duration = serializers.SerializerMethodField()
     
@@ -146,7 +146,7 @@ class OCRResultSerializer(serializers.ModelSerializer):
     """
     Serializer para resultados de OCR
     """
-    document_name = serializers.CharField(source='document.original_filename', read_only=True)
+    document_name = serializers.CharField(source='document.name', read_only=True)
     document_size = serializers.IntegerField(source='document.file_size', read_only=True)
     processing_duration = serializers.SerializerMethodField()
     text_preview = serializers.SerializerMethodField()
@@ -186,7 +186,7 @@ class SolrIndexSerializer(serializers.ModelSerializer):
     """
     Serializer para índices Solr
     """
-    document_name = serializers.CharField(source='document.original_filename', read_only=True)
+    document_name = serializers.CharField(source='document.name', read_only=True)
     document_size = serializers.IntegerField(source='document.file_size', read_only=True)
     sync_status = serializers.SerializerMethodField()
     

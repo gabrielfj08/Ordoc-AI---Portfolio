@@ -472,7 +472,7 @@ class SignatureService:
         try:
             # Implementação específica dependeria do tipo de documento
             # Por enquanto, usar um hash simples baseado no conteúdo
-            content = f"{document.original_filename}_{document.file_size}_{document.created_at.isoformat()}"
+            content = f"{document.name}_{document.file_size}_{document.created_at.isoformat()}"
             return hashlib.sha256(content.encode()).hexdigest()
         except Exception as e:
             logger.error(f"Erro ao calcular hash do documento: {str(e)}")
@@ -620,7 +620,7 @@ class SignatureBatchService:
                         organization=organization,
                         document=document,
                         template=template,
-                        title=f"{name} - {document.original_filename}",
+                        title=f"{name} - {document.name}",
                         signers_data=signers_data,
                         created_by=created_by,
                         **kwargs

@@ -496,7 +496,7 @@ class DocumentSignature(models.Model):
         ]
     
     def __str__(self):
-        return f"Assinatura de {self.signer.full_name} em {self.document.original_filename}"
+        return f"Assinatura de {self.signer.full_name} em {self.document.name}"
     
     def verify_signature(self):
         """Verifica a validade da assinatura"""
