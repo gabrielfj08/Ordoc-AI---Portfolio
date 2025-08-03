@@ -286,6 +286,24 @@ class ReportScheduleAPITests(BaseAPITestCase):
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, 404)
 
+    def test_schedule_next_run_in_past(self):
+        template = self._create_template()
+        url = "/api/v1/ordoc-reports/api/schedules/"
+        payload = self._schedule_payload(template)
+        payload["next_run"] = (timezone.now() - timedelta(hours=1)).isoformat()
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("next_run", response.data)
+
+    def test_schedule_custom_requires_cron(self):
+        template = self._create_template()
+        url = "/api/v1/ordoc-reports/api/schedules/"
+        payload = self._schedule_payload(template)
+        payload["frequency"] = "custom"
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("cron_expression", response.data)
+
     def test_schedules_requires_authentication(self):
         url = "/api/v1/ordoc-reports/api/schedules/"
         client = self.unauthenticated_client()
