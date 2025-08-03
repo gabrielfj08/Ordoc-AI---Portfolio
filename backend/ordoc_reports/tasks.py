@@ -31,8 +31,8 @@ def generate_report_task(self, report_id):
         logger.info(f"Relatório {report_id} gerado com sucesso")
 
         recipients = []
-        if getattr(report.generated_by, "email", None):
-            recipients.append(report.generated_by.email)
+        if getattr(report.generated_by.user, "email", None):
+            recipients.append(report.generated_by.user.email)
 
         if recipients:
             try:
@@ -65,8 +65,8 @@ def generate_report_task(self, report_id):
                 report.save()
 
                 recipients = []
-                if getattr(report.generated_by, "email", None):
-                    recipients.append(report.generated_by.email)
+                if getattr(report.generated_by.user, "email", None):
+                    recipients.append(report.generated_by.user.email)
 
                 if recipients:
                     try:
@@ -303,8 +303,8 @@ def send_report_notification_task(report_id, notification_type='completion'):
             message = f"Notificação sobre relatório '{report.title}'"
 
         recipients = []
-        if getattr(report.generated_by, "email", None):
-            recipients.append(report.generated_by.email)
+        if getattr(report.generated_by.user, "email", None):
+            recipients.append(report.generated_by.user.email)
 
         try:
             NotificationService.notify(subject=subject, message=message, emails=recipients)
