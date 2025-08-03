@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import signatureService from '@/services/signature';
 import {
   DigitalCertificate,
@@ -32,7 +33,11 @@ export default function DocumentSigner({ assignmentId, onBack }: DocumentSignerP
   const mutation = useMutation({
     mutationFn: (payload: SignDocumentPayload) =>
       signatureService.signDocument(assignmentId, payload),
-    onSuccess: onBack,
+    onSuccess: () => {
+      toast.success('Documento assinado com sucesso');
+      onBack();
+    },
+    onError: () => toast.error('Erro ao assinar documento'),
   });
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import signatureService, {
   DigitalCertificate,
   UploadCertificateData,
@@ -30,7 +31,9 @@ export default function CertificateManager({ onBack }: CertificateManagerProps) 
       setPassword('');
       setIsDefault(false);
       refetch();
+      toast.success('Certificado enviado com sucesso');
     },
+    onError: () => toast.error('Erro ao enviar certificado'),
   });
 
   const handleUpload = (e: React.FormEvent) => {
@@ -47,10 +50,14 @@ export default function CertificateManager({ onBack }: CertificateManagerProps) 
   const handleVerify = async (id: string) => {
     try {
       const result = await signatureService.verifyCertificate(id);
-      alert(`Certificado ${result.is_valid ? 'válido' : 'inválido'}: ${result.message}`);
+      if (result.is_valid) {
+        toast.success(`Certificado válido: ${result.message}`);
+      } else {
+        toast.error(`Certificado inválido: ${result.message}`);
+      }
     } catch (err) {
       console.error(err);
-      alert('Erro ao verificar certificado');
+      toast.error('Erro ao verificar certificado');
     }
   };
 
@@ -58,9 +65,10 @@ export default function CertificateManager({ onBack }: CertificateManagerProps) 
     try {
       await signatureService.setDefaultCertificate(id);
       refetch();
+      toast.success('Certificado definido como padrão');
     } catch (err) {
       console.error(err);
-      alert('Erro ao definir padrão');
+      toast.error('Erro ao definir padrão');
     }
   };
 
@@ -69,9 +77,10 @@ export default function CertificateManager({ onBack }: CertificateManagerProps) 
     try {
       await signatureService.deleteCertificate(id);
       refetch();
+      toast.success('Certificado excluído');
     } catch (err) {
       console.error(err);
-      alert('Erro ao excluir certificado');
+      toast.error('Erro ao excluir certificado');
     }
   };
 

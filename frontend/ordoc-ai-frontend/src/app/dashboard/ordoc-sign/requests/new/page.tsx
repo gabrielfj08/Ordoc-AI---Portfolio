@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Plus, X, User } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { signatureService } from '@/services/signature';
 import { CreateSignatureRequestData } from '@/types/ordoc-sign';
 
@@ -138,10 +139,12 @@ export default function NewSignatureRequestPage() {
       };
 
       await signatureService.createRequest(requestData);
+      toast.success('Solicitação criada com sucesso');
       router.push('/dashboard/ordoc-sign/requests');
     } catch (error) {
       console.error('Erro ao criar solicitação:', error);
       setError('Erro ao criar solicitação. Tente novamente.');
+      toast.error('Erro ao criar solicitação. Tente novamente.');
     } finally {
       setLoading(false);
     }
