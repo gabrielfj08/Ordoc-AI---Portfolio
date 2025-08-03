@@ -9,12 +9,28 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.http import Http404
+from guardian.shortcuts import assign_perm, remove_perm
 from ordoc_ai.base_viewset import BaseViewSet
-from .models import Organization, Department, Directory, Document, ShareableLink, RecentDocument
+from .models import (
+    Organization,
+    Department,
+    Directory,
+    Document,
+    ShareableLink,
+    RecentDocument,
+    Permission,
+)
 from .serializers import (
-    OrganizationSerializer, DepartmentSerializer, DirectorySerializer,
-    DocumentSerializer, DocumentDetailSerializer, ShareableLinkSerializer,
-    RecentDocumentSerializer, DocumentUploadSerializer, DocumentStatusUpdateSerializer
+    OrganizationSerializer,
+    DepartmentSerializer,
+    DirectorySerializer,
+    DocumentSerializer,
+    DocumentDetailSerializer,
+    ShareableLinkSerializer,
+    RecentDocumentSerializer,
+    DocumentUploadSerializer,
+    DocumentStatusUpdateSerializer,
+    PermissionSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
 import uuid
@@ -405,3 +421,22 @@ class RecentDocumentViewSet(BaseViewSet):
     def perform_create(self, serializer):
         """Set user on creation"""
         serializer.save(user=self.request.user)
+
+
+class PermissionViewSet(BaseViewSet):
+    """ViewSet for managing permissions"""
+
+    queryset = Permission.objects.all()
+    serializer_class = PermissionSerializer
+
+    def perform_create(self, serializer):
+        permission = serializer.save()
+        target = permission.directory or permission.document
+        user_or_group = permission.user or permission.group
+        assign_perm(permission.permission, user_or_group, target)
+
+    def perform_destroy(self, instance):
+        target = instance.directory or instance.document
+        user_or_group = instance.user or instance.group
+        remove_perm(instance.permission, user_or_group, target)
+        instance.delete()

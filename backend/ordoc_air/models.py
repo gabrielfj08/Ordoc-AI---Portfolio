@@ -1,8 +1,7 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.validators import FileExtensionValidator
 from django_fsm import FSMField, transition
-from guardian.shortcuts import assign_perm
 import uuid
 import os
 
@@ -251,3 +250,30 @@ class RecentDocument(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.document.original_filename}"
+
+
+class Permission(models.Model):
+    """Modelo para permissões em documentos e diretórios"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Relations
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True,
+                             related_name='air_permissions')
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, blank=True,
+                              related_name='air_permissions')
+    directory = models.ForeignKey('Directory', on_delete=models.CASCADE, null=True, blank=True,
+                                  related_name='permissions')
+    document = models.ForeignKey('Document', on_delete=models.CASCADE, null=True, blank=True,
+                                 related_name='permissions')
+
+    permission = models.CharField(max_length=100, verbose_name="Permissão")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Permissão"
+        verbose_name_plural = "Permissões"
+
+    def __str__(self):
+        target = self.directory or self.document
+        subject = self.user or self.group
+        return f"{subject} -> {self.permission} on {target}"
