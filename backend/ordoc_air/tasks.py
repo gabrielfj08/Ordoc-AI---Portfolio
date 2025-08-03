@@ -8,8 +8,25 @@ from PIL import Image
 import PyPDF2
 import io
 import logging
+from .batch_tasks import (
+    process_document_ocr as batch_process_document_ocr,
+    index_document_solr as batch_index_document_solr,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def process_document_upload(document_id):
+    """Queue OCR and Solr indexing for a newly uploaded document."""
+    ocr_task = batch_process_document_ocr.delay(document_id)
+    solr_task = batch_index_document_solr.delay(document_id)
+    return {
+        "document_id": str(document_id),
+        "ocr_task_id": ocr_task.id,
+        "index_task_id": solr_task.id,
+        "status": "queued",
+    }
 
 
 @shared_task(bind=True, max_retries=3)
