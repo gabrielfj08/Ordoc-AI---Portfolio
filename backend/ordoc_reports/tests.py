@@ -11,6 +11,7 @@ from .tasks import (
     generate_report_task,
     process_scheduled_reports_task,
     cleanup_expired_reports_task,
+    send_report_notification_task,
 )
 from ordoc_ai.jwt_service import JWTService
 
@@ -230,3 +231,28 @@ class ReportTasksTests(BaseAPITestCase):
         ):
             result = cleanup_expired_reports_task()
         self.assertIn("2", result)
+
+    @patch("ordoc_reports.tasks.NotificationService.notify")
+    def test_generate_report_task_sends_user_email(self, mock_notify):
+        report = self._create_report()
+
+        def fake_generate(rep):
+            rep.status = "completed"
+            rep.save()
+
+        with patch(
+            "ordoc_reports.tasks.ReportGenerationService.generate_report",
+            side_effect=fake_generate,
+        ):
+            generate_report_task(report.id)
+
+        mock_notify.assert_called_once()
+        self.assertIn(self.user.email, mock_notify.call_args.kwargs["emails"])
+
+    @patch("ordoc_reports.tasks.NotificationService.notify")
+    def test_send_report_notification_task_uses_user_email(self, mock_notify):
+        report = self._create_report()
+        send_report_notification_task(report.id, notification_type="completion")
+
+        mock_notify.assert_called_once()
+        self.assertIn(self.user.email, mock_notify.call_args.kwargs["emails"])
