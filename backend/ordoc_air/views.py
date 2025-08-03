@@ -255,35 +255,48 @@ class DocumentViewSet(BaseViewSet):
         
         if serializer.is_valid():
             new_status = serializer.validated_data['status']
-            
-            # Use FSM transition methods
+            current_user = self.get_current_user()
+
             try:
-                if new_status == 'processing' and hasattr(document, 'start_processing'):
-                    document.start_processing()
-                elif new_status == 'processed' and hasattr(document, 'complete_processing'):
-                    document.complete_processing()
-                elif new_status == 'failed' and hasattr(document, 'fail_processing'):
-                    document.fail_processing()
-                elif new_status == 'archived' and hasattr(document, 'archive'):
-                    document.archive()
+                if new_status == 'enqueued':
+                    if not getattr(document, 'can_enqueue', lambda: False)():
+                        return Response(
+                            {'error': f'Invalid status transition to {new_status}'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    document.enqueue(user=current_user)
+                elif new_status == 'processed':
+                    if not getattr(document, 'can_process', lambda: False)():
+                        return Response(
+                            {'error': f'Invalid status transition to {new_status}'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    document.process(user=current_user)
+                elif new_status == 'failed':
+                    if not getattr(document, 'can_fail', lambda: False)():
+                        return Response(
+                            {'error': f'Invalid status transition to {new_status}'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    document.fail(user=current_user)
                 else:
                     return Response(
                         {'error': f'Invalid status transition to {new_status}'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                
+
                 document.save()
                 return Response({
                     'message': f'Document status updated to {new_status}',
                     'status': document.status
                 })
-                
+
             except Exception as e:
                 return Response(
                     {'error': f'Status transition failed: {str(e)}'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])

@@ -270,10 +270,11 @@ class DocumentStatusUpdateSerializer(serializers.Serializer):
         """
         document = self.context['document']
         available_transitions = document.get_available_status_transitions()
-        
-        if value not in available_transitions:
+        available_targets = [t.target for t in available_transitions]
+
+        if value not in available_targets:
             raise serializers.ValidationError(
-                f"Cannot transition to '{value}'. Available transitions: {available_transitions}"
+                f"Cannot transition to '{value}'. Available transitions: {available_targets}"
             )
 
         return value
