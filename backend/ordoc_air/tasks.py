@@ -3,6 +3,7 @@ Celery tasks for OrdocAir - Document processing and OCR
 """
 from celery import shared_task
 from django.conf import settings
+from django_fsm import TransitionNotAllowed
 import pytesseract
 from PIL import Image
 import PyPDF2
@@ -41,10 +42,6 @@ def process_document_ocr(self, document_id):
         document = Document.objects.get(id=document_id)
         logger.info(f"Iniciando processamento OCR para documento: {document.original_filename}")
         
-        # Marcar documento como em processamento
-        document.enqueue()
-        document.save()
-        
         extracted_text = ""
         
         if document.is_pdf():
@@ -56,7 +53,10 @@ def process_document_ocr(self, document_id):
         
         # Salvar texto extraído
         document.extracted_text = extracted_text
-        document.process()  # Marcar como processado
+        try:
+            document.process()  # Marcar como processado
+        except TransitionNotAllowed:
+            pass
         document.save()
         
         logger.info(f"OCR concluído para documento: {document.original_filename}")
@@ -72,12 +72,15 @@ def process_document_ocr(self, document_id):
         
     except Exception as exc:
         logger.error(f"Erro no processamento OCR: {exc}")
-        
+
         try:
             document = Document.objects.get(id=document_id)
-            document.fail()  # Marcar como falhou
+            try:
+                document.fail()  # Marcar como falhou
+            except TransitionNotAllowed:
+                pass
             document.save()
-        except:
+        except Exception:
             pass
         
         # Retry com backoff exponencial
@@ -130,23 +133,36 @@ def index_document_in_solr(document_id):
     Task para indexar documento no Apache Solr
     Será implementada posteriormente
     """
+    document = None
     try:
         from .models import Document
-        
+
         document = Document.objects.get(id=document_id)
         logger.info(f"Indexando documento no Solr: {document.original_filename}")
-        
+
         # TODO: Implementar integração com Solr
         # solr_client = SolrClient(settings.SOLR_URL)
         # solr_client.index_document(document)
-        
+
+        try:
+            document.process()
+        except TransitionNotAllowed:
+            pass
+        document.save()
+
         return {
             'document_id': str(document_id),
             'status': 'indexed'
         }
-        
+
     except Exception as e:
         logger.error(f"Erro ao indexar documento no Solr: {e}")
+        if document is not None:
+            try:
+                document.fail()
+            except TransitionNotAllowed:
+                pass
+            document.save()
         raise
 
 
