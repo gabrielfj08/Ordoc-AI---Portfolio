@@ -696,6 +696,8 @@ class ReportScheduleService:
     """
     Serviço para gerenciamento de agendamentos de relatórios
     """
+
+    logger = logging.getLogger(__name__)
     
     @staticmethod
     def process_scheduled_reports():
@@ -752,19 +754,35 @@ class ReportScheduleService:
         """
         Envia notificação de erro no agendamento
         """
-        # Implementar envio de email/notificação
-        # Por enquanto, apenas log
-        print(f"ERRO no agendamento {schedule.name}: {error_message}")
-        
-        # TODO: Implementar envio real de email
-        # from django.core.mail import send_mail
-        # send_mail(
-        #     subject=f"Erro no agendamento de relatório: {schedule.name}",
-        #     message=f"Ocorreu um erro ao executar o agendamento:\n\n{error_message}",
-        #     from_email=settings.DEFAULT_FROM_EMAIL,
-        #     recipient_list=schedule.notification_emails,
-        #     fail_silently=True
-        # )
+        recipients = schedule.notification_emails or []
+
+        if not recipients:
+            ReportScheduleService.logger.info(
+                f"Nenhum destinatário configurado para o agendamento {schedule.name}"
+            )
+            return
+
+        subject = f"Erro no agendamento de relatório: {schedule.name}"
+        message = (
+            "Ocorreu um erro ao executar o agendamento:\n\n" f"{error_message}"
+        )
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com"),
+                recipient_list=recipients,
+                fail_silently=False,
+            )
+            ReportScheduleService.logger.info(
+                f"E-mail de erro enviado para {recipients}"
+            )
+        except Exception as exc:
+            ReportScheduleService.logger.error(
+                f"Falha ao enviar e-mail de erro para {recipients}: {exc}"
+            )
+            raise
 
 
 class ReportCleanupService:
