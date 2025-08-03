@@ -2,6 +2,7 @@ from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
 import logging
+from .services import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +29,24 @@ def generate_report_task(self, report_id):
         ReportGenerationService.generate_report(report)
         
         logger.info(f"Relatório {report_id} gerado com sucesso")
-        
-        # Envia notificação se configurado
-        # TODO: Implementar sistema de notificações
-        
+
+        recipients = []
+        if getattr(report.generated_by, "email", None):
+            recipients.append(report.generated_by.email)
+
+        if recipients:
+            try:
+                NotificationService.notify(
+                    subject=f"Relatório '{report.title}' gerado",
+                    message=f"O relatório '{report.title}' foi gerado com sucesso.",
+                    emails=recipients,
+                )
+                logger.info(f"Notificação de conclusão enviada para {recipients}")
+            except Exception as notify_exc:
+                logger.error(
+                    f"Falha ao enviar notificação de conclusão para relatório {report_id}: {notify_exc}"
+                )
+
         return f"Relatório {report_id} gerado com sucesso"
     
     except Exception as exc:
@@ -48,9 +63,28 @@ def generate_report_task(self, report_id):
                 report.status = 'failed'
                 report.error_message = f"Falha após {self.request.retries} tentativas: {str(exc)}"
                 report.save()
-            except:
+
+                recipients = []
+                if getattr(report.generated_by, "email", None):
+                    recipients.append(report.generated_by.email)
+
+                if recipients:
+                    try:
+                        NotificationService.notify(
+                            subject=f"Falha ao gerar relatório '{report.title}'",
+                            message=(
+                                f"O relatório '{report.title}' falhou após {self.request.retries} tentativas: {str(exc)}"
+                            ),
+                            emails=recipients,
+                        )
+                        logger.info(f"Notificação de erro enviada para {recipients}")
+                    except Exception as notify_exc:
+                        logger.error(
+                            f"Falha ao enviar notificação de erro para relatório {report_id}: {notify_exc}"
+                        )
+            except Exception:
                 pass
-            
+
             logger.error(f"Relatório {report_id} falhou após {self.request.retries} tentativas")
             return f"Relatório {report_id} falhou após esgotar tentativas"
 
@@ -257,27 +291,28 @@ def send_report_notification_task(report_id, notification_type='completion'):
             return
         
         logger.info(f"Enviando notificação de {notification_type} para relatório {report_id}")
-        
-        # TODO: Implementar envio real de notificações
-        # Por enquanto, apenas log
-        
+
         if notification_type == 'completion':
+            subject = f"Relatório '{report.title}' concluído"
             message = f"Relatório '{report.title}' foi gerado com sucesso"
         elif notification_type == 'error':
+            subject = f"Erro no relatório '{report.title}'"
             message = f"Erro na geração do relatório '{report.title}': {report.error_message}"
         else:
+            subject = f"Notificação sobre relatório '{report.title}'"
             message = f"Notificação sobre relatório '{report.title}'"
-        
-        # Simula envio de notificação
-        logger.info(f"NOTIFICAÇÃO: {message}")
-        
-        # TODO: Implementar envio real
-        # - Email
-        # - Push notification
-        # - Webhook
-        # - Slack/Teams
-        
-        return f"Notificação enviada para relatório {report_id}"
+
+        recipients = []
+        if getattr(report.generated_by, "email", None):
+            recipients.append(report.generated_by.email)
+
+        try:
+            NotificationService.notify(subject=subject, message=message, emails=recipients)
+            logger.info(f"Notificação enviada para {recipients}")
+            return f"Notificação enviada para relatório {report_id}"
+        except Exception as notify_exc:
+            logger.error(f"Falha ao enviar notificação para relatório {report_id}: {notify_exc}")
+            return f"Erro ao enviar notificação: {notify_exc}"
     
     except Exception as exc:
         logger.error(f"Erro ao enviar notificação para relatório {report_id}: {str(exc)}")

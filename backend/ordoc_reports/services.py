@@ -1,16 +1,19 @@
 import os
 import json
 import csv
+import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db import models
 from django.apps import apps
 from django.core.files.storage import default_storage
 from django.conf import settings
+from django.core.mail import send_mail
 import tempfile
 import zipfile
 import tarfile
 from io import BytesIO, StringIO
+import requests
 
 # Importações opcionais para geração de relatórios
 try:
@@ -29,6 +32,63 @@ try:
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
+
+
+class NotificationService:
+    """
+    Serviço utilitário para envio de notificações (e-mail e webhook)
+    """
+
+    logger = logging.getLogger(__name__)
+
+    @staticmethod
+    def send_email(subject, message, recipients):
+        if not recipients:
+            NotificationService.logger.info(
+                "Nenhum destinatário informado para e-mail de notificação"
+            )
+            return
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com"),
+                recipient_list=recipients,
+                fail_silently=False,
+            )
+            NotificationService.logger.info(
+                f"E-mail de notificação enviado para {recipients}"
+            )
+        except Exception as exc:
+            NotificationService.logger.error(
+                f"Falha ao enviar e-mail de notificação para {recipients}: {exc}"
+            )
+            raise
+
+    @staticmethod
+    def send_webhook(url, payload):
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+            NotificationService.logger.info(
+                f"Webhook de notificação enviado para {url} (status {response.status_code})"
+            )
+        except Exception as exc:
+            NotificationService.logger.error(
+                f"Falha ao enviar webhook de notificação para {url}: {exc}"
+            )
+            raise
+
+    @staticmethod
+    def notify(subject, message, emails=None, webhook_url=None, payload=None):
+        """Envia notificações por e-mail e/ou webhook"""
+        if emails:
+            NotificationService.send_email(subject, message, emails)
+
+        if webhook_url:
+            payload = payload or {"subject": subject, "message": message}
+            NotificationService.send_webhook(webhook_url, payload)
 
 
 class ReportGenerationService:
