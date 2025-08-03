@@ -2,17 +2,20 @@ from uuid import uuid4
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework.test import APITestCase
 
 from ordoc_air.models import Organization
 from ordoc_cloud.models import OrdocUser, UserOrganizationRole
-from .models import ReportTemplate, Report
+from .models import ReportTemplate, Report, ReportSchedule
 from .services import ReportScheduleService
 from .tasks import (
     generate_report_task,
     process_scheduled_reports_task,
     cleanup_expired_reports_task,
     send_report_notification_task,
+    export_reports_task,
 )
 from ordoc_ai.jwt_service import JWTService
 
@@ -167,6 +170,190 @@ class ReportGenerationAPITests(BaseAPITestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class ReportScheduleAPITests(BaseAPITestCase):
+    """CRUD and actions tests for ReportSchedule endpoints."""
+
+    def _create_template(self):
+        return ReportTemplate.objects.create(
+            name="Temp",
+            category="documents",
+            type="table",
+            status="active",
+            query_config={"model": "ordoc_air.Organization", "fields": ["corporate_name"]},
+            display_config={},
+            filter_config={},
+            export_config={},
+            is_public=True,
+            allowed_roles=[],
+            organization=self.organization,
+            created_by=self.ordoc_user,
+        )
+
+    def _schedule_payload(self, template):
+        return {
+            "name": "Sched A",
+            "frequency": "daily",
+            "next_run": (timezone.now() + timedelta(hours=1)).isoformat(),
+            "default_format": "json",
+            "default_filters": {},
+            "notification_emails": [],
+            "template": str(template.id),
+        }
+
+    def test_schedule_crud_and_actions(self):
+        template = self._create_template()
+        url = "/api/v1/ordoc-reports/api/schedules/"
+        payload = self._schedule_payload(template)
+
+        # Create
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        schedule_id = response.data["id"]
+        detail_url = f"{url}{schedule_id}/"
+
+        # Retrieve
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+
+        # Update
+        response = self.client.patch(detail_url, {"name": "Updated"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["name"], "Updated")
+
+        # Pause
+        pause_url = f"{detail_url}pause/"
+        response = self.client.post(pause_url)
+        self.assertEqual(response.status_code, 200)
+
+        # Activate
+        activate_url = f"{detail_url}activate/"
+        response = self.client.post(activate_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("next_run", response.data)
+
+        # Run now
+        run_now_url = f"{detail_url}run_now/"
+        with patch("ordoc_reports.views.generate_report_task.delay") as mock_delay:
+            response = self.client.post(run_now_url)
+        self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once()
+
+        # Delete
+        response = self.client.delete(detail_url)
+        self.assertEqual(response.status_code, 204)
+
+        # Ensure deleted
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 404)
+
+
+class ReportShareAPITests(BaseAPITestCase):
+    """Tests for report sharing flow and public access."""
+
+    def _create_report(self):
+        template = ReportTemplate.objects.create(
+            name="Temp",
+            category="documents",
+            type="table",
+            status="active",
+            query_config={"model": "ordoc_air.Organization", "fields": ["corporate_name"]},
+            display_config={},
+            filter_config={},
+            export_config={},
+            is_public=True,
+            allowed_roles=[],
+            organization=self.organization,
+            created_by=self.ordoc_user,
+        )
+        return Report.objects.create(
+            title="Report",
+            template=template,
+            organization=self.organization,
+            generated_by=self.ordoc_user,
+            filters_applied={},
+            parameters={},
+            status="completed",
+        )
+
+    def test_share_flow_public_access_and_revoke(self):
+        report = self._create_report()
+        url = "/api/v1/ordoc-reports/api/shares/"
+        payload = {
+            "report": str(report.id),
+            "access_type": "view",
+            "is_public": True,
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        share_id = response.data["id"]
+        token = response.data["share_token"]
+
+        public_url = "/api/v1/ordoc-reports/api/shares/public_access/"
+        response = self.client.get(f"{public_url}?token={token}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["report"]["id"], str(report.id))
+
+        revoke_url = f"{url}{share_id}/revoke/"
+        response = self.client.post(revoke_url)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f"{public_url}?token={token}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_public_access_invalid_token(self):
+        url = "/api/v1/ordoc-reports/api/shares/public_access/?token=invalid"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+
+class ReportMetricAPITests(BaseAPITestCase):
+    """Tests for metrics dashboard endpoint."""
+
+    def _create_entities(self):
+        template = ReportTemplate.objects.create(
+            name="Temp",
+            category="documents",
+            type="table",
+            status="active",
+            query_config={"model": "ordoc_air.Organization", "fields": ["corporate_name"]},
+            display_config={},
+            filter_config={},
+            export_config={},
+            is_public=True,
+            allowed_roles=[],
+            organization=self.organization,
+            created_by=self.ordoc_user,
+        )
+        ReportSchedule.objects.create(
+            name="Sched",
+            frequency="daily",
+            next_run=timezone.now() + timedelta(days=1),
+            template=template,
+            organization=self.organization,
+            created_by=self.ordoc_user,
+            default_format="json",
+            default_filters={},
+        )
+        Report.objects.create(
+            title="Report",
+            template=template,
+            organization=self.organization,
+            generated_by=self.ordoc_user,
+            filters_applied={},
+            parameters={},
+            status="completed",
+            generation_time=timedelta(seconds=5),
+        )
+
+    def test_dashboard_metrics(self):
+        self._create_entities()
+        url = "/api/v1/ordoc-reports/api/metrics/dashboard/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_reports"], 1)
+        self.assertEqual(response.data["active_templates"], 1)
+        self.assertEqual(response.data["active_schedules"], 1)
+
 class ReportTasksTests(BaseAPITestCase):
     """Tests for Celery tasks related to reports."""
 
@@ -257,6 +444,27 @@ class ReportTasksTests(BaseAPITestCase):
 
         mock_notify.assert_called_once()
         self.assertIn(self.user.email, mock_notify.call_args.kwargs["emails"])
+
+    def test_export_reports_task_success(self):
+        with patch(
+            "ordoc_reports.services.ReportExportService.export_reports",
+            return_value="/tmp/export.zip",
+        ) as mock_export:
+            result = export_reports_task([str(uuid4())])
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["export_path"], "/tmp/export.zip")
+        mock_export.assert_called_once()
+
+    def test_export_reports_task_error(self):
+        with patch(
+            "ordoc_reports.services.ReportExportService.export_reports",
+            side_effect=Exception("boom"),
+        ):
+            result = export_reports_task([str(uuid4())])
+
+        self.assertFalse(result["success"])
+        self.assertIn("error", result)
 
 
 class ReportScheduleServiceLogTests(BaseAPITestCase):
