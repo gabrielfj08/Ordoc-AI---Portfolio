@@ -1,16 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { reportsService } from '@/services/reports';
 import { ReportTemplate, GenerateReportData } from '@/types/ordoc-reports';
+import { toast } from 'react-hot-toast';
 
 interface Props {
   templates: ReportTemplate[];
 }
 
 export default function CreateReportForm({ templates }: Props) {
-  const router = useRouter();
   const [form, setForm] = useState<GenerateReportData>({
     template_id: '',
     title: '',
@@ -21,22 +20,28 @@ export default function CreateReportForm({ templates }: Props) {
     expires_in_days: 30,
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [reportId, setReportId] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm((prev: GenerateReportData) => ({ ...prev, [name]: value }));
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value, type } = e.target;
+    const parsed = type === 'number' ? (value === '' ? undefined : Number(value)) : value;
+    setForm((prev: GenerateReportData) => ({ ...prev, [name]: parsed }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setStatus('loading');
-      await reportsService.generateReport(form);
+      const report = await reportsService.generateReport(form);
+      setReportId(report?.id ?? null);
       setStatus('success');
-      router.push('/dashboard/ordoc-reports');
+      toast.success('Relatório gerado com sucesso');
     } catch (err) {
       console.error(err);
       setStatus('error');
+      toast.error('Erro ao gerar relatório');
     }
   };
 
@@ -110,6 +115,17 @@ export default function CreateReportForm({ templates }: Props) {
       >
         {status === 'loading' ? 'Gerando...' : 'Gerar Relatório'}
       </button>
+      {status === 'success' && (
+        <p className="text-green-600">
+          Relatório gerado com sucesso.{' '}
+          <a
+            href={reportId ? `/dashboard/ordoc-reports/reports/${reportId}` : '/dashboard/ordoc-reports/reports'}
+            className="underline text-blue-600"
+          >
+            {reportId ? 'Abrir relatório' : 'Ver relatórios'}
+          </a>
+        </p>
+      )}
       {status === 'error' && (
         <p className="text-red-600">Erro ao gerar relatório. Tente novamente.</p>
       )}
