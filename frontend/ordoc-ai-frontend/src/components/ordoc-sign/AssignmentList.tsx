@@ -12,7 +12,7 @@ interface AssignmentListProps {
 export default function AssignmentList({ assignments, onSign }: AssignmentListProps) {
   if (!assignments.length) {
     return (
-      <p className="text-gray-500">Nenhuma assinatura pendente.</p>
+      <p className="text-gray-500">Nenhuma assinatura pendente / No pending signatures.</p>
     );
   }
 
@@ -21,13 +21,24 @@ export default function AssignmentList({ assignments, onSign }: AssignmentListPr
       <table className="min-w-full divide-y divide-gray-200 bg-white shadow rounded-md">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Documento
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
+              Documento / Document
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
               Status
             </th>
-            <th className="px-6 py-3" />
+            <th
+              scope="col"
+              className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+            >
+              Ações / Actions
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -44,16 +55,18 @@ export default function AssignmentList({ assignments, onSign }: AssignmentListPr
                   onSign ? (
                     <button
                       onClick={() => onSign(assignment.id)}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      aria-label="Assinar / Sign"
                     >
-                      Assinar
+                      Assinar / Sign
                     </button>
                   ) : (
                     <Link
                       href={`/dashboard/ordoc-sign/sign/${assignment.id}`}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      aria-label="Assinar / Sign"
                     >
-                      Assinar
+                      Assinar / Sign
                     </Link>
                   )
                 ) : (

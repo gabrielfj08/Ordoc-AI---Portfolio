@@ -65,3 +65,12 @@ De acordo com o relatório de migração, já existem partes do frontend para:
 O módulo **OrdocSign** está em migração (cerca de 20% concluído).
 A página `src/app/dashboard/ordoc-sign` já lista as assinaturas pendentes do
 usuário e permite acessar a tela de assinatura.
+
+## Assinatura de Documentos
+
+1. Acesse o dashboard e clique em **OrdocSign**.
+2. Use o botão **Gerenciar Certificados / Manage Certificates** para enviar um certificado digital (tipos A1 ou A3) e defini-lo como padrão.
+3. Retorne à lista e selecione **Assinar / Sign** ao lado do documento desejado.
+4. Escolha o certificado, informe os dados da assinatura e confirme. Um indicador de carregamento aparecerá durante o processo.
+
+Todos os botões e campos podem ser navegados via teclado e possuem rótulos em português e inglês para facilitar o uso.
