@@ -85,8 +85,11 @@ services:
       # OCR
       TESSERACT_CMD: tesseract
       
-      # Solr (placeholder for future)
-      SOLR_URL: http://solr:8983/solr/ordoc_core
+      # Solr
+      SOLR_URL: http://solr:8983/solr
+      SOLR_COLLECTION: ordoc_core
+      SOLR_USERNAME: ''
+      SOLR_PASSWORD: ''
       
     volumes:
       - .:/app

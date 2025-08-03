@@ -244,6 +244,8 @@ TESSERACT_CMD = config('TESSERACT_CMD', default='/usr/bin/tesseract')
 # Solr Settings
 SOLR_URL = config('SOLR_URL', default='http://localhost:8983/solr')
 SOLR_COLLECTION = config('SOLR_COLLECTION', default='documents')
+SOLR_USERNAME = config('SOLR_USERNAME', default=None)
+SOLR_PASSWORD = config('SOLR_PASSWORD', default=None)
 
 # Frontend URL for notifications
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')

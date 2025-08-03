@@ -13,6 +13,7 @@ from .batch_tasks import (
     process_document_ocr as batch_process_document_ocr,
     index_document_solr as batch_index_document_solr,
 )
+from .batch_services import SolrService
 
 logger = logging.getLogger(__name__)
 
@@ -140,9 +141,18 @@ def index_document_in_solr(document_id):
         document = Document.objects.get(id=document_id)
         logger.info(f"Indexando documento no Solr: {document.original_filename}")
 
-        # TODO: Implementar integração com Solr
-        # solr_client = SolrClient(settings.SOLR_URL)
-        # solr_client.index_document(document)
+        solr = SolrService()
+        doc_data = {
+            'id': str(document.id),
+            'extracted_text': document.extracted_text or '',
+            'metadata': {
+                'filename': document.original_filename,
+                'content_type': document.content_type or '',
+                'file_size': document.file_size or 0,
+            }
+        }
+        solr.add([doc_data])
+        solr.commit()
 
         try:
             document.process()
