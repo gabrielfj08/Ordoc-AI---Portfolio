@@ -20,7 +20,7 @@ export default function CertificateManager({ onBack }: CertificateManagerProps) 
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
   const [isDefault, setIsDefault] = useState(false);
-  const [certificateType, setCertificateType] = useState('A1');
+  const [certificateType, setCertificateType] = useState<'A1' | 'A3' | 'ICP_BRASIL' | 'SELF_SIGNED'>('A1');
 
   const uploadMutation = useMutation({
     mutationFn: (data: UploadCertificateData) =>
@@ -102,7 +102,7 @@ export default function CertificateManager({ onBack }: CertificateManagerProps) 
           </label>
           <select
             value={certificateType}
-            onChange={(e) => setCertificateType(e.target.value)}
+            onChange={(e) => setCertificateType(e.target.value as 'A1' | 'A3' | 'ICP_BRASIL' | 'SELF_SIGNED')}
             className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
           >
             <option value="A1">A1</option>

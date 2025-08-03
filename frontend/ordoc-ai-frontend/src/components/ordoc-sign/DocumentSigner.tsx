@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import signatureService, {
+import signatureService from '@/services/signature';
+import {
   DigitalCertificate,
   SignDocumentPayload,
   SignatureRequestSigner,
-} from '@/services/signature';
+} from '@/types/ordoc-sign';
 
 interface DocumentSignerProps {
   assignmentId: string;
