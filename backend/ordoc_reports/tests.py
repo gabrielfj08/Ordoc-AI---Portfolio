@@ -99,6 +99,20 @@ class ReportTemplateAPITests(BaseAPITestCase):
         response = self.client.post(url, payload, format="json")
         self.assertEqual(response.status_code, 400)
 
+    def test_create_template_invalid_category_and_type(self):
+        url = "/api/v1/ordoc-reports/api/templates/"
+        payload = self._template_payload()
+        payload["category"] = "invalid"
+        payload["type"] = "invalid"
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["category"], ["\"invalid\" não é uma escolha válida."]
+        )
+        self.assertEqual(
+            response.data["type"], ["\"invalid\" não é uma escolha válida."]
+        )
+
     def test_retrieve_update_delete_template(self):
         # Create template
         url = "/api/v1/ordoc-reports/api/templates/"
