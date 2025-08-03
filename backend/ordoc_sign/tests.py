@@ -3,10 +3,12 @@ Testes automatizados para o módulo OrdocSign
 Sistema de assinatura digital do Ordoc-AI
 """
 
+import base64
 import json
 import uuid
 import os
 from datetime import datetime, timedelta
+from io import BytesIO
 from django.utils import timezone
 from django.test import TestCase
 from django.urls import reverse
@@ -16,14 +18,43 @@ from rest_framework import status
 from django.contrib.auth import get_user_model
 from ordoc_air.models import Organization, Document
 from ordoc_cloud.models import OrdocUser
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography import x509
+from cryptography.x509.oid import NameOID
 from .models import (
     DigitalCertificate, SignatureTemplate, SignatureRequest,
     SignatureRequestSigner, DocumentSignature, SignatureAuditLog,
     SignatureBatch
 )
-from .services import CertificateService, SignatureService
+from .services import CertificateService, SignatureService, SignatureBatchService
 
 User = get_user_model()
+
+
+def generate_pkcs12_certificate(password: str = "test123") -> BytesIO:
+    """Gera um certificado PKCS#12 de teste"""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, u"Teste Cert")
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow() - timedelta(days=1))
+        .not_valid_after(datetime.utcnow() + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    p12 = pkcs12.serialize_key_and_certificates(
+        b"test", key, cert, None, serialization.BestAvailableEncryption(password.encode())
+    )
+    bio = BytesIO(p12)
+    bio.name = "test_cert.p12"
+    return bio
 
 
 class OrdocSignTestCase(APITestCase):
@@ -586,11 +617,69 @@ class SignatureServiceTest(TestCase):
         )
         
         success, message = SignatureService.submit_signature_request(request, self.user)
-        
+
         self.assertTrue(success)
         self.assertEqual(message, "Solicitação submetida com sucesso")
         request.refresh_from_db()
         self.assertEqual(request.status, "pending")
+
+    def test_signature_flow_creates_audit_logs(self):
+        """Teste completo de assinatura com geração de logs"""
+        template = SignatureTemplate.objects.create(
+            name="Template Fluxo", organization=self.organization,
+            signature_type="digital", hash_algorithm="sha256",
+            is_active=True, created_by=self.user
+        )
+
+        cert_file = generate_pkcs12_certificate("pass123")
+        success, certificate = CertificateService.upload_certificate(
+            user=self.user,
+            organization=self.organization,
+            certificate_file=cert_file,
+            password="pass123",
+            certificate_type="A1"
+        )
+        self.assertTrue(success)
+
+        signers_data = [{
+            'signer_type': 'user',
+            'user': self.user,
+            'email': self.user.email,
+            'full_name': 'Signer',
+            'signing_order': 1
+        }]
+
+        success, request = SignatureService.create_signature_request(
+            organization=self.organization,
+            document=self.document,
+            template=template,
+            title="Fluxo Teste",
+            signers_data=signers_data,
+            created_by=self.user
+        )
+        self.assertTrue(success)
+
+        success, _ = SignatureService.submit_signature_request(request, self.user)
+        self.assertTrue(success)
+
+        signer = request.signers.first()
+        signature_value = base64.b64encode(b"assinatura").decode()
+        success, _ = SignatureService.sign_document(
+            request, signer, certificate, signature_value
+        )
+        self.assertTrue(success)
+
+        request.refresh_from_db()
+        self.assertEqual(request.status, "completed")
+
+        actions = list(
+            SignatureAuditLog.objects.filter(signature_request=request)
+            .values_list("action", flat=True)
+        )
+        self.assertIn("request_created", actions)
+        self.assertIn("request_submitted", actions)
+        self.assertIn("document_signed", actions)
+        self.assertIn("request_completed", actions)
 
 
 class CertificateServiceTest(TestCase):
@@ -633,26 +722,23 @@ class CertificateServiceTest(TestCase):
     
     def test_upload_certificate(self):
         """Teste: Upload de certificado via serviço"""
-        # Criar um arquivo mock de certificado
-        from io import BytesIO
-        mock_cert_file = BytesIO(b"fake_cert_data")
-        mock_cert_file.name = "test_cert.p12"
-        
-        # Como o método real requer um certificado válido, vamos testar apenas a chamada
-        # Em um teste real, seria necessário um certificado PKCS#12 válido
-        try:
-            success, result = CertificateService.upload_certificate(
-                user=self.user,  # Usar User, não OrdocUser
-                organization=self.organization,
-                certificate_file=mock_cert_file,
-                password="test123",
-                certificate_type="A1"
-            )
-            # Se chegou até aqui sem erro de método inexistente, o teste passou
-            self.assertTrue(True)
-        except Exception as e:
-            # Esperamos erro de processamento, não de método inexistente
-            self.assertNotIn("has no attribute 'create_certificate'", str(e))
+        cert_file = generate_pkcs12_certificate("senha123")
+
+        success, cert = CertificateService.upload_certificate(
+            user=self.user,
+            organization=self.organization,
+            certificate_file=cert_file,
+            password="senha123",
+            certificate_type="A1"
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(DigitalCertificate.objects.count(), 1)
+
+        log = SignatureAuditLog.objects.filter(
+            certificate=cert, action="certificate_uploaded"
+        ).first()
+        self.assertIsNotNone(log)
     
     def test_set_default_certificate(self):
         """Teste: Definir certificado padrão"""
@@ -703,3 +789,84 @@ class CertificateServiceTest(TestCase):
         # Verificar que cert2 é agora padrão
         cert2.refresh_from_db()
         self.assertTrue(cert2.is_default)
+
+
+class SignatureBatchServiceTest(TestCase):
+    """Testes para o serviço de lotes de assinatura"""
+
+    def setUp(self):
+        self.organization = Organization.objects.create(
+            corporate_name="Org Batch Ltda",
+            cnpj="12345678000196",
+            subdomain="batch",
+            email="batch@teste.com",
+            phone="(11) 77777-7777",
+            contact_name="Contato Batch",
+            contact_phone="(11) 66666-6666",
+            prn="PRN-BATCH-004",
+        )
+
+        self.user = User.objects.create_user(
+            username="batch@service.com",
+            email="batch@service.com",
+            password=TEST_PASSWORD,
+        )
+
+        self.ordoc_user = OrdocUser.objects.create(
+            user=self.user,
+            status="active",
+            phone="(11) 77777-7777",
+        )
+
+        from ordoc_cloud.models import UserOrganizationRole
+        UserOrganizationRole.objects.create(
+            user=self.ordoc_user,
+            organization=self.organization,
+            role="admin",
+        )
+
+        self.document = Document.objects.create(
+            original_filename="Documento Batch.pdf",
+            description="Documento batch",
+            file_size=1024,
+            content_type="application/pdf",
+            prn="PRN-DOC-BATCH-004",
+            created_by=self.user,
+        )
+
+    def test_create_batch_creates_requests_and_logs(self):
+        template = SignatureTemplate.objects.create(
+            name="Template Batch",
+            organization=self.organization,
+            signature_type="digital",
+            hash_algorithm="sha256",
+            is_active=True,
+            created_by=self.user,
+        )
+
+        signers_data = [{
+            'signer_type': 'email_only',
+            'email': 'assinante@teste.com',
+            'full_name': 'Assinante Batch'
+        }]
+
+        success, batch = SignatureBatchService.create_signature_batch(
+            organization=self.organization,
+            name="Lote Serviço",
+            template=template,
+            documents=[self.document],
+            signers_data=signers_data,
+            created_by=self.user,
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(batch.total_documents, 1)
+        self.assertEqual(
+            SignatureRequest.objects.filter(title__startswith="Lote Serviço").count(), 1
+        )
+        self.assertTrue(
+            SignatureAuditLog.objects.filter(
+                action="request_created",
+                signature_request__title__startswith="Lote Serviço"
+            ).exists()
+        )
