@@ -1,95 +1,276 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+  Folder,
+  FileText,
+  Upload,
+  PlusCircle,
+  ChevronRight,
+  Home,
+  AlertTriangle,
+} from 'lucide-react';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import directoriesService from '@/services/ordoc-air/directories';
+import documentsService from '@/services/ordoc-air/documents';
 
-const DocumentIcon = () => (
-  <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
+interface Directory {
+  id: number;
+  name: string;
+}
+
+interface Document {
+  id: number;
+  title?: string;
+  filename?: string;
+  created_at?: string;
+}
 
 function OrdocAirContent() {
+  const [currentDir, setCurrentDir] = useState<number | null>(null);
+  const [path, setPath] = useState<Directory[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const queryClient = useQueryClient();
+
+  const {
+    data: directoriesData,
+    isLoading: dirsLoading,
+    error: dirsError,
+    refetch: refetchDirs,
+  } = useQuery({
+    queryKey: ['directories', currentDir],
+    queryFn: () =>
+      currentDir
+        ? directoriesService.getChildren(currentDir)
+        : directoriesService.list({ parent: null }),
+  });
+
+  const {
+    data: documentsData,
+    isLoading: docsLoading,
+    error: docsError,
+    refetch: refetchDocs,
+  } = useQuery({
+    queryKey: ['documents', currentDir],
+    queryFn: () =>
+      currentDir
+        ? directoriesService.getDocuments(currentDir)
+        : documentsService.list({ directory: null }),
+  });
+
+  const directories: Directory[] =
+    directoriesData?.results || directoriesData || [];
+  const documents: Document[] =
+    documentsData?.results || documentsData || [];
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (currentDir) formData.append('directory', String(currentDir));
+      return documentsService.create(formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', currentDir] });
+    },
+  });
+
+  const createDirMutation = useMutation({
+    mutationFn: (name: string) =>
+      directoriesService.create({ name, parent: currentDir }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['directories', currentDir] });
+    },
+  });
+
+  const handleNavigate = (dir: Directory) => {
+    setCurrentDir(dir.id);
+    setPath((prev) => [...prev, dir]);
+  };
+
+  const handleBreadcrumb = (index: number) => {
+    if (index === -1) {
+      setCurrentDir(null);
+      setPath([]);
+    } else {
+      const newPath = path.slice(0, index + 1);
+      setCurrentDir(newPath[newPath.length - 1].id);
+      setPath(newPath);
+    }
+  };
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadMutation.mutate(file);
+  };
+
+  const handleCreateDirectory = () => {
+    const name = prompt('Nome da nova pasta:');
+    if (name) createDirMutation.mutate(name);
+  };
+
+  const isLoading = dirsLoading || docsLoading;
+  const isError = dirsError || docsError;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-lg border-b border-gray-200">
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                <DocumentIcon />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">OrdocAir</h1>
-                <p className="text-gray-600">Gestão Documental Inteligente</p>
-              </div>
+              <Folder className="w-6 h-6 text-blue-600" />
+              <h1 className="text-xl font-bold text-gray-900">OrdocAir</h1>
             </div>
+            <Link
+              href="/dashboard"
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              ← Voltar ao Dashboard
+            </Link>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-          <div className="text-center">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <DocumentIcon />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Módulo OrdocAir</h2>
-            <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-              Sistema completo de gestão documental com OCR automático, versionamento inteligente, 
-              busca avançada e organização hierárquica de documentos.
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center text-sm text-gray-600 space-x-1">
+            <button
+              onClick={() => handleBreadcrumb(-1)}
+              className="flex items-center hover:text-gray-900"
+            >
+              <Home className="w-4 h-4 mr-1" />
+              Raiz
+            </button>
+            {path.map((dir, idx) => (
+              <React.Fragment key={dir.id}>
+                <ChevronRight className="w-4 h-4" />
+                <button
+                  onClick={() => handleBreadcrumb(idx)}
+                  className="hover:text-gray-900"
+                >
+                  {dir.name}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+              disabled={uploadMutation.isPending}
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              Upload
+            </button>
+            <button
+              onClick={handleCreateDirectory}
+              className="flex items-center px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300"
+              disabled={createDirMutation.isPending}
+            >
+              <PlusCircle className="w-4 h-4 mr-1" />
+              Nova Pasta
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleUpload}
+              className="hidden"
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Carregando documentos...</span>
+          </div>
+        ) : isError ? (
+          <div className="text-center py-12">
+            <AlertTriangle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Erro ao carregar dados
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Não foi possível carregar as pastas ou documentos.
             </p>
-            
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8">
-              <div className="flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-yellow-800 mb-2">Em Desenvolvimento</h3>
-              <p className="text-yellow-700">
-                Este módulo está sendo migrado do sistema legado. As funcionalidades completas 
-                estarão disponíveis em breve.
-              </p>
+            <button
+              onClick={() => {
+                refetchDirs();
+                refetchDocs();
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                Pastas
+              </h2>
+              {directories.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Nenhuma pasta encontrada.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {directories.map((dir) => (
+                    <div
+                      key={dir.id}
+                      onClick={() => handleNavigate(dir)}
+                      className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow cursor-pointer flex items-center space-x-3"
+                    >
+                      <Folder className="w-5 h-5 text-blue-500" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {dir.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Features Preview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-gray-50 rounded-xl p-6">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                </div>
-                <h4 className="font-semibold text-gray-900 mb-2">Upload Inteligente</h4>
-                <p className="text-gray-600 text-sm">Upload em lote com processamento automático e OCR</p>
-              </div>
-
-              <div className="bg-gray-50 rounded-xl p-6">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <h4 className="font-semibold text-gray-900 mb-2">Busca Avançada</h4>
-                <p className="text-gray-600 text-sm">Busca por conteúdo, metadados e texto extraído</p>
-              </div>
-
-              <div className="bg-gray-50 rounded-xl p-6">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <h4 className="font-semibold text-gray-900 mb-2">Organização</h4>
-                <p className="text-gray-600 text-sm">Estrutura hierárquica e categorização automática</p>
-              </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                Documentos
+              </h2>
+              {documents.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum documento encontrado.</p>
+              ) : (
+                <ul className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
+                  {documents.map((doc) => (
+                    <li
+                      key={doc.id}
+                      className="flex items-center justify-between p-4 hover:bg-gray-50"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {doc.title || doc.filename}
+                          </p>
+                          {doc.created_at && (
+                            <p className="text-xs text-gray-500">
+                              {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
-        </div>
-      </main>
+        )}
+      </div>
     </div>
   );
 }
@@ -101,3 +282,4 @@ export default function OrdocAir() {
     </ProtectedRoute>
   );
 }
+
