@@ -55,7 +55,7 @@ def directory(user):
 def document(directory, user):
     uploaded = SimpleUploadedFile("test.txt", b"content")
     return Document.objects.create(
-        original_filename="test.txt",
+        name="test.txt",
         prn="doc-prn",
         file=uploaded,
         directory=directory,

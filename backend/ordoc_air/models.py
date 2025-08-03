@@ -119,10 +119,10 @@ class Document(models.Model):
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    original_filename = models.CharField(max_length=500, verbose_name="Nome Original")
+    name = models.CharField(max_length=500, verbose_name="Nome")
     description = models.TextField(blank=True, null=True, verbose_name="Descrição")
     file_size = models.BigIntegerField(null=True, blank=True, verbose_name="Tamanho do Arquivo")
-    content_type = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tipo de Conteúdo")
+    mime_type = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tipo MIME")
     prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
 
     # Versioning
@@ -184,14 +184,31 @@ class Document(models.Model):
         verbose_name_plural = "Documentos"
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['original_filename']),
+            models.Index(fields=['name']),
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
             models.Index(fields=['directory']),
         ]
-    
+
     def __str__(self):
-        return self.original_filename
+        return self.name
+
+    # Backwards compatibility aliases
+    @property
+    def original_filename(self):  # pragma: no cover - temporary alias
+        return self.name
+
+    @original_filename.setter
+    def original_filename(self, value):  # pragma: no cover
+        self.name = value
+
+    @property
+    def content_type(self):  # pragma: no cover
+        return self.mime_type
+
+    @content_type.setter
+    def content_type(self, value):  # pragma: no cover
+        self.mime_type = value
 
     # FSM Transitions - equivalente ao AASM do Rails
     @transition(field=status, source='created', target='enqueued')
@@ -223,7 +240,7 @@ class Document(models.Model):
     
     def get_file_extension(self):
         """Retorna a extensão do arquivo"""
-        return os.path.splitext(self.original_filename)[1].lower()
+        return os.path.splitext(self.name)[1].lower()
     
     def is_image(self):
         """Verifica se o documento é uma imagem"""
@@ -265,7 +282,7 @@ class ShareableLink(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"Link para {self.document.original_filename}"
+        return f"Link para {self.document.name}"
 
 
 class RecentDocument(models.Model):
@@ -287,7 +304,7 @@ class RecentDocument(models.Model):
         unique_together = ['user', 'document']
     
     def __str__(self):
-        return f"{self.user.username} - {self.document.original_filename}"
+        return f"{self.user.username} - {self.document.name}"
 
 
 class Permission(models.Model):

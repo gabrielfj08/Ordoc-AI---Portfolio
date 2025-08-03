@@ -162,7 +162,7 @@ class SignatureRequestSignerSerializer(serializers.ModelSerializer):
 class SignatureRequestSerializer(serializers.ModelSerializer):
     """Serializer para solicitações de assinatura"""
     
-    document_name = serializers.CharField(source='document.original_filename', read_only=True)
+    document_name = serializers.CharField(source='document.name', read_only=True)
     template_name = serializers.CharField(source='template.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     signers = SignatureRequestSignerSerializer(many=True, read_only=True)
@@ -289,7 +289,7 @@ class SignatureRequestCreateSerializer(serializers.ModelSerializer):
 class DocumentSignatureSerializer(serializers.ModelSerializer):
     """Serializer para assinaturas de documento"""
     
-    document_name = serializers.CharField(source='document.original_filename', read_only=True)
+    document_name = serializers.CharField(source='document.name', read_only=True)
     signer_name = serializers.CharField(source='signer.full_name', read_only=True)
     signer_email = serializers.CharField(source='signer.email', read_only=True)
     certificate_subject = serializers.CharField(source='certificate.subject_name', read_only=True)

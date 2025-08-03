@@ -129,13 +129,13 @@ class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            'id', 'original_filename', 'description', 'file', 'file_size',
-            'content_type', 'status', 'version', 'is_current_version',
+            'id', 'name', 'description', 'file', 'file_size',
+            'mime_type', 'status', 'version', 'is_current_version',
             'parent_document', 'prn', 'directory', 'directory_name',
             'department', 'created_at', 'updated_at', 'processed_at'
         ]
         read_only_fields = [
-            'id', 'file_size', 'content_type', 'status', 'version',
+            'id', 'file_size', 'mime_type', 'status', 'version',
             'is_current_version', 'parent_document', 'prn',
             'directory_name', 'created_at', 'updated_at', 'processed_at'
         ]
@@ -237,7 +237,7 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            'original_filename', 'description', 'file', 'directory', 'department',
+            'name', 'description', 'file', 'directory', 'department',
             'prn', 'parent_document', 'version', 'is_current_version'
         ]
         read_only_fields = ['parent_document', 'version', 'is_current_version']
@@ -245,9 +245,9 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create document and populate upload metadata."""
         file = validated_data['file']
-        validated_data.setdefault('original_filename', file.name)
+        validated_data.setdefault('name', file.name)
         validated_data['file_size'] = getattr(file, 'size', None)
-        validated_data['content_type'] = getattr(file, 'content_type', None)
+        validated_data['mime_type'] = getattr(file, 'content_type', None)
         validated_data.setdefault('prn', str(uuid.uuid4()))
         if not validated_data.get('department') and validated_data.get('directory'):
             validated_data['department'] = validated_data['directory'].department

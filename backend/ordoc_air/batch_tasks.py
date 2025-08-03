@@ -335,14 +335,14 @@ def generate_batch_operation_report(batch_operation_id):
             if item.status == 'completed':
                 successful_items.append({
                     'document_id': str(item.document.id),
-                    'document_name': item.document.original_filename,
+                    'document_name': item.document.name,
                     'processing_time': str(item.processing_time) if item.processing_time else None,
                     'result': item.result
                 })
             elif item.status == 'failed':
                 failed_items_detail.append({
                     'document_id': str(item.document.id),
-                    'document_name': item.document.original_filename,
+                    'document_name': item.document.name,
                     'error': item.error_message
                 })
         

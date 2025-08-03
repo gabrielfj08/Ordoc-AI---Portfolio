@@ -125,10 +125,10 @@ class OrdocSignTestCase(APITestCase):
         
         # Criar documento de teste
         self.document = Document.objects.create(
-            original_filename="Documento Teste.pdf",
+            name="Documento Teste.pdf",
             description="Documento para testes de assinatura",
             file_size=1024,
-            content_type="application/pdf",
+            mime_type="application/pdf",
             prn="PRN-DOC-TESTE-001",
             department=self.department,  # Associar ao departamento
             created_by=self.user
@@ -540,10 +540,10 @@ class SignatureServiceTest(TestCase):
         )
         
         self.document = Document.objects.create(
-            original_filename="Documento Service.pdf",
+            name="Documento Service.pdf",
             description="Documento para testes de serviço",
             file_size=2048,
-            content_type="application/pdf",
+            mime_type="application/pdf",
             prn="PRN-DOC-SERVICE-002",
             created_by=self.user
         )
@@ -826,10 +826,10 @@ class SignatureBatchServiceTest(TestCase):
         )
 
         self.document = Document.objects.create(
-            original_filename="Documento Batch.pdf",
+            name="Documento Batch.pdf",
             description="Documento batch",
             file_size=1024,
-            content_type="application/pdf",
+            mime_type="application/pdf",
             prn="PRN-DOC-BATCH-004",
             created_by=self.user,
         )
