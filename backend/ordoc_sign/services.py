@@ -196,6 +196,9 @@ class CertificateService:
             # Verificações básicas
             now = timezone.now()
             
+            if certificate.status == 'revoked':
+                return False, "Certificado revogado"
+
             if certificate.status != 'active':
                 return False, f"Certificado com status: {certificate.get_status_display()}"
             
@@ -203,14 +206,18 @@ class CertificateService:
                 return False, "Certificado ainda não é válido"
             
             if now > certificate.valid_until:
-                certificate.status = 'expired'
-                certificate.save()
+                if certificate.status != 'expired':
+                    certificate.status = 'expired'
+                    certificate.save(update_fields=["status"])
                 return False, "Certificado expirado"
-            
+
+            # Validar uso da chave
+            if certificate.key_usage and "digital_signature" not in certificate.key_usage:
+                return False, "Certificado não permite assinatura digital"
+
             # Verificar integridade do certificado
             try:
-                cert = x509.load_pem_x509_certificate(certificate.certificate_data.encode())
-                # Verificações adicionais podem ser implementadas aqui
+                x509.load_pem_x509_certificate(certificate.certificate_data.encode())
                 return True, "Certificado válido"
             except Exception as e:
                 return False, f"Erro na verificação do certificado: {str(e)}"
