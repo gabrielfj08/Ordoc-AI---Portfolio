@@ -3,8 +3,16 @@ Serializers for OrdocAir module
 Equivalent to Rails serializers and JSON responses
 """
 from rest_framework import serializers
-from django.contrib.auth.models import User
-from .models import Organization, Department, Directory, Document, ShareableLink, RecentDocument
+from django.contrib.auth.models import User, Group
+from .models import (
+    Organization,
+    Department,
+    Directory,
+    Document,
+    ShareableLink,
+    RecentDocument,
+    Permission,
+)
 from ordoc_cloud.models import OrdocUser
 
 
@@ -328,5 +336,30 @@ class DocumentStatusUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"Cannot transition to '{value}'. Available transitions: {available_transitions}"
             )
-        
+
         return value
+
+
+class PermissionSerializer(serializers.ModelSerializer):
+    """Serializer for Permission model"""
+
+    class Meta:
+        model = Permission
+        fields = ['id', 'user', 'group', 'directory', 'document', 'permission', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate(self, attrs):
+        user = attrs.get('user')
+        group = attrs.get('group')
+        directory = attrs.get('directory')
+        document = attrs.get('document')
+
+        if not user and not group:
+            raise serializers.ValidationError('User or group must be provided.')
+        if user and group:
+            raise serializers.ValidationError('Provide either user or group, not both.')
+        if not directory and not document:
+            raise serializers.ValidationError('Directory or document must be provided.')
+        if directory and document:
+            raise serializers.ValidationError('Provide either directory or document, not both.')
+        return attrs

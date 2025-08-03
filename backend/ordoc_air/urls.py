@@ -4,8 +4,13 @@ URLs for OrdocAir - Document Management Module
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    OrganizationViewSet, DepartmentViewSet, DirectoryViewSet,
-    DocumentViewSet, ShareableLinkViewSet, RecentDocumentViewSet
+    OrganizationViewSet,
+    DepartmentViewSet,
+    DirectoryViewSet,
+    DocumentViewSet,
+    ShareableLinkViewSet,
+    RecentDocumentViewSet,
+    PermissionViewSet,
 )
 
 # Create router for OrdocAir API endpoints
@@ -18,6 +23,7 @@ router.register(r'directories', DirectoryViewSet, basename='directory')
 router.register(r'documents', DocumentViewSet, basename='document')
 router.register(r'shareable-links', ShareableLinkViewSet, basename='shareablelink')
 router.register(r'recent-documents', RecentDocumentViewSet, basename='recentdocument')
+router.register(r'permissions', PermissionViewSet, basename='permission')
 
 app_name = 'ordoc_air'
 
