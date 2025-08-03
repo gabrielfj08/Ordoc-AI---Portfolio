@@ -4,6 +4,8 @@ Equivalent to Rails serializers and JSON responses
 """
 from rest_framework import serializers
 from django.contrib.auth.models import User, Group
+from django.db import models
+import uuid
 from .models import (
     Organization,
     Department,
@@ -120,101 +122,40 @@ class DirectorySerializer(serializers.ModelSerializer):
 
 
 class DocumentSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Document model
-    Equivalent to Rails DocumentSerializer
-    """
-    
-    # Nested fields
+    """Serializer for Document model with versioning support."""
+
     directory_name = serializers.CharField(source='directory.name', read_only=True)
-    directory_path = serializers.CharField(source='directory.get_full_path', read_only=True)
-    uploaded_by_name = serializers.SerializerMethodField()
-    file_size_formatted = serializers.SerializerMethodField()
-    can_transition_to = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Document
         fields = [
-            'id', 'name', 'description', 'file', 'file_size', 'file_size_formatted',
-            'file_type', 'mime_type', 'status', 'can_transition_to', 'version',
-            'is_current_version', 'parent_document', 'directory', 'directory_name',
-            'directory_path', 'organization', 'department', 'uploaded_by',
-            'uploaded_by_name', 'ocr_content', 'thumbnail', 'tags', 'metadata',
-            'created_at', 'updated_at', 'processed_at'
+            'id', 'original_filename', 'description', 'file', 'file_size',
+            'content_type', 'status', 'version', 'is_current_version',
+            'parent_document', 'prn', 'directory', 'directory_name',
+            'department', 'created_at', 'updated_at', 'processed_at'
         ]
         read_only_fields = [
-            'id', 'file_size', 'file_size_formatted', 'file_type', 'mime_type',
-            'status', 'can_transition_to', 'version', 'is_current_version',
-            'directory_name', 'directory_path', 'uploaded_by_name', 'ocr_content',
-            'thumbnail', 'created_at', 'updated_at', 'processed_at'
+            'id', 'file_size', 'content_type', 'status', 'version',
+            'is_current_version', 'parent_document', 'prn',
+            'directory_name', 'created_at', 'updated_at', 'processed_at'
         ]
-    
-    def get_uploaded_by_name(self, obj):
-        """Get uploader name"""
-        if obj.uploaded_by:
-            try:
-                ordoc_user = obj.uploaded_by.ordoc_profile
-                return obj.uploaded_by.get_full_name() or obj.uploaded_by.username
-            except:
-                return obj.uploaded_by.username
-        return None
-    
-    def get_file_size_formatted(self, obj):
-        """Get formatted file size"""
-        return obj.get_file_size_display()
-    
-    def get_can_transition_to(self, obj):
-        """Get available status transitions"""
-        return obj.get_available_status_transitions()
 
 
 class DocumentDetailSerializer(DocumentSerializer):
-    """
-    Detailed serializer for Document model with additional fields
-    Used for single document retrieval
-    """
-    
-    # Additional fields for detail view
+    """Detailed serializer including all document versions."""
+
     versions = serializers.SerializerMethodField()
-    recent_activity = serializers.SerializerMethodField()
-    shareable_links = serializers.SerializerMethodField()
-    
+
     class Meta(DocumentSerializer.Meta):
-        fields = DocumentSerializer.Meta.fields + ['versions', 'recent_activity', 'shareable_links']
-    
+        fields = DocumentSerializer.Meta.fields + ['versions']
+
     def get_versions(self, obj):
-        """Get document versions"""
-        if obj.parent_document:
-            # This is a version, get all versions of the parent
-            versions = Document.objects.filter(
-                parent_document=obj.parent_document,
-                deleted_at__isnull=True
-            ).order_by('-version')
-        else:
-            # This is the main document, get its versions
-            versions = Document.objects.filter(
-                parent_document=obj,
-                deleted_at__isnull=True
-            ).order_by('-version')
-        
-        return DocumentSerializer(versions, many=True, context=self.context).data
-    
-    def get_recent_activity(self, obj):
-        """Get recent activity for this document"""
-        recent_docs = RecentDocument.objects.filter(
-            document=obj
-        ).select_related('user').order_by('-accessed_at')[:10]
-        
-        return RecentDocumentSerializer(recent_docs, many=True, context=self.context).data
-    
-    def get_shareable_links(self, obj):
-        """Get active shareable links"""
-        links = obj.shareable_links.filter(
-            is_active=True,
+        parent = obj.parent_document or obj
+        versions = Document.objects.filter(
+            models.Q(parent_document=parent) | models.Q(id=parent.id),
             deleted_at__isnull=True
-        ).order_by('-created_at')
-        
-        return ShareableLinkSerializer(links, many=True, context=self.context).data
+        ).order_by('-version')
+        return DocumentSerializer(versions, many=True, context=self.context).data
 
 
 class ShareableLinkSerializer(serializers.ModelSerializer):
@@ -291,31 +232,29 @@ class RecentDocumentSerializer(serializers.ModelSerializer):
 
 
 class DocumentUploadSerializer(serializers.ModelSerializer):
-    """
-    Specialized serializer for document upload
-    """
-    
+    """Serializer used for uploading documents and creating versions."""
+
     class Meta:
         model = Document
         fields = [
-            'name', 'description', 'file', 'directory', 'department', 'tags', 'metadata'
+            'original_filename', 'description', 'file', 'directory', 'department',
+            'prn', 'parent_document', 'version', 'is_current_version'
         ]
-    
+        read_only_fields = ['parent_document', 'version', 'is_current_version']
+
     def create(self, validated_data):
-        """
-        Create document with file processing
-        """
-        # Set organization and uploaded_by from context
-        validated_data['organization'] = self.context['current_organization']
-        validated_data['uploaded_by'] = self.context['current_user']
-        
-        # Create document
+        """Create document and populate upload metadata."""
+        file = validated_data['file']
+        validated_data.setdefault('original_filename', file.name)
+        validated_data['file_size'] = getattr(file, 'size', None)
+        validated_data['content_type'] = getattr(file, 'content_type', None)
+        validated_data.setdefault('prn', str(uuid.uuid4()))
+        if not validated_data.get('department') and validated_data.get('directory'):
+            validated_data['department'] = validated_data['directory'].department
+        validated_data['created_by'] = self.context.get('current_user')
         document = super().create(validated_data)
-        
-        # Trigger async processing
         from .tasks import process_document_upload
         process_document_upload.delay(str(document.id))
-        
         return document
 
 

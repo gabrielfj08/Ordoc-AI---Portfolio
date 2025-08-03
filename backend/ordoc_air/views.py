@@ -224,6 +224,14 @@ class DocumentViewSet(BaseViewSet):
         elif self.action == 'update_status':
             return DocumentStatusUpdateSerializer
         return DocumentSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({
+            'current_user': self.get_current_user(),
+            'current_organization': self.get_current_organization(),
+        })
+        return context
     
     def get_queryset(self):
         """Override to filter current versions by default"""
@@ -310,20 +318,11 @@ class DocumentViewSet(BaseViewSet):
     def versions(self, request, pk=None):
         """Get all versions of document"""
         document = self.get_object()
-        
-        if document.parent_document:
-            # This is a version, get all versions of the parent
-            versions = Document.objects.filter(
-                parent_document=document.parent_document,
-                deleted_at__isnull=True
-            ).order_by('-version')
-        else:
-            # This is the main document, get its versions
-            versions = Document.objects.filter(
-                parent_document=document,
-                deleted_at__isnull=True
-            ).order_by('-version')
-        
+        parent = document.parent_document or document
+        versions = Document.objects.filter(
+            Q(parent_document=parent) | Q(id=parent.id),
+            deleted_at__isnull=True
+        ).order_by('-version')
         serializer = DocumentSerializer(versions, many=True, context={'request': request})
         return Response(serializer.data)
     
