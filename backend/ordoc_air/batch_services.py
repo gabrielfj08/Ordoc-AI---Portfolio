@@ -521,21 +521,30 @@ class SolrService:
     
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
-        self.solr_available = self._check_solr_availability()
-    
-    def _check_solr_availability(self) -> bool:
-        """
-        Verifica se o Solr está disponível
-        """
+        self.solr_available = False
         try:
             import pysolr
-            solr_url = getattr(settings, 'SOLR_URL', 'http://localhost:8983/solr/ordoc_documents')
-            solr = pysolr.Solr(solr_url)
-            solr.ping()
-            return True
+            solr_url = getattr(settings, 'SOLR_URL', 'http://localhost:8983/solr')
+            collection = getattr(settings, 'SOLR_COLLECTION', 'documents')
+            username = getattr(settings, 'SOLR_USERNAME', None)
+            password = getattr(settings, 'SOLR_PASSWORD', None)
+            auth = (username, password) if username and password else None
+            self.solr = pysolr.Solr(f"{solr_url.rstrip('/')}/{collection}", auth=auth)
+            self.solr.ping()
+            self.solr_available = True
         except Exception as e:
             self.logger.warning(f"Solr não está disponível: {str(e)}")
-            return False
+            self.solr = None
+
+    def add(self, docs: List[Dict[str, Any]]):
+        if not self.solr_available:
+            raise ValueError("Solr não está disponível")
+        self.solr.add(docs)
+
+    def commit(self):
+        if not self.solr_available:
+            raise ValueError("Solr não está disponível")
+        self.solr.commit()
     
     def index_document(self, document: Document) -> SolrIndex:
         """
@@ -554,21 +563,15 @@ class SolrService:
         )
         
         try:
-            import pysolr
-            
             solr_index.status = 'indexing'
             solr_index.save()
-            
+
             # Preparar dados para indexação
             doc_data = self._prepare_document_data(document)
-            
-            # Conectar ao Solr
-            solr_url = getattr(settings, 'SOLR_URL', 'http://localhost:8983/solr/ordoc_documents')
-            solr = pysolr.Solr(solr_url)
-            
+
             # Indexar documento
-            solr.add([doc_data])
-            solr.commit()
+            self.add([doc_data])
+            self.commit()
             
             # Atualizar status
             solr_index.status = 'indexed'
@@ -604,7 +607,7 @@ class SolrService:
             'document_id': str(document.id),
             'filename': document.original_filename,
             'content': extracted_text,
-            'mime_type': document.mime_type or '',
+            'mime_type': getattr(document, 'content_type', '') or '',
             'file_size': document.file_size or 0,
             'status': document.status,
             'directory_id': str(document.directory.id) if document.directory else '',
@@ -613,7 +616,7 @@ class SolrService:
             'created_at': document.created_at.isoformat() if document.created_at else '',
             'updated_at': document.updated_at.isoformat() if document.updated_at else '',
             'created_by': document.created_by.username if document.created_by else '',
-            'metadata': document.metadata if document.metadata else {},
+            'metadata': getattr(document, 'metadata', {}) or {},
         }
         
         # Adicionar campos de boost baseados na relevância
@@ -633,11 +636,6 @@ class SolrService:
             raise ValueError("Solr não está disponível")
         
         try:
-            import pysolr
-            
-            solr_url = getattr(settings, 'SOLR_URL', 'http://localhost:8983/solr/ordoc_documents')
-            solr = pysolr.Solr(solr_url)
-            
             # Preparar query
             search_query = query if query else '*:*'
             
@@ -651,7 +649,7 @@ class SolrService:
                         filter_queries.append(f"{field}:{value}")
             
             # Executar busca
-            results = solr.search(
+            results = self.solr.search(
                 search_query,
                 fq=filter_queries,
                 start=start,
@@ -681,14 +679,9 @@ class SolrService:
             return
         
         try:
-            import pysolr
-            
-            solr_url = getattr(settings, 'SOLR_URL', 'http://localhost:8983/solr/ordoc_documents')
-            solr = pysolr.Solr(solr_url)
-            
             # Remover do Solr
-            solr.delete(id=f"doc_{document.id}")
-            solr.commit()
+            self.solr.delete(id=f"doc_{document.id}")
+            self.commit()
             
             # Remover registro local
             if hasattr(document, 'solr_index'):
