@@ -124,6 +124,17 @@ class Document(models.Model):
     file_size = models.BigIntegerField(null=True, blank=True, verbose_name="Tamanho do Arquivo")
     content_type = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tipo de Conteúdo")
     prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
+
+    # Versioning
+    version = models.PositiveIntegerField(default=1)
+    is_current_version = models.BooleanField(default=True)
+    parent_document = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='versions'
+    )
     
     # FSM Status field - equivalente ao AASM do Rails
     status = FSMField(default='created', choices=STATUS_CHOICES, verbose_name="Status")
@@ -148,7 +159,6 @@ class Document(models.Model):
     # Relations
     directory = models.ForeignKey(Directory, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
     department = models.ForeignKey(Department, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
-    head_document = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='versions')
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -182,7 +192,7 @@ class Document(models.Model):
     
     def __str__(self):
         return self.original_filename
-    
+
     # FSM Transitions - equivalente ao AASM do Rails
     @transition(field=status, source='created', target='enqueued')
     def enqueue(self, user=None):
@@ -223,6 +233,13 @@ class Document(models.Model):
     def is_pdf(self):
         """Verifica se o documento é um PDF"""
         return self.get_file_extension() == '.pdf'
+
+    def get_next_version_number(self):
+        """Return the next version number for this document"""
+        max_version = self.versions.aggregate(models.Max('version'))['version__max']
+        if max_version is None:
+            max_version = self.version
+        return max_version + 1
 
 
 class ShareableLink(models.Model):
