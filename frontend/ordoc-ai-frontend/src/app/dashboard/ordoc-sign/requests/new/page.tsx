@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -19,6 +19,8 @@ export default function NewSignatureRequestPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Omit<CreateSignatureRequestData, 'signers' | 'document_file'> & { document_file: File | null }>({
     title: '',
@@ -49,7 +51,24 @@ export default function NewSignatureRequestPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setFormData(prev => ({ ...prev, document_file: file }));
+
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    if (file) {
+      setPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setPreviewUrl(null);
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const addSigner = () => {
     setSigners(prev => [
@@ -229,6 +248,12 @@ export default function NewSignatureRequestPage() {
                 <p className="text-sm text-gray-500 mt-1">
                   Formatos aceitos: PDF, DOC, DOCX
                 </p>
+                {previewUrl && (
+                  <iframe
+                    src={previewUrl}
+                    className="w-full h-64 mt-4"
+                  />
+                )}
               </div>
 
               <div className="md:col-span-2 space-y-4">
