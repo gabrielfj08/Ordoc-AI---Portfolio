@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from ordoc_air.models import Organization
 from ordoc_cloud.models import OrdocUser, UserOrganizationRole
 from .models import ReportTemplate, Report
+from .services import ReportScheduleService
 from .tasks import (
     generate_report_task,
     process_scheduled_reports_task,
@@ -256,3 +257,64 @@ class ReportTasksTests(BaseAPITestCase):
 
         mock_notify.assert_called_once()
         self.assertIn(self.user.email, mock_notify.call_args.kwargs["emails"])
+
+
+class ReportScheduleServiceLogTests(BaseAPITestCase):
+    """Tests for logging in ReportScheduleService."""
+
+    def _create_template(self):
+        return ReportTemplate.objects.create(
+            name="Temp",
+            category="documents",
+            type="table",
+            status="active",
+            query_config={"model": "ordoc_air.Organization", "fields": ["corporate_name"]},
+            display_config={},
+            filter_config={},
+            export_config={},
+            is_public=True,
+            allowed_roles=[],
+            organization=self.organization,
+            created_by=self.ordoc_user,
+        )
+
+    def _create_schedule(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        from .models import ReportSchedule
+
+        template = self._create_template()
+        return ReportSchedule.objects.create(
+            name="Sched",
+            frequency="daily",
+            next_run=timezone.now() - timedelta(minutes=1),
+            template=template,
+            organization=self.organization,
+            created_by=self.ordoc_user,
+            default_format="json",
+            default_filters={},
+        )
+
+    def test_process_scheduled_reports_logs_success(self):
+        schedule = self._create_schedule()
+        with patch("ordoc_reports.tasks.generate_report_task.delay"):
+            with self.assertLogs("ordoc_reports.services", level="INFO") as cm:
+                ReportScheduleService.process_scheduled_reports()
+
+        self.assertTrue(
+            any("Relatório agendado criado" in message for message in cm.output)
+        )
+
+    def test_process_scheduled_reports_logs_error(self):
+        schedule = self._create_schedule()
+        with patch("ordoc_reports.tasks.generate_report_task.delay"):
+            with patch(
+                "ordoc_reports.models.Report.objects.create",
+                side_effect=Exception("boom"),
+            ):
+                with self.assertLogs("ordoc_reports.services", level="ERROR") as cm:
+                    ReportScheduleService.process_scheduled_reports()
+
+        self.assertTrue(
+            any(schedule.name in message and "boom" in message for message in cm.output)
+        )

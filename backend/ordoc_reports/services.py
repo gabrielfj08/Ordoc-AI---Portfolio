@@ -740,11 +740,16 @@ class ReportScheduleService:
                 schedule.last_run = now
                 schedule.calculate_next_run()
                 
-                print(f"Relatório agendado criado: {report.id} para agendamento {schedule.name}")
-            
+                ReportScheduleService.logger.info(
+                    f"Relatório agendado criado: {report.id} para agendamento {schedule.id} ({schedule.name})"
+                )
+
             except Exception as e:
-                print(f"Erro ao processar agendamento {schedule.name}: {str(e)}")
-                
+                ReportScheduleService.logger.error(
+                    f"Erro ao processar agendamento {schedule.id} ({schedule.name}): {e}",
+                    exc_info=True,
+                )
+
                 # Opcional: enviar notificação de erro
                 if schedule.notify_on_error:
                     ReportScheduleService._send_error_notification(schedule, str(e))
@@ -821,9 +826,14 @@ class ReportCleanupService:
                 cleaned_count += 1
                 
             except Exception as e:
-                print(f"Erro ao limpar relatório {report.id}: {str(e)}")
-        
-        print(f"Limpeza concluída: {cleaned_count} relatórios limpos")
+                ReportScheduleService.logger.error(
+                    f"Erro ao limpar relatório {report.id}: {e}",
+                    exc_info=True,
+                )
+
+        ReportScheduleService.logger.info(
+            f"Limpeza concluída: {cleaned_count} relatórios limpos"
+        )
         return cleaned_count
     
     @staticmethod
@@ -852,7 +862,12 @@ class ReportCleanupService:
                 cleaned_count += 1
                 
             except Exception as e:
-                print(f"Erro ao remover relatório antigo {report.id}: {str(e)}")
-        
-        print(f"Limpeza de relatórios antigos concluída: {cleaned_count} relatórios removidos")
+                ReportScheduleService.logger.error(
+                    f"Erro ao remover relatório antigo {report.id}: {e}",
+                    exc_info=True,
+                )
+
+        ReportScheduleService.logger.info(
+            f"Limpeza de relatórios antigos concluída: {cleaned_count} relatórios removidos"
+        )
         return cleaned_count
