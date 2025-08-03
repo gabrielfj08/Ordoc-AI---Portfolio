@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User, Group
 from django.core.validators import FileExtensionValidator
 from django_fsm import FSMField, transition
+from django.utils import timezone
 import uuid
 import os
 
@@ -158,6 +159,15 @@ class Document(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_documents')
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_documents')
     deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deleted_documents')
+
+    # Process tracking
+    enqueued_at = models.DateTimeField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    failed_at = models.DateTimeField(null=True, blank=True)
+
+    enqueued_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='enqueued_documents')
+    processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='processed_documents')
+    failed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='failed_documents')
     
     class Meta:
         verbose_name = "Documento"
@@ -175,20 +185,31 @@ class Document(models.Model):
     
     # FSM Transitions - equivalente ao AASM do Rails
     @transition(field=status, source='created', target='enqueued')
-    def enqueue(self):
+    def enqueue(self, user=None):
         """Enfileira o documento para processamento"""
-        # Aqui seria chamado o job de OCR
-        pass
-    
+        from .tasks import process_document_ocr
+
+        self.enqueued_at = timezone.now()
+        if user:
+            self.enqueued_by = user
+            self.updated_by = user
+        process_document_ocr.delay(self.id)
+
     @transition(field=status, source=['enqueued', 'failed'], target='processed')
-    def process(self):
+    def process(self, user=None):
         """Marca o documento como processado"""
-        pass
-    
+        self.processed_at = timezone.now()
+        if user:
+            self.processed_by = user
+            self.updated_by = user
+
     @transition(field=status, source=['enqueued', 'processed'], target='failed')
-    def fail(self):
+    def fail(self, user=None):
         """Marca o documento como falhou"""
-        pass
+        self.failed_at = timezone.now()
+        if user:
+            self.failed_by = user
+            self.updated_by = user
     
     def get_file_extension(self):
         """Retorna a extensão do arquivo"""
