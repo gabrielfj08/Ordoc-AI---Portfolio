@@ -16,9 +16,11 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { FolderIcon, FolderOpenIcon } from '@heroicons/react/24/outline';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import directoriesService from '@/services/ordoc-air/directories';
 import documentsService from '@/services/ordoc-air/documents';
+import EmptyState from '@/components/ui/EmptyState';
 import { RecentDocuments } from '@/components/ordoc-air';
 
 interface Directory {
@@ -69,6 +71,10 @@ function OrdocAirContent() {
     directoriesData?.results || directoriesData || [];
   const documents: Document[] =
     documentsData?.results || documentsData || [];
+  const hasDepartments =
+    currentDir !== null
+      ? true
+      : directoriesData?.has_departments ?? true;
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => {
@@ -210,6 +216,19 @@ function OrdocAirContent() {
               Tentar novamente
             </button>
           </div>
+        ) : !hasDepartments ? (
+          <EmptyState
+            icon={FolderIcon}
+            title="Nenhum departamento encontrado"
+            description="Crie um departamento para começar"
+            actionButton={{ text: 'Criar Departamento', onClick: handleCreateDirectory }}
+          />
+        ) : !directories.length ? (
+          <EmptyState
+            icon={FolderOpenIcon}
+            title="Nenhuma pasta encontrada"
+            description="Crie uma pasta para organizar seus documentos"
+          />
         ) : (
           <div className="space-y-8">
             <RecentDocuments />
@@ -217,26 +236,20 @@ function OrdocAirContent() {
               <h2 className="text-lg font-semibold text-gray-900 mb-3">
                 Pastas
               </h2>
-              {directories.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  Nenhuma pasta encontrada.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {directories.map((dir) => (
-                    <div
-                      key={dir.id}
-                      onClick={() => handleNavigate(dir)}
-                      className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow cursor-pointer flex items-center space-x-3"
-                    >
-                      <Folder className="w-5 h-5 text-blue-500" />
-                      <span className="text-sm font-medium text-gray-900">
-                        {dir.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {directories.map((dir) => (
+                  <div
+                    key={dir.id}
+                    onClick={() => handleNavigate(dir)}
+                    className="p-4 bg-white border border-gray-200 rounded-lg hover:shadow cursor-pointer flex items-center space-x-3"
+                  >
+                    <Folder className="w-5 h-5 text-blue-500" />
+                    <span className="text-sm font-medium text-gray-900">
+                      {dir.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div>
@@ -244,7 +257,9 @@ function OrdocAirContent() {
                 Documentos
               </h2>
               {documents.length === 0 ? (
-                <p className="text-sm text-gray-500">Nenhum documento encontrado.</p>
+                <p className="text-sm text-gray-500">
+                  Nenhum documento encontrado.
+                </p>
               ) : (
                 <ul className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
                   {documents.map((doc) => (
