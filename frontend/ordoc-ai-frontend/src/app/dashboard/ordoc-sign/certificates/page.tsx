@@ -2,13 +2,17 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Upload, Shield, CheckCircle, XCircle, AlertTriangle, Star } from 'lucide-react';
+import { DocumentCheckIcon } from '@heroicons/react/24/outline';
+import EmptyState from '@/components/ui/EmptyState';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { signatureService } from '@/services/signature';
 import { FilterDigitalCertificatesParams } from '@/types/ordoc-sign';
 
 export default function CertificatesPage() {
+  const router = useRouter();
   const [filters, setFilters] = useState<FilterDigitalCertificatesParams>({
     page: 1,
     page_size: 20
@@ -135,18 +139,12 @@ export default function CertificatesPage() {
               </button>
             </div>
           ) : certificates.length === 0 ? (
-            <div className="text-center py-12">
-              <Shield className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum certificado encontrado</h3>
-              <p className="text-gray-600 mb-4">Faça upload do seu primeiro certificado digital.</p>
-              <Link
-                href="/dashboard/ordoc-sign/certificates/new"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Certificado
-              </Link>
-            </div>
+            <EmptyState
+              icon={DocumentCheckIcon}
+              title="Nenhum certificado configurado"
+              description="Importe ou crie certificados para assinar documentos"
+              actionButton={{ text: 'Importar Certificado', onClick: () => router.push('/dashboard/ordoc-sign/certificates/new') }}
+            />
           ) : (
             <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
