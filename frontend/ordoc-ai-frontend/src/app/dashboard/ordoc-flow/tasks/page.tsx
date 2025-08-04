@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  CheckSquare, 
+import {
+  Plus,
+  Search,
+  Filter,
+  CheckSquare,
   MoreVertical,
   Edit,
   Trash2,
@@ -15,6 +15,7 @@ import {
   User,
   AlertCircle
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { tasksService } from '@/services/ordoc-flow/tasks';
 import { Task, FilterTasksParams } from '@/types/ordoc-flow';
 
@@ -22,6 +23,7 @@ const TasksPage = () => {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalObjects, setTotalObjects] = useState(0);
   
@@ -48,12 +50,14 @@ const TasksPage = () => {
   const loadTasks = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await tasksService.getTasks(params);
       setTasks(response.data);
       setTotalPages(response.totalPages);
       setTotalObjects(response.total);
     } catch (error) {
       console.error('Erro ao carregar tarefas:', error);
+      setError('Erro ao carregar tarefas.');
     } finally {
       setLoading(false);
     }
@@ -205,28 +209,15 @@ const TasksPage = () => {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Carregando tarefas...</p>
           </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-600">{error}</div>
         ) : tasks.length === 0 ? (
-          <div className="p-8 text-center">
-            <CheckSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma tarefa encontrada</h3>
-            <p className="text-gray-600 mb-4">
-              {params.q || params.status || params.priority ? 
-                'Nenhuma tarefa corresponde aos filtros aplicados.' : 
-                'Comece criando sua primeira tarefa.'
-              }
-            </p>
-            {!params.q && !params.status && !params.priority && (
-              <div className="mt-6">
-                <button
-                  onClick={() => router.push('/dashboard/ordoc-flow/tasks/new')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Criar Primeira Tarefa
-                </button>
-              </div>
-            )}
-          </div>
+          <EmptyState
+            icon={CheckSquare}
+            title="Nenhuma tarefa configurada"
+            description="Configure tarefas para automatizar seus workflows"
+            actionButton={{ text: 'Criar Tarefa', onClick: () => router.push('/dashboard/ordoc-flow/tasks/new') }}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">

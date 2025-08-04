@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  CheckSquare, 
+import {
+  Plus,
+  Search,
+  Filter,
+  CheckSquare,
   MoreVertical,
   Edit,
   Trash2,
@@ -17,6 +17,7 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { signaturesService } from '@/services/ordoc-flow/signatures';
 import { Signature, FilterSignaturesParams } from '@/types/ordoc-flow';
 
@@ -24,6 +25,7 @@ const SignaturesPage = () => {
   const router = useRouter();
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalObjects, setTotalObjects] = useState(0);
   
@@ -50,12 +52,14 @@ const SignaturesPage = () => {
   const loadSignatures = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await signaturesService.getSignatures(params);
       setSignatures(response.data);
       setTotalPages(response.totalPages);
       setTotalObjects(response.total);
     } catch (error) {
       console.error('Erro ao carregar assinaturas:', error);
+      setError('Erro ao carregar assinaturas.');
     } finally {
       setLoading(false);
     }
@@ -181,28 +185,15 @@ const SignaturesPage = () => {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Carregando assinaturas...</p>
           </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-600">{error}</div>
         ) : signatures.length === 0 ? (
-          <div className="p-8 text-center">
-            <CheckSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma assinatura encontrada</h3>
-            <p className="text-gray-600 mb-4">
-              {params.q || params.status ? 
-                'Nenhuma assinatura corresponde aos filtros aplicados.' : 
-                'Comece criando sua primeira assinatura.'
-              }
-            </p>
-            {!params.q && !params.status && (
-              <div className="mt-6">
-                <button
-                  onClick={() => router.push('/dashboard/ordoc-flow/signatures/new')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Criar Primeira Assinatura
-                </button>
-              </div>
-            )}
-          </div>
+          <EmptyState
+            icon={CheckSquare}
+            title="Nenhuma assinatura configurada"
+            description="Configure assinaturas para automatizar seus workflows"
+            actionButton={{ text: 'Criar Assinatura', onClick: () => router.push('/dashboard/ordoc-flow/signatures/new') }}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">

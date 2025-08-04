@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Users, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Users,
   MoreVertical,
   Edit,
   Trash2,
@@ -16,6 +16,7 @@ import {
   ToggleLeft,
   ToggleRight
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { requestersService } from '@/services/ordoc-flow/requesters';
 import { Requester, FilterRequestersParams } from '@/types/ordoc-flow';
 
@@ -23,6 +24,7 @@ const RequestersPage = () => {
   const router = useRouter();
   const [requesters, setRequesters] = useState<Requester[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalObjects, setTotalObjects] = useState(0);
   
@@ -47,12 +49,14 @@ const RequestersPage = () => {
   const loadRequesters = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await requestersService.getRequesters(params);
       setRequesters(response.data);
       setTotalPages(response.totalPages);
       setTotalObjects(response.total);
     } catch (error) {
       console.error('Erro ao carregar requerentes:', error);
+      setError('Erro ao carregar requerentes.');
     } finally {
       setLoading(false);
     }
@@ -190,28 +194,15 @@ const RequestersPage = () => {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Carregando requerentes...</p>
           </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-600">{error}</div>
         ) : requesters.length === 0 ? (
-          <div className="p-8 text-center">
-            <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum requerente encontrado</h3>
-            <p className="text-gray-600 mb-4">
-              {params.q || params.status || params.type ? 
-                'Nenhum requerente corresponde aos filtros aplicados.' : 
-                'Comece criando seu primeiro requerente.'
-              }
-            </p>
-            {!params.q && !params.status && !params.type && (
-              <div className="mt-6">
-                <button
-                  onClick={() => router.push('/dashboard/ordoc-flow/requesters/new')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Criar Primeiro Requerente
-                </button>
-              </div>
-            )}
-          </div>
+          <EmptyState
+            icon={Users}
+            title="Nenhum requerente configurado"
+            description="Configure requerentes para automatizar seus workflows"
+            actionButton={{ text: 'Criar Requerente', onClick: () => router.push('/dashboard/ordoc-flow/requesters/new') }}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
