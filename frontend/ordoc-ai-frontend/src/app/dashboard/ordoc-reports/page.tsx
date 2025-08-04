@@ -8,14 +8,19 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { reportsService, ReportTemplate } from '@/services/reports';
 import TemplateList from '@/components/ordoc-reports/TemplateList';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 
 export default function OrdocReportsPage() {
   const [, setShowCreateModal] = useState(false);
-  const { data: templates = [], isLoading } = useQuery({
+  const {
+    data: templates = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['report-templates'],
     queryFn: () => reportsService.getTemplates(),
   });
-  const hasTemplates = templates.length > 0;
+  const isEmpty = !isLoading && !error && templates.length === 0;
 
   return (
     <ProtectedRoute>
@@ -42,15 +47,17 @@ export default function OrdocReportsPage() {
           </div>
           {isLoading ? (
             <p>Carregando...</p>
-          ) : hasTemplates ? (
-            <TemplateList templates={templates} />
-          ) : (
+          ) : error ? (
+            <ErrorState message="Erro ao conectar com o servidor" />
+          ) : isEmpty ? (
             <EmptyState
               icon={DocumentTextIcon}
               title="Nenhum template de relatório"
               description="Crie seu primeiro template para começar a gerar relatórios"
               actionButton={{ text: 'Criar Template', onClick: () => setShowCreateModal(true) }}
             />
+          ) : (
+            <TemplateList templates={templates} />
           )}
         </div>
       </div>

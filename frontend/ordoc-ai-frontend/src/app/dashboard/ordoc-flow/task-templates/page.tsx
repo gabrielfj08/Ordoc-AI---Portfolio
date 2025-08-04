@@ -18,6 +18,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { taskTemplatesService } from '@/services/ordoc-flow/task-templates';
 import { TaskTemplate, FilterTaskTemplatesParams } from '@/types/ordoc-flow';
+import ErrorState from '@/components/ui/ErrorState';
 
 const TaskTemplatesPage = () => {
   const router = useRouter();
@@ -182,7 +183,7 @@ const TaskTemplatesPage = () => {
             <p className="mt-2 text-gray-600">Carregando templates...</p>
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-red-600">{error}</div>
+          <ErrorState message="Erro ao conectar com o servidor" />
         ) : taskTemplates.length === 0 ? (
           <EmptyState
             icon={FileText}

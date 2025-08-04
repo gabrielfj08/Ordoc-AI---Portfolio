@@ -18,6 +18,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { procedureTemplatesService } from '@/services/ordoc-flow/procedure-templates';
 import { ProcedureTemplate, FilterProcedureTemplatesParams } from '@/types/ordoc-flow';
+import ErrorState from '@/components/ui/ErrorState';
 
 const ProcedureTemplatesPage = () => {
   const router = useRouter();
@@ -171,7 +172,7 @@ const ProcedureTemplatesPage = () => {
             <p className="mt-2 text-gray-600">Carregando templates...</p>
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-red-600">{error}</div>
+          <ErrorState message="Erro ao conectar com o servidor" />
         ) : procedureTemplates.length === 0 ? (
           <EmptyState
             icon={FileText}

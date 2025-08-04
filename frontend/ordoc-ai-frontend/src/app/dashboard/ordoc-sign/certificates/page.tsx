@@ -10,6 +10,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { signatureService } from '@/services/signature';
 import { FilterDigitalCertificatesParams } from '@/types/ordoc-sign';
+import ErrorState from '@/components/ui/ErrorState';
 
 export default function CertificatesPage() {
   const router = useRouter();
@@ -125,19 +126,7 @@ export default function CertificatesPage() {
               <span className="ml-3 text-gray-600">Carregando certificados...</span>
             </div>
           ) : error ? (
-            <div className="text-center py-12">
-              <div className="text-red-600 mb-4">
-                <Shield className="mx-auto h-12 w-12" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Erro ao carregar certificados</h3>
-              <p className="text-gray-600 mb-4">Não foi possível carregar a lista de certificados.</p>
-              <button
-                onClick={() => refetch()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Tentar novamente
-              </button>
-            </div>
+            <ErrorState message="Erro ao conectar com o servidor" />
           ) : certificates.length === 0 ? (
             <EmptyState
               icon={DocumentCheckIcon}

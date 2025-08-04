@@ -18,6 +18,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { tasksService } from '@/services/ordoc-flow/tasks';
 import { Task, FilterTasksParams } from '@/types/ordoc-flow';
+import ErrorState from '@/components/ui/ErrorState';
 
 const TasksPage = () => {
   const router = useRouter();
@@ -210,7 +211,7 @@ const TasksPage = () => {
             <p className="mt-2 text-gray-600">Carregando tarefas...</p>
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-red-600">{error}</div>
+          <ErrorState message="Erro ao conectar com o servidor" />
         ) : tasks.length === 0 ? (
           <EmptyState
             icon={CheckSquare}

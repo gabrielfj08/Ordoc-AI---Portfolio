@@ -19,6 +19,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { requestersService } from '@/services/ordoc-flow/requesters';
 import { Requester, FilterRequestersParams } from '@/types/ordoc-flow';
+import ErrorState from '@/components/ui/ErrorState';
 
 const RequestersPage = () => {
   const router = useRouter();
@@ -195,7 +196,7 @@ const RequestersPage = () => {
             <p className="mt-2 text-gray-600">Carregando requerentes...</p>
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-red-600">{error}</div>
+          <ErrorState message="Erro ao conectar com o servidor" />
         ) : requesters.length === 0 ? (
           <EmptyState
             icon={Users}
