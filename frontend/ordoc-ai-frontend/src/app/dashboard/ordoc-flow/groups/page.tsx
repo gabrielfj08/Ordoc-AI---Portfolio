@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Users, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Users,
   MoreVertical,
   Edit,
   Trash2,
@@ -14,6 +14,7 @@ import {
   UserPlus,
   UserMinus
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { groupsService } from '@/services/ordoc-flow/groups';
 import { Group, FilterGroupsParams } from '@/types/ordoc-flow';
 
@@ -21,6 +22,7 @@ const GroupsPage = () => {
   const router = useRouter();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalObjects, setTotalObjects] = useState(0);
   
@@ -44,12 +46,14 @@ const GroupsPage = () => {
   const loadGroups = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await groupsService.getGroups(params);
       setGroups(response.data);
       setTotalPages(response.totalPages);
       setTotalObjects(response.total);
     } catch (error) {
       console.error('Erro ao carregar grupos:', error);
+      setError('Erro ao carregar grupos.');
     } finally {
       setLoading(false);
     }
@@ -256,25 +260,19 @@ const GroupsPage = () => {
                     </td>
                   </tr>
                 ))
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-red-600">{error}</td>
+                </tr>
               ) : groups.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
-                    <Users className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum grupo encontrado</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {params.q || params.status ? 'Tente ajustar os filtros de busca.' : 'Comece criando um novo grupo.'}
-                    </p>
-                    {!params.q && !params.status && (
-                      <div className="mt-6">
-                        <button
-                          onClick={() => router.push('/dashboard/ordoc-flow/groups/new')}
-                          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Novo Grupo
-                        </button>
-                      </div>
-                    )}
+                  <td colSpan={7} className="px-6 py-12">
+                    <EmptyState
+                      icon={Users}
+                      title="Nenhum grupo configurado"
+                      description="Configure grupos para automatizar seus workflows"
+                      actionButton={{ text: 'Criar Grupo', onClick: () => router.push('/dashboard/ordoc-flow/groups/new') }}
+                    />
                   </td>
                 </tr>
               ) : (

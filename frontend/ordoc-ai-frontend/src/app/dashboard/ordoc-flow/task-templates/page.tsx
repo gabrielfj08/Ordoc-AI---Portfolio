@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  FileText, 
+import {
+  Plus,
+  Search,
+  Filter,
+  FileText,
   MoreVertical,
   Edit,
   Trash2,
@@ -15,6 +15,7 @@ import {
   ToggleRight,
   Copy
 } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
 import { taskTemplatesService } from '@/services/ordoc-flow/task-templates';
 import { TaskTemplate, FilterTaskTemplatesParams } from '@/types/ordoc-flow';
 
@@ -22,6 +23,7 @@ const TaskTemplatesPage = () => {
   const router = useRouter();
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalObjects, setTotalObjects] = useState(0);
   
@@ -46,12 +48,14 @@ const TaskTemplatesPage = () => {
   const loadTaskTemplates = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await taskTemplatesService.getTaskTemplates(params);
       setTaskTemplates(response.data);
       setTotalPages(response.totalPages);
       setTotalObjects(response.total);
     } catch (error) {
       console.error('Erro ao carregar templates de tarefa:', error);
+      setError('Erro ao carregar templates de tarefa.');
     } finally {
       setLoading(false);
     }
@@ -177,28 +181,15 @@ const TaskTemplatesPage = () => {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Carregando templates...</p>
           </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-600">{error}</div>
         ) : taskTemplates.length === 0 ? (
-          <div className="p-8 text-center">
-            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum template encontrado</h3>
-            <p className="text-gray-600 mb-4">
-              {params.q || params.status ? 
-                'Nenhum template corresponde aos filtros aplicados.' : 
-                'Comece criando seu primeiro template de tarefa.'
-              }
-            </p>
-            {!params.q && !params.status && (
-              <div className="mt-6">
-                <button
-                  onClick={() => router.push('/dashboard/ordoc-flow/task-templates/new')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Criar Primeiro Template
-                </button>
-              </div>
-            )}
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="Nenhum template de tarefa configurado"
+            description="Configure templates de tarefa para automatizar seus workflows"
+            actionButton={{ text: 'Criar Template de Tarefa', onClick: () => router.push('/dashboard/ordoc-flow/task-templates/new') }}
+          />
         ) : (
           <>
             <div className="overflow-x-auto">
