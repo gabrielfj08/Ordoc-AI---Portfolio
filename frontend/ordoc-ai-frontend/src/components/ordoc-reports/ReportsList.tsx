@@ -283,13 +283,15 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
     }
     
     try {
-      // TODO: Implementar delete no service
-      // await reportsService.deleteReport(reportId);
-      alert('Funcionalidade de exclusão será implementada em breve');
+      setLoading(true);
+      await reportsService.deleteReport(reportId);
+      alert('Relatório excluído com sucesso!');
       onRefresh();
     } catch (error) {
       console.error('Erro ao excluir relatório:', error);
-      alert('Erro ao excluir relatório');
+      alert('Erro ao excluir relatório. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
