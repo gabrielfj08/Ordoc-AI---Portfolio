@@ -19,6 +19,7 @@ import {
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import directoriesService from '@/services/ordoc-air/directories';
 import documentsService from '@/services/ordoc-air/documents';
+import { RecentDocuments } from '@/components/ordoc-air';
 
 interface Directory {
   id: number;
@@ -211,6 +212,7 @@ function OrdocAirContent() {
           </div>
         ) : (
           <div className="space-y-8">
+            <RecentDocuments />
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-3">
                 Pastas
