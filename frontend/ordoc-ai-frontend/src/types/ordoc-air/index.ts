@@ -4,3 +4,4 @@ export interface APIMetaProperties {
 
 export * from './document';
 export * from './directory';
+export * from './shareableLink';
