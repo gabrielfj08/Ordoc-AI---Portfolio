@@ -2,11 +2,12 @@
 
 import React, { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Eye, Download, Trash2, History, Upload } from 'lucide-react';
+import { Eye, Download, Trash2, History, Upload, Share2 } from 'lucide-react';
 import documentsService from '@/services/ordoc-air/documents';
 import { OrdocAirDocument } from './DocumentCard';
 import DocumentPreview from './DocumentPreview';
 import VersionHistory from './VersionHistory';
+import { ShareModal } from '../sharing';
 
 interface DocumentActionsProps {
   document: OrdocAirDocument;
@@ -17,6 +18,7 @@ const DocumentActions: React.FC<DocumentActionsProps> = ({ document: doc }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => documentsService.delete(doc.id),
@@ -88,6 +90,13 @@ const DocumentActions: React.FC<DocumentActionsProps> = ({ document: doc }) => {
         <History className="w-4 h-4" />
       </button>
       <button
+        onClick={() => setShareOpen(true)}
+        className="text-gray-600 hover:text-gray-900"
+        title="Compartilhar"
+      >
+        <Share2 className="w-4 h-4" />
+      </button>
+      <button
         onClick={() => deleteMutation.mutate()}
         className="text-red-600 hover:text-red-800"
         title="Excluir"
@@ -100,6 +109,13 @@ const DocumentActions: React.FC<DocumentActionsProps> = ({ document: doc }) => {
       )}
       {historyOpen && (
         <VersionHistory document={doc} onClose={() => setHistoryOpen(false)} />
+      )}
+      {shareOpen && (
+        <ShareModal
+          objectId={doc.id}
+          objectType="document"
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </div>
   );
