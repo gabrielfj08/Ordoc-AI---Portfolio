@@ -19,7 +19,7 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({ document, onClose }) =>
   const handleDownload = async (versionId: number) => {
     const blob = await documentsService.download(versionId);
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = window.document.createElement('a');
     a.href = url;
     a.download = '';
     a.click();

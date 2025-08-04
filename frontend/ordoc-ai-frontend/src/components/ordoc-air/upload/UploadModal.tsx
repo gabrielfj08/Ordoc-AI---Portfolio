@@ -20,8 +20,8 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="fixed inset-0 z-50">
+      <div className="fixed inset-0 bg-black/40" aria-hidden="true" />
       <div className="flex items-center justify-center min-h-screen">
-        <Dialog.Overlay className="fixed inset-0 bg-black/40" />
         <div className="bg-white rounded-lg shadow-xl p-6 z-10 w-full max-w-lg">
           <Dialog.Title className="text-lg font-medium mb-4">
             Enviar arquivos
