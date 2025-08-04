@@ -21,6 +21,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import directoriesService from '@/services/ordoc-air/directories';
 import documentsService from '@/services/ordoc-air/documents';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import { RecentDocuments } from '@/components/ordoc-air';
 
 interface Directory {
@@ -198,24 +199,7 @@ function OrdocAirContent() {
             <span className="ml-3 text-gray-600">Carregando documentos...</span>
           </div>
         ) : isError ? (
-          <div className="text-center py-12">
-            <AlertTriangle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Erro ao carregar dados
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Não foi possível carregar as pastas ou documentos.
-            </p>
-            <button
-              onClick={() => {
-                refetchDirs();
-                refetchDocs();
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Tentar novamente
-            </button>
-          </div>
+          <ErrorState message="Erro ao conectar com o servidor" />
         ) : !hasDepartments ? (
           <EmptyState
             icon={FolderIcon}

@@ -17,6 +17,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { groupsService } from '@/services/ordoc-flow/groups';
 import { Group, FilterGroupsParams } from '@/types/ordoc-flow';
+import ErrorState from '@/components/ui/ErrorState';
 
 const GroupsPage = () => {
   const router = useRouter();
@@ -262,7 +263,9 @@ const GroupsPage = () => {
                 ))
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-red-600">{error}</td>
+                  <td colSpan={7} className="px-6 py-12">
+                    <ErrorState message="Erro ao conectar com o servidor" />
+                  </td>
                 </tr>
               ) : groups.length === 0 ? (
                 <tr>

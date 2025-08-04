@@ -20,6 +20,7 @@ import {
 import EmptyState from '@/components/ui/EmptyState';
 import { signaturesService } from '@/services/ordoc-flow/signatures';
 import { Signature, FilterSignaturesParams } from '@/types/ordoc-flow';
+import ErrorState from '@/components/ui/ErrorState';
 
 const SignaturesPage = () => {
   const router = useRouter();
@@ -186,7 +187,7 @@ const SignaturesPage = () => {
             <p className="mt-2 text-gray-600">Carregando assinaturas...</p>
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-red-600">{error}</div>
+          <ErrorState message="Erro ao conectar com o servidor" />
         ) : signatures.length === 0 ? (
           <EmptyState
             icon={CheckSquare}
