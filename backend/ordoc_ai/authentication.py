@@ -181,10 +181,27 @@ def get_current_organization(request) -> Optional[Organization]:
     """
     Helper function to get current organization
     Equivalent to Rails current_organization method
+    
+    Tries multiple methods to find organization:
+    1. From request.current_organization (set by middleware)
+    2. From user's organization role
+    3. Default organization (fallback)
     """
-    if hasattr(request, 'current_organization'):
+    # Try from middleware first
+    if hasattr(request, 'current_organization') and request.current_organization:
         return request.current_organization
-    return None
+    
+    # Try from user's organization role
+    user = get_current_user(request)
+    if user and hasattr(user, 'ordoc_profile'):
+        ordoc_user = user.ordoc_profile
+        from ordoc_cloud.models import UserOrganizationRole
+        role = UserOrganizationRole.objects.filter(user=ordoc_user).first()
+        if role:
+            return role.organization
+    
+    # Fallback to first organization (for development/testing)
+    return Organization.objects.first()
 
 
 def get_current_ordoc_user(request) -> Optional[OrdocUser]:
