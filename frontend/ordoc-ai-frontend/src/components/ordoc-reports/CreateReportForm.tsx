@@ -94,7 +94,7 @@ export default function CreateReportForm({ templates }: Props) {
         >
           <option value="html">HTML</option>
           <option value="pdf">PDF</option>
-          <option value="xlsx">Excel</option>
+          <option value="excel">Excel</option>
           <option value="csv">CSV</option>
         </select>
       </div>
