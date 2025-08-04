@@ -40,6 +40,11 @@ class ReportsService {
     return response.data.results || [];
   }
 
+  async getReport(id: string): Promise<Report> {
+    const response = await api.get(`${this.base}/reports/${id}/`);
+    return response.data;
+  }
+
   async getReportStats(): Promise<any> {
     const response = await api.get(`${this.base}/reports/stats/`);
     return response.data;
