@@ -1,13 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { reportsService, ReportTemplate } from '@/services/reports';
 import TemplateList from '@/components/ordoc-reports/TemplateList';
+import EmptyState from '@/components/ui/EmptyState';
 
 export default function OrdocReportsPage() {
+  const [, setShowCreateModal] = useState(false);
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['report-templates'],
     queryFn: () => reportsService.getTemplates(),
@@ -42,9 +45,12 @@ export default function OrdocReportsPage() {
           ) : hasTemplates ? (
             <TemplateList templates={templates} />
           ) : (
-            <div className="text-center py-20">
-              <p className="text-gray-500 text-lg">Em construção</p>
-            </div>
+            <EmptyState
+              icon={DocumentTextIcon}
+              title="Nenhum template de relatório"
+              description="Crie seu primeiro template para começar a gerar relatórios"
+              actionButton={{ text: 'Criar Template', onClick: () => setShowCreateModal(true) }}
+            />
           )}
         </div>
       </div>
