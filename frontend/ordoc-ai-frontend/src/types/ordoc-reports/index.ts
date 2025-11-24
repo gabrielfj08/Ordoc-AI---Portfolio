@@ -32,6 +32,9 @@ export interface ReportTemplate extends BaseEntity {
   allowed_roles: string[];
   organization_id: number;
   created_by_id: number;
+  isActive: boolean;
+  fields?: Array<{ name: string; type: string; label: string }>;
+  charts?: Array<{ type: string; title: string; config: Record<string, any> }>;
 }
 
 export interface Report extends BaseEntity {

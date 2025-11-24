@@ -55,6 +55,16 @@ class ReportsService {
     return response.data;
   }
 
+  async getStats(timeRange?: string): Promise<any> {
+    const response = await api.get(`${this.base}/stats/`, { params: { timeRange } });
+    return response.data;
+  }
+
+  async getRecentReports(limit: number = 10): Promise<Report[]> {
+    const response = await api.get(`${this.base}/reports/recent/`, { params: { limit } });
+    return response.data.results || [];
+  }
+
   /* Schedules */
   async getSchedules(params?: FilterReportSchedulesParams): Promise<ReportSchedule[]> {
     const response = await api.get(`${this.base}/schedules/`, { params });
@@ -165,6 +175,48 @@ class ReportsService {
   async previewTemplate(id: string, params?: Record<string, any>): Promise<any> {
     const response = await api.get(`${this.base}/templates/${id}/preview/`, { params });
     return response.data;
+  }
+
+  async createTemplate(data: any): Promise<ReportTemplate> {
+    const response = await api.post(`${this.base}/templates/`, data);
+    return response.data;
+  }
+
+  async updateTemplate(id: string, data: any): Promise<ReportTemplate> {
+    const response = await api.put(`${this.base}/templates/${id}/`, data);
+    return response.data;
+  }
+
+  async deleteTemplate(id: string): Promise<any> {
+    const response = await api.delete(`${this.base}/templates/${id}/`);
+    return response.data;
+  }
+
+  async exportReport(id: string, format: string, options?: any): Promise<string> {
+    const response = await api.post(`${this.base}/reports/${id}/export/`, {
+      format,
+      ...options
+    }, {
+      responseType: 'blob'
+    });
+    
+    // Create download URL from blob
+    const blob = new Blob([response.data]);
+    return URL.createObjectURL(blob);
+  }
+
+  async exportReportData(data: any, format: string, options?: any): Promise<string> {
+    const response = await api.post(`${this.base}/reports/export_data/`, {
+      data,
+      format,
+      ...options
+    }, {
+      responseType: 'blob'
+    });
+    
+    // Create download URL from blob
+    const blob = new Blob([response.data]);
+    return URL.createObjectURL(blob);
   }
 }
 

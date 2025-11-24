@@ -40,6 +40,13 @@ const api = axios.create({
 
 // Add request interceptor to include subdomain and auth token
 api.interceptors.request.use((config) => {
+  // Skip interceptor for login requests to avoid issues
+  if (config.url?.includes('/api/auth/login/')) {
+    // Only add subdomain for login
+    config.headers['X-Subdomain'] = 'demo';
+    return config;
+  }
+  
   // Get subdomain from hostname
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
@@ -54,6 +61,11 @@ api.interceptors.request.use((config) => {
   // Optional override for development via environment variable
   if (!config.headers['X-Api-Subdomain'] && process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN) {
     config.headers['X-Api-Subdomain'] = process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN;
+  }
+  
+  // Force subdomain for development if not set
+  if (!config.headers['X-Api-Subdomain']) {
+    config.headers['X-Subdomain'] = 'demo';
   }
   
   // Add auth token if available
@@ -111,10 +123,23 @@ export const authService = {
       console.log('Making login request:', {
         url: `${API_BASE_URL}/api/auth/login/`,
         data: { ...requestData, password: '[HIDDEN]' },
-        headers: api.defaults.headers
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Subdomain': process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN || 'demo',
+          'Accept': 'application/json'
+        }
       });
       
-      const response: AxiosResponse<LoginResponse> = await api.post('/api/auth/login/', requestData);
+      // Make direct axios call without interceptors for login
+      const response = await axios.post(`${API_BASE_URL}/api/auth/login/`, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Subdomain': process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN || 'demo',
+          'Accept': 'application/json'
+        },
+        timeout: 30000,
+        withCredentials: false
+      });
       
       return response.data;
     } catch (error: any) {
@@ -126,6 +151,7 @@ export const authService = {
         statusText: error?.response?.statusText || null,
         url: error?.config?.url || null,
         method: error?.config?.method || null,
+        stack: error?.stack || null,
         fullError: error
       });
       

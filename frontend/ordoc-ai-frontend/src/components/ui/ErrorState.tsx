@@ -12,3 +12,4 @@ const ErrorState: React.FC<ErrorStateProps> = ({ message }) => (
 );
 
 export default ErrorState;
+export { ErrorState };

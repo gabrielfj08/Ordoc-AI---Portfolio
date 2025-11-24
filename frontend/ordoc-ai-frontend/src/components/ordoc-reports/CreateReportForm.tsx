@@ -1,134 +1,180 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Formik, Form, Field, ErrorMessage } from 'formik';
+import * as Yup from 'yup';
+import { DocumentChartBarIcon, CalendarIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { reportsService } from '@/services/reports';
 import { ReportTemplate, GenerateReportData } from '@/types/ordoc-reports';
-import { toast } from 'react-hot-toast';
 
 interface Props {
   templates: ReportTemplate[];
+  onReportGenerated?: (reportId: string) => void;
 }
 
-export default function CreateReportForm({ templates }: Props) {
-  const [form, setForm] = useState<GenerateReportData>({
-    template_id: '',
-    title: '',
-    description: '',
-    format: 'html',
-    filters: {},
-    parameters: {},
-    expires_in_days: 30,
-  });
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [reportId, setReportId] = useState<string | null>(null);
+const validationSchema = Yup.object({
+  template_id: Yup.string().required('Template é obrigatório'),
+  title: Yup.string().required('Título é obrigatório'),
+  description: Yup.string(),
+  format: Yup.string().oneOf(['html', 'pdf', 'excel', 'csv']).required('Formato é obrigatório'),
+  expires_in_days: Yup.number().min(1, 'Deve ser pelo menos 1 dia').max(365, 'Máximo 365 dias'),
+});
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target;
-    const parsed = type === 'number' ? (value === '' ? undefined : Number(value)) : value;
-    setForm((prev: GenerateReportData) => ({ ...prev, [name]: parsed }));
-  };
+export default function CreateReportForm({ templates, onReportGenerated }: Props) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (values: GenerateReportData) => {
+    setIsSubmitting(true);
     try {
-      setStatus('loading');
-      const report = await reportsService.generateReport(form);
-      setReportId(report?.id ?? null);
-      setStatus('success');
-      toast.success('Relatório gerado com sucesso');
-    } catch (err) {
-      console.error(err);
-      setStatus('error');
-      toast.error('Erro ao gerar relatório');
+      const report = await reportsService.generateReport(values);
+      if (report?.id && onReportGenerated) {
+        onReportGenerated(report.id);
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      throw error;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-xl">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Template</label>
-        <select
-          name="template_id"
-          value={form.template_id}
-          onChange={handleChange}
-          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-          required
-        >
-          <option value="">Selecione...</option>
-          {templates.map((tpl) => (
-            <option key={tpl.id} value={tpl.id}>
-              {tpl.name}
-            </option>
-          ))}
-        </select>
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="flex items-center mb-6">
+        <DocumentChartBarIcon className="h-6 w-6 text-blue-600 mr-2" />
+        <h2 className="text-xl font-semibold text-gray-900">Criar Novo Relatório</h2>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Título</label>
-        <input
-          type="text"
-          name="title"
-          value={form.title}
-          onChange={handleChange}
-          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Descrição</label>
-        <textarea
-          name="description"
-          value={form.description}
-          onChange={handleChange}
-          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Formato</label>
-        <select
-          name="format"
-          value={form.format}
-          onChange={handleChange}
-          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-        >
-          <option value="html">HTML</option>
-          <option value="pdf">PDF</option>
-          <option value="excel">Excel</option>
-          <option value="csv">CSV</option>
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Expira em (dias)</label>
-        <input
-          type="number"
-          name="expires_in_days"
-          value={form.expires_in_days}
-          onChange={handleChange}
-          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-        />
-      </div>
-      <button
-        type="submit"
-        className="px-4 py-2 bg-blue-600 text-white rounded-md"
-        disabled={status === 'loading'}
+
+      <Formik
+        initialValues={{
+          template_id: '',
+          title: '',
+          description: '',
+          format: 'html' as const,
+          filters: {},
+          parameters: {},
+          expires_in_days: 30,
+        }}
+        validationSchema={validationSchema}
+        onSubmit={handleSubmit}
       >
-        {status === 'loading' ? 'Gerando...' : 'Gerar Relatório'}
-      </button>
-      {status === 'success' && (
-        <p className="text-green-600">
-          Relatório gerado com sucesso.{' '}
-          <a
-            href={reportId ? `/dashboard/ordoc-reports/reports/${reportId}` : '/dashboard/ordoc-reports/reports'}
-            className="underline text-blue-600"
-          >
-            {reportId ? 'Abrir relatório' : 'Ver relatórios'}
-          </a>
-        </p>
-      )}
-      {status === 'error' && (
-        <p className="text-red-600">Erro ao gerar relatório. Tente novamente.</p>
-      )}
-    </form>
+        {({ errors, touched }) => (
+          <Form className="space-y-6">
+            <div>
+              <label htmlFor="template_id" className="block text-sm font-medium text-gray-700 mb-2">
+                <FunnelIcon className="h-4 w-4 inline mr-1" />
+                Template do Relatório
+              </label>
+              <Field
+                as="select"
+                id="template_id"
+                name="template_id"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Selecione um template...</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </Field>
+              <ErrorMessage name="template_id" component="div" className="text-red-600 text-sm mt-1" />
+            </div>
+
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                Título do Relatório
+              </label>
+              <Field
+                type="text"
+                id="title"
+                name="title"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Digite o título do relatório"
+              />
+              <ErrorMessage name="title" component="div" className="text-red-600 text-sm mt-1" />
+            </div>
+
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                Descrição (Opcional)
+              </label>
+              <Field
+                as="textarea"
+                id="description"
+                name="description"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Descreva o objetivo do relatório"
+              />
+              <ErrorMessage name="description" component="div" className="text-red-600 text-sm mt-1" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="format" className="block text-sm font-medium text-gray-700 mb-2">
+                  Formato de Exportação
+                </label>
+                <Field
+                  as="select"
+                  id="format"
+                  name="format"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="html">HTML (Visualização)</option>
+                  <option value="pdf">PDF</option>
+                  <option value="excel">Excel</option>
+                  <option value="csv">CSV</option>
+                </Field>
+                <ErrorMessage name="format" component="div" className="text-red-600 text-sm mt-1" />
+              </div>
+
+              <div>
+                <label htmlFor="expires_in_days" className="block text-sm font-medium text-gray-700 mb-2">
+                  <CalendarIcon className="h-4 w-4 inline mr-1" />
+                  Expira em (dias)
+                </label>
+                <Field
+                  type="number"
+                  id="expires_in_days"
+                  name="expires_in_days"
+                  min="1"
+                  max="365"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <ErrorMessage name="expires_in_days" component="div" className="text-red-600 text-sm mt-1" />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                onClick={() => window.history.back()}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <DocumentChartBarIcon className="h-4 w-4 mr-2" />
+                    Gerar Relatório
+                  </>
+                )}
+              </button>
+            </div>
+          </Form>
+        )}
+      </Formik>
+    </div>
   );
 }

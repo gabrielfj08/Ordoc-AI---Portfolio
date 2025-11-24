@@ -54,6 +54,9 @@ urlpatterns = [
         path('ordoc-reports/', include('ordoc_reports.urls')),
     ])),
     
+    # External APIs for OrdocCidadao
+    path('', include('ordoc_flow.urls')),  # Includes external/ endpoints
+    
     # API v2 (for backward compatibility)
     path('api/v2/', include([
         path('ordoc-air/', include(('ordoc_air.urls', 'ordoc_air'), namespace='ordoc_air_v2')),

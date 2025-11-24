@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 
 export const HeroSection: React.FC = () => {

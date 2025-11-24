@@ -39,6 +39,7 @@ export const organizationsService = {
     page_size?: number;
     search?: string;
     ordering?: string;
+    is_active?: boolean;
   }): Promise<OrganizationListResponse> {
     const response = await api.get('/api/v1/ordoc-air/organizations/', { params });
     return response.data;
@@ -79,6 +80,16 @@ export const organizationsService = {
     await api.delete(`/api/v1/ordoc-air/organizations/${id}/`);
   },
 
+  // Activate organization
+  async activateOrganization(id: string): Promise<void> {
+    await api.post(`/api/v1/ordoc-air/organizations/${id}/activate/`);
+  },
+
+  // Deactivate organization
+  async deactivateOrganization(id: string): Promise<void> {
+    await api.post(`/api/v1/ordoc-air/organizations/${id}/deactivate/`);
+  },
+
   // Get available apps
   async getAvailableApps(): Promise<Array<{ id: number; name: string; service: string }>> {
     try {
@@ -99,12 +110,12 @@ export const organizationsService = {
   transformOrganizationResponse(data: any): Organization {
     return {
       id: data.id,
-      corporateName: data.corporate_name,
-      cnpj: data.cnpj,
-      email: data.email,
-      phone: data.phone,
-      contactName: data.contact_name,
-      contactPhone: data.contact_phone,
+      corporateName: data.corporate_name || '',
+      cnpj: data.cnpj || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      contactName: data.contact_name || '',
+      contactPhone: data.contact_phone || '',
       site: data.site || '',
       logoUrl: data.logo_url || '',
       storageLimit: data.storage_limit?.toString() || '100',

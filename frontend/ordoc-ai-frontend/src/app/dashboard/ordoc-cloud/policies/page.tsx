@@ -1,116 +1,229 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
+import {
   ShieldCheckIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  FunnelIcon
+  EllipsisVerticalIcon,
+  PencilIcon,
+  TrashIcon,
+  EyeIcon,
+  ArrowLeftIcon,
+  CheckIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 
+// Types
 interface Policy {
   id: string;
   name: string;
   description: string;
-  effect: 'Allow' | 'Deny';
-  resource: string;
-  actions: string[];
-  status: 'active' | 'inactive';
+  effect: 'allow' | 'deny';
+  service: string;
+  resource: string[];
+  source: 'system_managed' | 'customer_managed';
+  is_public: boolean;
   created_at: string;
+  user_groups_count?: number;
+  users_count?: number;
+}
+
+interface FilterParams {
+  search: string;
+  effect: string;
+  service: string;
+  source: string;
+  page: number;
+  ordering: string;
 }
 
 export default function PoliciesPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [effectFilter, setEffectFilter] = useState('');
-  const [sortBy, setSortBy] = useState('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showNewPolicyModal, setShowNewPolicyModal] = useState(false);
+  const [showEditPolicyModal, setShowEditPolicyModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
+  const [filters, setFilters] = useState<FilterParams>({
+    search: '',
+    effect: '',
+    service: '',
+    source: '',
+    page: 1,
+    ordering: 'name'
+  });
 
-  // Mock data - será substituído por chamada à API
-  const policies: Policy[] = [
-    {
-      id: '1',
-      name: 'Admin Full Access',
-      description: 'Política que concede acesso total aos administradores',
-      effect: 'Allow',
-      resource: '*',
-      actions: ['*'],
-      status: 'active',
-      created_at: '2025-07-27T09:37:11.749656-03:00'
-    },
-    {
-      id: '2',
-      name: 'User Read Only',
-      description: 'Política que permite apenas leitura para usuários comuns',
-      effect: 'Allow',
-      resource: 'documents:*',
-      actions: ['read', 'list'],
-      status: 'active',
-      created_at: '2025-07-26T14:22:33.123456-03:00'
-    },
-    {
-      id: '3',
-      name: 'Deny Sensitive Data',
-      description: 'Política que nega acesso a dados sensíveis',
-      effect: 'Deny',
-      resource: 'sensitive:*',
-      actions: ['*'],
-      status: 'active',
-      created_at: '2025-07-25T10:15:22.987654-03:00'
-    }
-  ];
+  // Mock data for development
+  useEffect(() => {
+    const mockPolicies: Policy[] = [
+      {
+        id: '1',
+        name: 'Admin Full Access',
+        description: 'Política que concede acesso total aos administradores do sistema',
+        effect: 'allow',
+        service: 'ordoc_cloud',
+        resource: ['*'],
+        source: 'system_managed',
+        is_public: false,
+        created_at: '2024-01-15T10:00:00Z',
+        user_groups_count: 1,
+        users_count: 2
+      },
+      {
+        id: '2',
+        name: 'User Document Read',
+        description: 'Permite visualizar e baixar documentos para usuários padrão',
+        effect: 'allow',
+        service: 'ordoc_air',
+        resource: ['document:read', 'document:list'],
+        source: 'customer_managed',
+        is_public: true,
+        created_at: '2024-01-20T14:30:00Z',
+        user_groups_count: 3,
+        users_count: 15
+      },
+      {
+        id: '3',
+        name: 'Deny Sensitive Operations',
+        description: 'Política que bloqueia operações sensíveis do sistema',
+        effect: 'deny',
+        service: 'ordoc_flow',
+        resource: ['procedure:delete', 'template:delete'],
+        source: 'system_managed',
+        is_public: false,
+        created_at: '2024-02-01T09:15:00Z',
+        user_groups_count: 0,
+        users_count: 0
+      }
+    ];
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(event.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleStatusFilter = (status: string) => {
-    setStatusFilter(status);
-    setCurrentPage(1);
-  };
-
-  const handleEffectFilter = (effect: string) => {
-    setEffectFilter(effect);
-    setCurrentPage(1);
-  };
-
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortDirection('asc');
-    }
-    setCurrentPage(1);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
-    if (status === 'active') {
-      return `${baseClasses} bg-green-100 text-green-800`;
-    }
-    return `${baseClasses} bg-red-100 text-red-800`;
-  };
-
-  const getStatusText = (status: string) => {
-    return status === 'active' ? 'Ativa' : 'Inativa';
-  };
+    setTimeout(() => {
+      setPolicies(mockPolicies);
+      setLoading(false);
+    }, 1000);
+  }, [filters]);
 
   const getEffectBadge = (effect: string) => {
-    const baseClasses = "px-2 py-1 text-xs font-medium rounded-full";
-    if (effect === 'Allow') {
-      return `${baseClasses} bg-blue-100 text-blue-800`;
-    }
-    return `${baseClasses} bg-red-100 text-red-800`;
+    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      allow: 'default',
+      deny: 'destructive'
+    };
+
+    const labels: Record<string, string> = {
+      allow: 'Permitir',
+      deny: 'Negar'
+    };
+
+    const icons = {
+      allow: CheckIcon,
+      deny: XMarkIcon
+    };
+
+    const Icon = icons[effect as keyof typeof icons];
+
+    return (
+      <Badge variant={variants[effect] || 'outline'} className="flex items-center gap-1">
+        <Icon className="w-3 h-3" />
+        {labels[effect] || effect}
+      </Badge>
+    );
   };
 
-  const getEffectText = (effect: string) => {
-    return effect === 'Allow' ? 'Permitir' : 'Negar';
+  const getSourceBadge = (source: string) => {
+    const labels: Record<string, string> = {
+      system_managed: 'Sistema',
+      customer_managed: 'Cliente'
+    };
+
+    return (
+      <Badge variant="outline">
+        {labels[source] || source}
+      </Badge>
+    );
   };
+
+  const getServiceBadge = (service: string) => {
+    const labels: Record<string, string> = {
+      ordoc_air: 'OrdocAir',
+      ordoc_flow: 'OrdocFlow',
+      ordoc_cloud: 'OrdocCloud',
+      ordoc_sign: 'OrdocSign',
+      ordoc_reports: 'OrdocReports'
+    };
+
+    const colors: Record<string, string> = {
+      ordoc_air: 'bg-blue-100 text-blue-800',
+      ordoc_flow: 'bg-green-100 text-green-800',
+      ordoc_cloud: 'bg-purple-100 text-purple-800',
+      ordoc_sign: 'bg-orange-100 text-orange-800',
+      ordoc_reports: 'bg-pink-100 text-pink-800'
+    };
+
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[service] || 'bg-gray-100 text-gray-800'}`}>
+        {labels[service] || service}
+      </span>
+    );
+  };
+
+  const handleFilterChange = (key: keyof FilterParams, value: string | number) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+      page: key !== 'page' ? 1 : value // Reset page when other filters change
+    }));
+  };
+
+  const handleActionClick = (action: string, policy: Policy) => {
+    setSelectedPolicy(policy);
+    
+    switch (action) {
+      case 'view':
+        window.location.href = `/dashboard/ordoc-cloud/policies/${policy.id}`;
+        break;
+      case 'edit':
+        setShowEditPolicyModal(true);
+        break;
+      case 'delete':
+        setShowDeleteDialog(true);
+        break;
+    }
+  };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <ProtectedRoute>
@@ -121,283 +234,274 @@ export default function PoliciesPage() {
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-4">
                 <Link href="/dashboard/ordoc-cloud" className="text-gray-500 hover:text-gray-700">
-                  ← Voltar ao OrdocCloud
+                  <ArrowLeftIcon className="w-6 h-6" />
                 </Link>
-                <div className="h-6 w-px bg-gray-300"></div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-                    <ShieldCheckIcon className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900">Políticas de Acesso</h1>
-                    <p className="text-sm text-gray-500">Definir permissões e controle de acesso</p>
-                  </div>
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
+                  <ShieldCheckIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Políticas de Acesso</h1>
+                  <p className="text-sm text-gray-500">Definir permissões e controle de acesso do sistema</p>
                 </div>
               </div>
-              <button className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors">
+              <Button onClick={() => setShowNewPolicyModal(true)} className="bg-purple-600 hover:bg-purple-700">
                 <PlusIcon className="w-4 h-4 mr-2" />
                 Nova Política
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Filters and Search */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-              {/* Search */}
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <MagnifyingGlassIcon className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Buscar políticas..."
-                    value={searchQuery}
-                    onChange={handleSearchChange}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent w-80"
-                  />
-                </div>
-
-                {/* Status Filter */}
-                <div className="flex items-center space-x-2">
-                  <FunnelIcon className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700">Status:</span>
-                  <div className="flex space-x-2">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="status"
-                        value=""
-                        checked={statusFilter === ''}
-                        onChange={(e) => handleStatusFilter(e.target.value)}
-                        className="mr-1"
-                      />
-                      <span className="text-sm">Todas</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="active"
-                        checked={statusFilter === 'active'}
-                        onChange={(e) => handleStatusFilter(e.target.value)}
-                        className="mr-1"
-                      />
-                      <span className="text-sm">Ativas</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="inactive"
-                        checked={statusFilter === 'inactive'}
-                        onChange={(e) => handleStatusFilter(e.target.value)}
-                        className="mr-1"
-                      />
-                      <span className="text-sm">Inativas</span>
-                    </label>
+          {/* Filters */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Filtros</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <Input
+                      placeholder="Buscar por nome, descrição ou recurso..."
+                      value={filters.search}
+                      onChange={(e) => handleFilterChange('search', e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
                 </div>
+                
+                <Select value={filters.effect} onValueChange={(value) => handleFilterChange('effect', value)}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Efeito" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="allow">Permitir</SelectItem>
+                    <SelectItem value="deny">Negar</SelectItem>
+                  </SelectContent>
+                </Select>
 
-                {/* Effect Filter */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-gray-700">Efeito:</span>
-                  <select
-                    value={effectFilter}
-                    onChange={(e) => handleEffectFilter(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="">Todos</option>
-                    <option value="Allow">Permitir</option>
-                    <option value="Deny">Negar</option>
-                  </select>
-                </div>
-              </div>
+                <Select value={filters.service} onValueChange={(value) => handleFilterChange('service', value)}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="ordoc_air">OrdocAir</SelectItem>
+                    <SelectItem value="ordoc_flow">OrdocFlow</SelectItem>
+                    <SelectItem value="ordoc_cloud">OrdocCloud</SelectItem>
+                    <SelectItem value="ordoc_sign">OrdocSign</SelectItem>
+                    <SelectItem value="ordoc_reports">OrdocReports</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              {/* Sort */}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">Ordenar por:</span>
-                <select
-                  value={`${sortBy}-${sortDirection}`}
-                  onChange={(e) => {
-                    const [field, direction] = e.target.value.split('-');
-                    setSortBy(field);
-                    setSortDirection(direction as 'asc' | 'desc');
-                  }}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="name-asc">Nome A-Z</option>
-                  <option value="name-desc">Nome Z-A</option>
-                  <option value="created_at-desc">Mais recentes</option>
-                  <option value="created_at-asc">Mais antigas</option>
-                </select>
+                <Select value={filters.source} onValueChange={(value) => handleFilterChange('source', value)}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="system_managed">Sistema</SelectItem>
+                    <SelectItem value="customer_managed">Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filters.ordering} onValueChange={(value) => handleFilterChange('ordering', value)}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Nome A-Z</SelectItem>
+                    <SelectItem value="-name">Nome Z-A</SelectItem>
+                    <SelectItem value="-created_at">Mais recentes</SelectItem>
+                    <SelectItem value="created_at">Mais antigas</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Policies Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('name')}
-                    >
-                      Nome da Política
-                      {sortBy === 'name' && (
-                        <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Descrição
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Efeito
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Recurso
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('created_at')}
-                    >
-                      Data de Criação
-                      {sortBy === 'created_at' && (
-                        <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Gerenciar
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {policies.map((policy) => (
-                    <tr key={policy.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{policy.name}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs truncate" title={policy.description}>
-                          {policy.description}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={getEffectBadge(policy.effect)}>
-                          {getEffectText(policy.effect)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded">
-                          {policy.resource}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {policy.actions.length > 3 ? (
-                            <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                              {policy.actions.slice(0, 3).join(', ')} +{policy.actions.length - 3}
-                            </span>
-                          ) : (
-                            <span className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                              {policy.actions.join(', ')}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {new Date(policy.created_at).toLocaleDateString('pt-BR')}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={getStatusBadge(policy.status)}>
-                          {getStatusText(policy.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Link
-                            href={`/dashboard/ordoc-cloud/policies/${policy.id}`}
-                            className="text-purple-600 hover:text-purple-900"
-                          >
-                            Visualizar
-                          </Link>
-                          <Link
-                            href={`/dashboard/ordoc-cloud/policies/${policy.id}/edit`}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            Editar
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {policies.length === 0 && (
-              <div className="text-center py-12">
-                <ShieldCheckIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma política encontrada</h3>
-                <p className="text-gray-500 mb-4">
-                  {searchQuery || statusFilter || effectFilter
-                    ? 'Tente ajustar os filtros de busca.' 
-                    : 'Comece criando sua primeira política de acesso.'}
-                </p>
-                <button className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors">
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Nova Política
-                </button>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>
+                  Políticas ({policies.length})
+                </CardTitle>
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <span>Página 1 de 1</span>
+                </div>
               </div>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {policies.length > 0 && (
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow-sm">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                  Anterior
-                </button>
-                <button className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                  Próximo
-                </button>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Política</TableHead>
+                      <TableHead>Serviço</TableHead>
+                      <TableHead>Efeito</TableHead>
+                      <TableHead>Recursos</TableHead>
+                      <TableHead>Origem</TableHead>
+                      <TableHead>Atribuições</TableHead>
+                      <TableHead>Criada em</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {policies.map((policy) => (
+                      <TableRow key={policy.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                              <ShieldCheckIcon className="w-5 h-5 text-purple-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{policy.name}</div>
+                              <div className="text-sm text-gray-500 max-w-xs truncate" title={policy.description}>
+                                {policy.description}
+                              </div>
+                              {policy.is_public && (
+                                <div className="inline-flex items-center mt-1">
+                                  <Badge variant="secondary" className="text-xs">Pública</Badge>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getServiceBadge(policy.service)}
+                        </TableCell>
+                        <TableCell>
+                          {getEffectBadge(policy.effect)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {policy.resource.length > 2 ? (
+                              <div className="space-y-1">
+                                <div className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                                  {policy.resource[0]}
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  +{policy.resource.length - 1} mais
+                                </Badge>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {policy.resource.map((resource, index) => (
+                                  <div key={index} className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                                    {resource}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getSourceBadge(policy.source)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="text-gray-900">
+                              {(policy.user_groups_count || 0)} grupos
+                            </div>
+                            <div className="text-gray-500">
+                              {(policy.users_count || 0)} usuários
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-gray-900">
+                            {new Date(policy.created_at).toLocaleDateString('pt-BR')}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(policy.created_at).toLocaleTimeString('pt-BR')}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <EllipsisVerticalIcon className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleActionClick('view', policy)}>
+                                <EyeIcon className="w-4 h-4 mr-2" />
+                                Visualizar
+                              </DropdownMenuItem>
+                              {policy.source === 'customer_managed' && (
+                                <DropdownMenuItem onClick={() => handleActionClick('edit', policy)}>
+                                  <PencilIcon className="w-4 h-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                              )}
+                              {policy.source === 'customer_managed' && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleActionClick('delete', policy)}
+                                  className="text-red-600"
+                                >
+                                  <TrashIcon className="w-4 h-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Mostrando <span className="font-medium">1</span> a <span className="font-medium">{policies.length}</span> de{' '}
-                    <span className="font-medium">{policies.length}</span> resultados
+              
+              {policies.length === 0 && (
+                <div className="text-center py-12">
+                  <ShieldCheckIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma política encontrada</h3>
+                  <p className="text-gray-500 mb-4">
+                    {filters.search || filters.effect || filters.service
+                      ? 'Tente ajustar os filtros de busca.' 
+                      : 'Comece criando sua primeira política de acesso.'}
                   </p>
+                  <Button onClick={() => setShowNewPolicyModal(true)} className="bg-purple-600 hover:bg-purple-700">
+                    <PlusIcon className="w-4 h-4 mr-2" />
+                    Nova Política
+                  </Button>
                 </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                    <button className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                      Anterior
-                    </button>
-                    <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-purple-50 text-sm font-medium text-purple-600">
-                      1
-                    </button>
-                    <button className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                      Próximo
-                    </button>
-                  </nav>
-                </div>
-              </div>
-            </div>
-          )}
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Excluir Política</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja excluir a política "{selectedPolicy?.name}"? 
+                Esta ação não pode ser desfeita e pode afetar o acesso de usuários.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => {
+                  console.log('Deleting policy:', selectedPolicy?.id);
+                  setShowDeleteDialog(false);
+                  setSelectedPolicy(null);
+                }}
+              >
+                Excluir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   );

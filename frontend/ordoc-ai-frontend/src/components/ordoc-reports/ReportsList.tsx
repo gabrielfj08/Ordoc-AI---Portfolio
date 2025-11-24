@@ -2,8 +2,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { formatDate } from '@/lib/utils';
-import { reportsService } from '@/services/reports';
+import { DocumentArrowDownIcon, TrashIcon, EyeIcon, ArrowPathIcon, ShareIcon } from '@heroicons/react/24/outline';
+import ExportModal from './ExportModal';
 import ReportsFilters, { ReportsFilters as FiltersType } from './ReportsFilters';
+import { reportsService } from '@/services/reports';
 
 // Interface para um relatório gerado
 interface GeneratedReport {
@@ -74,6 +76,10 @@ const formatFileSize = (bytes?: number) => {
 
 export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
   const [selectedReports, setSelectedReports] = useState<string[]>([]);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportReportId, setExportReportId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<FiltersType>({
     search: '',
@@ -255,6 +261,11 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExport = (reportId: string) => {
+    setExportReportId(reportId);
+    setExportModalOpen(true);
   };
 
   const handleDownload = async (report: GeneratedReport) => {
@@ -479,19 +490,27 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
                         className="text-blue-600 hover:text-blue-900"
                         title="Download"
                       >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <DocumentArrowDownIcon className="h-4 w-4" />
                       </button>
                     )}
                     <button
+                      onClick={() => handleExport(report.id)}
+                      className="text-green-600 hover:text-green-900"
+                      title="Exportar"
+                    >
+                      <ShareIcon className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => handleDelete(report.id)}
-                      className="text-red-600 hover:text-red-900"
+                      disabled={deleteLoading === report.id}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
                       title="Excluir"
                     >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      {deleteLoading === report.id ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                      ) : (
+                        <TrashIcon className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                 </td>
@@ -500,6 +519,17 @@ export default function ReportsList({ reports, onRefresh }: ReportsListProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={exportModalOpen}
+        onClose={() => {
+          setExportModalOpen(false);
+          setExportReportId(null);
+        }}
+        reportId={exportReportId || undefined}
+        title={exportReportId ? (Array.isArray(reports) ? reports.find((r: GeneratedReport) => r.id === exportReportId)?.title : undefined) : undefined}
+      />
     </div>
   );
 }

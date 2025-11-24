@@ -6,18 +6,23 @@ import { useQuery } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { reportsService } from '@/services/reports';
 import ReportsList from '@/components/ordoc-reports/ReportsList';
-import ReportsFilter from '@/components/ordoc-reports/ReportsFilter';
-import { FilterReportsParams } from '@/types/ordoc-reports';
+import ReportsFilters, { ReportsFilters as FiltersType } from '@/components/ordoc-reports/ReportsFilters';
 
 export default function ReportsListPage() {
-  const [filters, setFilters] = useState<FilterReportsParams>({
-    page: 1,
-    page_size: 20
+  const [filters, setFilters] = useState<FiltersType>({
+    search: '',
+    status: '',
+    format: '',
+    dateRange: '',
+    customDateFrom: '',
+    customDateTo: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc',
   });
 
   const { data: reportsData, isLoading, error, refetch } = useQuery({
     queryKey: ['reports-list', filters],
-    queryFn: () => reportsService.getReports(filters),
+    queryFn: () => reportsService.getReports(),
   });
 
   const reports = reportsData || [];
@@ -54,10 +59,21 @@ export default function ReportsListPage() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <ReportsFilter 
+          <ReportsFilters 
             filters={filters} 
-            onFiltersChange={setFilters} 
-            loading={isLoading} 
+            onFiltersChange={setFilters}
+            onClearFilters={() => setFilters({
+              search: '',
+              status: '',
+              format: '',
+              dateRange: '',
+              customDateFrom: '',
+              customDateTo: '',
+              sortBy: 'created_at',
+              sortOrder: 'desc',
+            })}
+            totalCount={Array.isArray(reports) ? reports.length : 0}
+            filteredCount={Array.isArray(reports) ? reports.length : 0}
           />
           
           {isLoading ? (
