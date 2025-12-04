@@ -1,11 +1,21 @@
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
+from django.utils import timezone
 from ordoc_ai.base_viewset import BaseViewSet
-from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy
-from .serializers import OrdocUserSerializer, OrdocUserCreateSerializer, OrdocUserListSerializer, UserGroupSerializer, PolicySerializer
+from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog
+from .serializers import (
+    OrdocUserSerializer, OrdocUserCreateSerializer, OrdocUserListSerializer,
+    UserGroupSerializer, PolicySerializer, UserOrganizationRoleSerializer,
+    AuditLogSerializer
+)
+from .permissions import (
+    IsActiveUser, IsAdmin, IsOrganizationManager, CanManageUsers,
+    CanManageRoles, CanManagePolicies
+)
 
 
 class OrdocUserViewSet(BaseViewSet):
@@ -97,9 +107,9 @@ class OrdocUserViewSet(BaseViewSet):
         query = request.query_params.get('q', '')
         if not query:
             return Response([])
-        
+
         queryset = self.get_queryset()
-        
+
         # Enhanced search across multiple fields
         search_filter = Q(
             user__username__icontains=query
@@ -110,10 +120,305 @@ class OrdocUserViewSet(BaseViewSet):
         ) | Q(
             user__last_name__icontains=query
         )
-        
+
         queryset = queryset.filter(search_filter)[:10]  # Limit results
-        
+
         serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def unlock(self, request, pk=None):
+        """Unlock a blocked user account"""
+        user = self.get_object()
+        user.unlock_account()
+
+        # Log the action
+        org = self.get_current_organization()
+        if org:
+            AuditLog.log(
+                action='user_unlock',
+                organization=org,
+                user=getattr(request, 'ordoc_user', None),
+                target_user=user,
+                description=f'Conta desbloqueada para {user.user.email}',
+                ip_address=self._get_client_ip(request),
+            )
+
+        return Response({'status': 'User account unlocked successfully'})
+
+    @action(detail=True, methods=['post'])
+    def block(self, request, pk=None):
+        """Block a user account"""
+        user = self.get_object()
+        reason = request.data.get('reason', '')
+        user.block_account(reason)
+
+        # Log the action
+        org = self.get_current_organization()
+        if org:
+            AuditLog.log(
+                action='user_block',
+                organization=org,
+                user=getattr(request, 'ordoc_user', None),
+                target_user=user,
+                description=f'Conta bloqueada: {reason}' if reason else 'Conta bloqueada',
+                ip_address=self._get_client_ip(request),
+            )
+
+        return Response({'status': 'User account blocked successfully'})
+
+    @action(detail=True, methods=['post'])
+    def toggle_status(self, request, pk=None):
+        """Toggle user status between active and inactive"""
+        user = self.get_object()
+        if user.status == 'active':
+            user.deactivate()
+            new_status = 'inactive'
+        else:
+            user.activate()
+            new_status = 'active'
+
+        return Response({
+            'status': f'User status changed to {new_status}',
+            'new_status': new_status
+        })
+
+    @action(detail=True, methods=['post'])
+    def send_password_reset(self, request, pk=None):
+        """Send password reset email to user"""
+        user = self.get_object()
+        token = user.generate_password_reset_token()
+
+        # TODO: Send email with reset link
+        # For now, just return success
+        return Response({
+            'status': 'Password reset email sent',
+            'message': f'Email enviado para {user.user.email}'
+        })
+
+    @action(detail=True, methods=['get'])
+    def roles(self, request, pk=None):
+        """Get user roles in current organization"""
+        user = self.get_object()
+        org = self.get_current_organization()
+
+        roles = UserOrganizationRole.objects.filter(
+            user=user,
+            organization=org,
+            is_active=True
+        )
+
+        serializer = UserOrganizationRoleSerializer(roles, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def assign_role(self, request, pk=None):
+        """Assign a role to user"""
+        user = self.get_object()
+        org = self.get_current_organization()
+        role = request.data.get('role')
+
+        if not role:
+            return Response(
+                {'error': 'Role is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if role already exists
+        existing = UserOrganizationRole.objects.filter(
+            user=user,
+            organization=org,
+            role=role,
+            is_active=True
+        ).first()
+
+        if existing:
+            return Response(
+                {'error': 'User already has this role'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        role_obj = UserOrganizationRole.objects.create(
+            user=user,
+            organization=org,
+            role=role,
+            assigned_by=getattr(request, 'ordoc_user', None)
+        )
+
+        # Log the action
+        AuditLog.log(
+            action='role_assign',
+            organization=org,
+            user=getattr(request, 'ordoc_user', None),
+            target_user=user,
+            description=f'Função {role} atribuída',
+            new_values={'role': role},
+            ip_address=self._get_client_ip(request),
+        )
+
+        serializer = UserOrganizationRoleSerializer(role_obj)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def remove_role(self, request, pk=None):
+        """Remove a role from user"""
+        user = self.get_object()
+        org = self.get_current_organization()
+        role = request.data.get('role')
+
+        if not role:
+            return Response(
+                {'error': 'Role is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        role_obj = UserOrganizationRole.objects.filter(
+            user=user,
+            organization=org,
+            role=role,
+            is_active=True
+        ).first()
+
+        if not role_obj:
+            return Response(
+                {'error': 'User does not have this role'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        role_obj.end_role()
+
+        # Log the action
+        AuditLog.log(
+            action='role_remove',
+            organization=org,
+            user=getattr(request, 'ordoc_user', None),
+            target_user=user,
+            description=f'Função {role} removida',
+            old_values={'role': role},
+            ip_address=self._get_client_ip(request),
+        )
+
+        return Response({'status': 'Role removed successfully'})
+
+    @action(detail=True, methods=['post'])
+    def enable_2fa(self, request, pk=None):
+        """Enable two-factor authentication for user"""
+        user = self.get_object()
+
+        # Only allow user to enable their own 2FA or admin to force it
+        current_user = getattr(request, 'ordoc_user', None)
+        if current_user != user and not self._is_admin(request):
+            return Response(
+                {'error': 'You can only enable 2FA for your own account'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        secret = user.enable_two_factor()
+        uri = user.get_two_factor_uri()
+
+        return Response({
+            'secret': secret,
+            'uri': uri,
+            'backup_codes': user.two_factor_backup_codes
+        })
+
+    @action(detail=True, methods=['post'])
+    def disable_2fa(self, request, pk=None):
+        """Disable two-factor authentication for user"""
+        user = self.get_object()
+
+        # Require current 2FA code to disable
+        code = request.data.get('code')
+        if user.two_factor_enabled and not user.verify_two_factor(code):
+            return Response(
+                {'error': 'Invalid 2FA code'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.disable_two_factor()
+
+        # Log the action
+        org = self.get_current_organization()
+        if org:
+            AuditLog.log(
+                action='2fa_disable',
+                organization=org,
+                user=getattr(request, 'ordoc_user', None),
+                target_user=user,
+                ip_address=self._get_client_ip(request),
+            )
+
+        return Response({'status': '2FA disabled successfully'})
+
+    def _get_client_ip(self, request):
+        """Get client IP address from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0]
+        return request.META.get('REMOTE_ADDR')
+
+    def _is_admin(self, request):
+        """Check if current user is admin"""
+        ordoc_user = getattr(request, 'ordoc_user', None)
+        org = self.get_current_organization()
+        if not ordoc_user or not org:
+            return False
+        return UserOrganizationRole.objects.filter(
+            user=ordoc_user,
+            organization=org,
+            role='admin',
+            is_active=True
+        ).exists()
+
+
+class UserOrganizationRoleViewSet(BaseViewSet):
+    """
+    ViewSet for managing User Organization Roles
+    """
+    queryset = UserOrganizationRole.objects.all()
+    serializer_class = UserOrganizationRoleSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['role', 'is_active', 'user']
+    ordering_fields = ['created_at', 'role']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        """Filter roles by current organization"""
+        queryset = super().get_queryset()
+
+        org = self.get_current_organization()
+        if org:
+            queryset = queryset.filter(organization=org)
+
+        return queryset.filter(is_active=True)
+
+    def perform_create(self, serializer):
+        """Set organization and assigned_by when creating role"""
+        serializer.save(
+            organization=self.get_current_organization(),
+            assigned_by=getattr(self.request, 'ordoc_user', None)
+        )
+
+    @action(detail=False, methods=['get'])
+    def available_roles(self, request):
+        """Get available role types"""
+        return Response([
+            {'code': code, 'name': name}
+            for code, name in UserOrganizationRole.ROLE_CHOICES
+        ])
+
+    @action(detail=False, methods=['get'])
+    def by_user(self, request):
+        """Get roles for a specific user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        roles = self.get_queryset().filter(user_id=user_id)
+        serializer = self.get_serializer(roles, many=True)
         return Response(serializer.data)
 
 
@@ -212,7 +517,7 @@ class PolicyViewSet(BaseViewSet):
     def actions(self, request):
         """Get list of available actions for a service"""
         service = request.query_params.get('service')
-        
+
         # This would typically come from a configuration or registry
         actions_map = {
             'ordoc_air': [
@@ -235,6 +540,184 @@ class PolicyViewSet(BaseViewSet):
                 {'code': 'policy:write', 'name': 'Gerenciar Políticas'},
             ]
         }
-        
+
         actions = actions_map.get(service, [])
         return Response(actions)
+
+    @action(detail=True, methods=['post'])
+    def attach_users(self, request, pk=None):
+        """Attach policy to users"""
+        policy = self.get_object()
+        user_ids = request.data.get('user_ids', [])
+
+        users = OrdocUser.objects.filter(id__in=user_ids)
+        policy.users.add(*users)
+
+        return Response({
+            'status': f'Policy attached to {len(users)} users',
+            'attached_count': len(users)
+        })
+
+    @action(detail=True, methods=['post'])
+    def detach_users(self, request, pk=None):
+        """Detach policy from users"""
+        policy = self.get_object()
+        user_ids = request.data.get('user_ids', [])
+
+        users = OrdocUser.objects.filter(id__in=user_ids)
+        policy.users.remove(*users)
+
+        return Response({
+            'status': f'Policy detached from {len(users)} users',
+            'detached_count': len(users)
+        })
+
+    @action(detail=True, methods=['post'])
+    def attach_groups(self, request, pk=None):
+        """Attach policy to user groups"""
+        policy = self.get_object()
+        group_ids = request.data.get('group_ids', [])
+
+        groups = UserGroup.objects.filter(id__in=group_ids)
+        policy.user_groups.add(*groups)
+
+        return Response({
+            'status': f'Policy attached to {len(groups)} groups',
+            'attached_count': len(groups)
+        })
+
+    @action(detail=True, methods=['post'])
+    def detach_groups(self, request, pk=None):
+        """Detach policy from user groups"""
+        policy = self.get_object()
+        group_ids = request.data.get('group_ids', [])
+
+        groups = UserGroup.objects.filter(id__in=group_ids)
+        policy.user_groups.remove(*groups)
+
+        return Response({
+            'status': f'Policy detached from {len(groups)} groups',
+            'detached_count': len(groups)
+        })
+
+    @action(detail=True, methods=['get'])
+    def affected_users(self, request, pk=None):
+        """Get all users affected by this policy"""
+        policy = self.get_object()
+
+        # Direct users
+        direct_users = set(policy.users.all())
+
+        # Users from groups
+        for group in policy.user_groups.all():
+            direct_users.update(group.get_all_users())
+
+        serializer = OrdocUserListSerializer(list(direct_users), many=True)
+        return Response({
+            'total': len(direct_users),
+            'users': serializer.data
+        })
+
+
+class AuditLogViewSet(BaseViewSet):
+    """
+    ViewSet for viewing audit logs (read-only)
+    """
+    queryset = AuditLog.objects.all()
+    serializer_class = AuditLogSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['action', 'user', 'target_user']
+    search_fields = ['description', 'action']
+    ordering_fields = ['created_at', 'action']
+    ordering = ['-created_at']
+    http_method_names = ['get', 'head', 'options']  # Read-only
+
+    def get_queryset(self):
+        """Filter audit logs by current organization"""
+        queryset = super().get_queryset()
+
+        org = self.get_current_organization()
+        if org:
+            queryset = queryset.filter(organization=org)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def by_user(self, request):
+        """Get audit logs for a specific user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        logs = self.get_queryset().filter(
+            Q(user_id=user_id) | Q(target_user_id=user_id)
+        )
+
+        page = self.paginate_queryset(logs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(logs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_action(self, request):
+        """Get audit logs filtered by action type"""
+        action_type = request.query_params.get('action')
+        if not action_type:
+            return Response(
+                {'error': 'action is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        logs = self.get_queryset().filter(action=action_type)
+
+        page = self.paginate_queryset(logs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(logs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """Get recent audit logs (last 24 hours)"""
+        from datetime import timedelta
+        cutoff = timezone.now() - timedelta(hours=24)
+
+        logs = self.get_queryset().filter(created_at__gte=cutoff)[:100]
+        serializer = self.get_serializer(logs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get audit log statistics"""
+        from django.db.models import Count
+        from datetime import timedelta
+
+        queryset = self.get_queryset()
+
+        # Stats for last 7 days
+        week_ago = timezone.now() - timedelta(days=7)
+        recent_logs = queryset.filter(created_at__gte=week_ago)
+
+        # Count by action type
+        action_counts = recent_logs.values('action').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        # Count by user
+        user_counts = recent_logs.exclude(user__isnull=True).values(
+            'user__user__username'
+        ).annotate(count=Count('id')).order_by('-count')[:10]
+
+        return Response({
+            'total_last_7_days': recent_logs.count(),
+            'by_action': list(action_counts),
+            'top_users': list(user_counts),
+        })

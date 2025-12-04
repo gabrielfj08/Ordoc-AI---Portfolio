@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 import uuid
-from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy
+from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog
 from ordoc_air.models import Organization, Department
 
 
@@ -23,10 +23,27 @@ class DepartmentSerializer(serializers.ModelSerializer):
 class UserOrganizationRoleSerializer(serializers.ModelSerializer):
     """Serializer for UserOrganizationRole model"""
     role_display = serializers.CharField(source='get_role_display', read_only=True)
-    
+    user_name = serializers.SerializerMethodField()
+    organization_name = serializers.CharField(source='organization.corporate_name', read_only=True)
+    assigned_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = UserOrganizationRole
-        fields = ['id', 'role', 'role_display', 'created_at']
+        fields = [
+            'id', 'user', 'user_name', 'organization', 'organization_name',
+            'role', 'role_display', 'is_active', 'is_primary',
+            'started_at', 'ended_at', 'assigned_by', 'assigned_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'started_at']
+
+    def get_user_name(self, obj):
+        return obj.user.user.get_full_name() or obj.user.user.username
+
+    def get_assigned_by_name(self, obj):
+        if obj.assigned_by:
+            return obj.assigned_by.user.get_full_name() or obj.assigned_by.user.username
+        return None
 
 
 class OrdocUserCreateSerializer(serializers.ModelSerializer):
@@ -133,24 +150,31 @@ class OrdocUserSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source='user.last_name', read_only=True)
     is_active = serializers.BooleanField(source='user.is_active', read_only=True)
     date_joined = serializers.DateTimeField(source='user.date_joined', read_only=True)
-    
+
     # OrdocUser fields
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    language_display = serializers.CharField(source='get_language_display', read_only=True)
     is_external = serializers.SerializerMethodField()
-    
+
     # Related fields
     roles = UserOrganizationRoleSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = OrdocUser
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'is_active', 'date_joined',
-            'status', 'status_display', 'is_external', 'phone', 'avatar',
+            'status', 'status_display', 'is_external', 'phone', 'cpf', 'date_of_birth',
+            'registration_number', 'avatar', 'profile_complete',
+            'language', 'language_display', 'timezone', 'email_notifications',
             'must_change_password', 'password_changed_at', 'failed_attempts',
+            'last_login_at', 'last_login_ip', 'two_factor_enabled',
             'created_at', 'updated_at', 'roles'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'failed_attempts']
-    
+        read_only_fields = [
+            'id', 'created_at', 'updated_at', 'failed_attempts',
+            'last_login_at', 'last_login_ip', 'profile_complete'
+        ]
+
     def get_is_external(self, obj):
         """Determine if user is external based on roles"""
         # For now, consider all users as internal unless specified otherwise
@@ -230,20 +254,56 @@ class PolicySerializer(serializers.ModelSerializer):
     """Serializer for Policy model"""
     effect_display = serializers.CharField(source='get_effect_display', read_only=True)
     source_display = serializers.CharField(source='get_source_display', read_only=True)
+    service_display = serializers.CharField(source='get_service_display', read_only=True)
     user_groups_count = serializers.SerializerMethodField()
     users_count = serializers.SerializerMethodField()
-    
+    created_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Policy
         fields = [
             'id', 'name', 'description', 'effect', 'effect_display',
-            'service', 'resource', 'source', 'source_display', 'is_public',
-            'user_groups_count', 'users_count', 'created_at', 'updated_at'
+            'service', 'service_display', 'resource', 'actions', 'conditions',
+            'source', 'source_display', 'is_public', 'is_active', 'priority', 'version',
+            'user_groups_count', 'users_count', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-    
+        read_only_fields = ['id', 'created_at', 'updated_at', 'version']
+
     def get_user_groups_count(self, obj):
         return obj.user_groups.count()
-    
+
     def get_users_count(self, obj):
         return obj.users.count()
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.user.get_full_name() or obj.created_by.user.username
+        return None
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """Serializer for AuditLog model"""
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    user_name = serializers.SerializerMethodField()
+    target_user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'action', 'action_display', 'description',
+            'user', 'user_name', 'target_user', 'target_user_name',
+            'target_type', 'target_id', 'old_values', 'new_values',
+            'ip_address', 'user_agent', 'organization', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_user_name(self, obj):
+        if obj.user:
+            return obj.user.user.get_full_name() or obj.user.user.username
+        return 'Sistema'
+
+    def get_target_user_name(self, obj):
+        if obj.target_user:
+            return obj.target_user.user.get_full_name() or obj.target_user.user.username
+        return None
