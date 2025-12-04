@@ -111,7 +111,7 @@ class WorkflowRequest(models.Model):
     """
     Modelo para solicitações de workflow - equivalente ao PrinterFlow::WorkflowRequest
     """
-    
+
     STATUS_CHOICES = [
         ('draft', 'Rascunho'),
         ('submitted', 'Enviado'),
@@ -121,25 +121,29 @@ class WorkflowRequest(models.Model):
         ('completed', 'Concluído'),
         ('cancelled', 'Cancelado'),
     ]
-    
+
     PRIORITY_CHOICES = [
         ('low', 'Baixa'),
         ('medium', 'Média'),
         ('high', 'Alta'),
         ('urgent', 'Urgente'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
     # Basic info
     title = models.CharField(max_length=255, verbose_name="Título")
     description = models.TextField(verbose_name="Descrição")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
-    
+
     # Request data
     request_data = models.JSONField(default=dict, verbose_name="Dados da Solicitação")
-    
+    metadata = models.JSONField(default=dict, blank=True, verbose_name="Metadados")
+
+    # Due date
+    due_date = models.DateField(null=True, blank=True, verbose_name="Data de Vencimento")
+
     # Relations
     requester = models.ForeignKey(
         ExternalRequester,
@@ -153,14 +157,22 @@ class WorkflowRequest(models.Model):
         related_name='workflow_requests',
         verbose_name="Organização"
     )
-    
+    assigned_to = models.ForeignKey(
+        'ordoc_cloud.OrdocUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_workflow_requests',
+        verbose_name="Atribuído para"
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         verbose_name = "Solicitação de Workflow"
         verbose_name_plural = "Solicitações de Workflow"
@@ -170,27 +182,36 @@ class WorkflowRequest(models.Model):
             models.Index(fields=['priority']),
             models.Index(fields=['organization', 'status']),
             models.Index(fields=['requester', 'status']),
+            models.Index(fields=['assigned_to', 'status']),
+            models.Index(fields=['due_date']),
             models.Index(fields=['created_at']),
         ]
-    
+
     def __str__(self):
         return f"{self.title} - {self.requester.name} ({self.get_status_display()})"
-    
+
     @property
     def is_draft(self):
         return self.status == 'draft'
-    
+
     @property
     def is_submitted(self):
         return self.status == 'submitted'
-    
+
     @property
     def is_completed(self):
         return self.status == 'completed'
-    
+
     @property
     def is_cancelled(self):
         return self.status == 'cancelled'
+
+    @property
+    def is_overdue(self):
+        """Verifica se a solicitação está atrasada"""
+        if self.due_date and self.status not in ['completed', 'cancelled']:
+            return timezone.now().date() > self.due_date
+        return False
 
 
 # ============================================================================
@@ -1015,3 +1036,386 @@ class Task(models.Model):
         if not self.procedure.status == 'started':
             self.procedure.start()
             self.procedure.save()
+
+
+# ============================================================================
+# MODELOS DE DOCUMENTOS E ANEXOS
+# ============================================================================
+
+class ProcedureDocument(models.Model):
+    """
+    Modelo para documentos anexados a procedimentos.
+    Equivalente ao PrinterFlow::ProcedureDocument do Rails.
+    """
+
+    DOCUMENT_TYPE_CHOICES = [
+        ('attachment', 'Anexo'),
+        ('evidence', 'Evidência'),
+        ('report', 'Relatório'),
+        ('contract', 'Contrato'),
+        ('invoice', 'Fatura'),
+        ('certificate', 'Certificado'),
+        ('other', 'Outro'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('approved', 'Aprovado'),
+        ('rejected', 'Rejeitado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Document info
+    name = models.CharField(max_length=255, verbose_name='Nome do Documento')
+    description = models.TextField(blank=True, verbose_name='Descrição')
+    document_type = models.CharField(
+        max_length=20,
+        choices=DOCUMENT_TYPE_CHOICES,
+        default='attachment',
+        verbose_name='Tipo do Documento'
+    )
+
+    # File info
+    file = models.FileField(
+        upload_to='procedure_documents/%Y/%m/%d/',
+        verbose_name='Arquivo'
+    )
+    file_name = models.CharField(max_length=255, verbose_name='Nome do Arquivo')
+    file_size = models.PositiveIntegerField(verbose_name='Tamanho do Arquivo')
+    file_type = models.CharField(max_length=100, verbose_name='Tipo do Arquivo')
+    storage_key = models.CharField(max_length=500, blank=True, verbose_name='Chave de Armazenamento')
+
+    # Status
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name='Status'
+    )
+
+    # Versioning
+    version = models.PositiveIntegerField(default=1, verbose_name='Versão')
+    is_current = models.BooleanField(default=True, verbose_name='Versão Atual')
+    parent_document = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='versions',
+        verbose_name='Documento Original'
+    )
+
+    # Relations
+    procedure = models.ForeignKey(
+        Procedure,
+        on_delete=models.CASCADE,
+        related_name='documents',
+        verbose_name='Procedimento'
+    )
+
+    uploaded_by = models.ForeignKey(
+        'ordoc_cloud.OrdocUser',
+        on_delete=models.CASCADE,
+        related_name='uploaded_procedure_documents',
+        verbose_name='Enviado por'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'ordoc_flow_procedure_documents'
+        verbose_name = 'Documento do Procedimento'
+        verbose_name_plural = 'Documentos do Procedimento'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['procedure', 'status']),
+            models.Index(fields=['document_type']),
+            models.Index(fields=['uploaded_by']),
+            models.Index(fields=['is_current']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} - {self.procedure.process_number}"
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.file_name:
+            self.file_name = self.file.name
+        if self.file and not self.file_size:
+            self.file_size = self.file.size
+        super().save(*args, **kwargs)
+
+    def soft_delete(self):
+        """Soft delete do documento"""
+        self.deleted_at = timezone.now()
+        self.save()
+
+    def create_new_version(self, new_file, uploaded_by):
+        """Cria uma nova versão do documento"""
+        # Marca a versão atual como não atual
+        self.is_current = False
+        self.save()
+
+        # Cria nova versão
+        new_doc = ProcedureDocument.objects.create(
+            name=self.name,
+            description=self.description,
+            document_type=self.document_type,
+            file=new_file,
+            file_name=new_file.name,
+            file_size=new_file.size,
+            file_type=new_file.content_type if hasattr(new_file, 'content_type') else '',
+            procedure=self.procedure,
+            uploaded_by=uploaded_by,
+            version=self.version + 1,
+            is_current=True,
+            parent_document=self.parent_document or self
+        )
+
+        return new_doc
+
+
+class TaskAttachment(models.Model):
+    """
+    Modelo para anexos de tarefas.
+    Equivalente ao PrinterFlow::TaskAttachment do Rails.
+    """
+
+    ATTACHMENT_TYPE_CHOICES = [
+        ('document', 'Documento'),
+        ('image', 'Imagem'),
+        ('video', 'Vídeo'),
+        ('audio', 'Áudio'),
+        ('spreadsheet', 'Planilha'),
+        ('presentation', 'Apresentação'),
+        ('other', 'Outro'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Attachment info
+    name = models.CharField(max_length=255, verbose_name='Nome do Anexo')
+    description = models.TextField(blank=True, verbose_name='Descrição')
+    attachment_type = models.CharField(
+        max_length=20,
+        choices=ATTACHMENT_TYPE_CHOICES,
+        default='document',
+        verbose_name='Tipo do Anexo'
+    )
+
+    # File info
+    file = models.FileField(
+        upload_to='task_attachments/%Y/%m/%d/',
+        verbose_name='Arquivo'
+    )
+    file_name = models.CharField(max_length=255, verbose_name='Nome do Arquivo')
+    file_size = models.PositiveIntegerField(verbose_name='Tamanho do Arquivo')
+    file_type = models.CharField(max_length=100, verbose_name='Tipo do Arquivo')
+    storage_key = models.CharField(max_length=500, blank=True, verbose_name='Chave de Armazenamento')
+
+    # Thumbnail for images/videos
+    thumbnail = models.ImageField(
+        upload_to='task_attachments/thumbnails/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        verbose_name='Miniatura'
+    )
+
+    # Relations
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name='attachments',
+        verbose_name='Tarefa'
+    )
+
+    uploaded_by = models.ForeignKey(
+        'ordoc_cloud.OrdocUser',
+        on_delete=models.CASCADE,
+        related_name='uploaded_task_attachments',
+        verbose_name='Enviado por'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'ordoc_flow_task_attachments'
+        verbose_name = 'Anexo da Tarefa'
+        verbose_name_plural = 'Anexos da Tarefa'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['task']),
+            models.Index(fields=['attachment_type']),
+            models.Index(fields=['uploaded_by']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} - {self.task.name}"
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.file_name:
+            self.file_name = self.file.name
+        if self.file and not self.file_size:
+            self.file_size = self.file.size
+
+        # Detecta tipo do anexo baseado na extensão
+        if not self.attachment_type or self.attachment_type == 'other':
+            self._detect_attachment_type()
+
+        super().save(*args, **kwargs)
+
+    def _detect_attachment_type(self):
+        """Detecta o tipo de anexo baseado na extensão do arquivo"""
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(self.file_name)
+
+        if mime_type:
+            if mime_type.startswith('image/'):
+                self.attachment_type = 'image'
+            elif mime_type.startswith('video/'):
+                self.attachment_type = 'video'
+            elif mime_type.startswith('audio/'):
+                self.attachment_type = 'audio'
+            elif mime_type in ['application/pdf', 'application/msword',
+                               'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+                self.attachment_type = 'document'
+            elif mime_type in ['application/vnd.ms-excel',
+                               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+                self.attachment_type = 'spreadsheet'
+            elif mime_type in ['application/vnd.ms-powerpoint',
+                               'application/vnd.openxmlformats-officedocument.presentationml.presentation']:
+                self.attachment_type = 'presentation'
+
+    def soft_delete(self):
+        """Soft delete do anexo"""
+        self.deleted_at = timezone.now()
+        self.save()
+
+    def generate_thumbnail(self):
+        """Gera thumbnail para imagens e vídeos"""
+        # Implementação depende de bibliotecas como Pillow ou ffmpeg
+        pass
+
+
+class WorkflowHistory(models.Model):
+    """
+    Modelo para histórico de ações em procedimentos e tarefas.
+    Registra todas as alterações e transições de estado.
+    """
+
+    ACTION_CHOICES = [
+        ('created', 'Criado'),
+        ('updated', 'Atualizado'),
+        ('status_changed', 'Status Alterado'),
+        ('assigned', 'Atribuído'),
+        ('commented', 'Comentado'),
+        ('document_added', 'Documento Adicionado'),
+        ('document_removed', 'Documento Removido'),
+        ('approved', 'Aprovado'),
+        ('rejected', 'Rejeitado'),
+        ('archived', 'Arquivado'),
+        ('restored', 'Restaurado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    action = models.CharField(
+        max_length=20,
+        choices=ACTION_CHOICES,
+        verbose_name='Ação'
+    )
+
+    description = models.TextField(verbose_name='Descrição')
+
+    # Previous and new values for tracking changes
+    old_value = models.JSONField(default=dict, blank=True, verbose_name='Valor Anterior')
+    new_value = models.JSONField(default=dict, blank=True, verbose_name='Novo Valor')
+
+    # Generic foreign key para procedimentos ou tarefas
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.UUIDField()
+    workflow_object = GenericForeignKey('content_type', 'object_id')
+
+    # Who performed the action
+    performed_by = models.ForeignKey(
+        'ordoc_cloud.OrdocUser',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='workflow_history_actions',
+        verbose_name='Realizado por'
+    )
+
+    external_performed_by = models.ForeignKey(
+        ExternalRequester,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='workflow_history_actions',
+        verbose_name='Realizado por (Externo)'
+    )
+
+    # Metadata
+    ip_address = models.GenericIPAddressField(null=True, blank=True, verbose_name='Endereço IP')
+    user_agent = models.TextField(blank=True, verbose_name='User Agent')
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'ordoc_flow_workflow_history'
+        verbose_name = 'Histórico do Workflow'
+        verbose_name_plural = 'Históricos do Workflow'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['action']),
+            models.Index(fields=['performed_by']),
+            models.Index(fields=['external_performed_by']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        performer = self.performed_by.name if self.performed_by else (
+            self.external_performed_by.name if self.external_performed_by else 'Sistema'
+        )
+        return f"{self.get_action_display()} por {performer}"
+
+    @classmethod
+    def log_action(cls, obj, action, description, performed_by=None, external_performed_by=None,
+                   old_value=None, new_value=None, request=None):
+        """
+        Método auxiliar para registrar uma ação no histórico.
+
+        Args:
+            obj: Objeto (Procedure ou Task)
+            action: Tipo da ação
+            description: Descrição da ação
+            performed_by: Usuário interno que realizou a ação
+            external_performed_by: Usuário externo que realizou a ação
+            old_value: Valor anterior (dict)
+            new_value: Novo valor (dict)
+            request: Request HTTP para capturar IP e User Agent
+        """
+        history = cls.objects.create(
+            content_type=ContentType.objects.get_for_model(obj),
+            object_id=obj.id,
+            action=action,
+            description=description,
+            performed_by=performed_by,
+            external_performed_by=external_performed_by,
+            old_value=old_value or {},
+            new_value=new_value or {},
+            ip_address=request.META.get('REMOTE_ADDR') if request else None,
+            user_agent=request.META.get('HTTP_USER_AGENT', '') if request else ''
+        )
+
+        return history

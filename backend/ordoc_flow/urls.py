@@ -8,7 +8,8 @@ from .views import (
     ProcedureViewSet, TaskViewSet, WorkflowDashboardViewSet, BatchOperationViewSet,
     ApprovalWorkflowViewSet, ApprovalInstanceViewSet, NotificationTemplateViewSet,
     NotificationLogViewSet, WorkflowRequestViewSet, WorkflowSearchViewSet,
-    WorkflowAnalyticsViewSet
+    WorkflowAnalyticsViewSet, ProcedureDocumentViewSet, TaskAttachmentViewSet,
+    WorkflowHistoryViewSet
 )
 from .external_views import (
     ExternalProcedureViewSet, ExternalProcedureTemplateViewSet, ExternalTaskViewSet
@@ -32,6 +33,11 @@ router.register(r'approval-instances', ApprovalInstanceViewSet, basename='approv
 # ViewSets para sistema de notificações
 router.register(r'notification-templates', NotificationTemplateViewSet, basename='notification-template')
 router.register(r'notification-logs', NotificationLogViewSet, basename='notification-log')
+
+# ViewSets para documentos e anexos
+router.register(r'procedure-documents', ProcedureDocumentViewSet, basename='procedure-document')
+router.register(r'task-attachments', TaskAttachmentViewSet, basename='task-attachment')
+router.register(r'history', WorkflowHistoryViewSet, basename='workflow-history')
 
 # ViewSets especiais
 router.register(r'dashboard', WorkflowDashboardViewSet, basename='workflow-dashboard')
