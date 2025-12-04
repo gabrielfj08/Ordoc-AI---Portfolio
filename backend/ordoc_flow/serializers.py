@@ -3,7 +3,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from .models import (
     ExternalRequester, WorkflowRequest, GroupRequester, GroupRequesterMember,
-    ProcedureTemplate, Field, FieldValueOption, Procedure, TaskTemplate, Task
+    ProcedureTemplate, Field, FieldValueOption, Procedure, TaskTemplate, Task,
+    ProcedureDocument, TaskAttachment, WorkflowHistory
 )
 from .approval_models import (
     JustificationNote, TaskComment, TaskField, ApprovalWorkflow, ApprovalStep,
@@ -13,24 +14,28 @@ from .approval_models import (
 
 class ExternalRequesterSerializer(serializers.ModelSerializer):
     """Serializer para solicitantes externos"""
-    
+
     organization_name = serializers.CharField(source='organization.name', read_only=True)
-    is_active = serializers.BooleanField(read_only=True)
-    
+    is_active = serializers.BooleanField(source='is_active_user', read_only=True)
+
     class Meta:
         model = ExternalRequester
         fields = [
-            'id', 'name', 'email', 'phone', 'cpf', 'notification_type',
-            'status', 'organization', 'organization_name', 'is_active',
+            'id', 'name', 'email', 'phone', 'document_number', 'company',
+            'status', 'failed_attempts', 'locked_at',
+            'organization', 'organization_name', 'is_active',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-    
-    def validate_cpf(self, value):
-        """Validação básica de CPF"""
+        read_only_fields = ['id', 'failed_attempts', 'locked_at', 'created_at', 'updated_at']
+
+    def validate_document_number(self, value):
+        """Validação básica de CPF/CNPJ"""
         import re
-        if not re.match(r'^\d{3}\.\d{3}\.\d{3}-\d{2}$', value):
-            raise serializers.ValidationError('CPF deve estar no formato XXX.XXX.XXX-XX')
+        if value:
+            # Remove caracteres não numéricos para validação
+            clean_value = re.sub(r'\D', '', value)
+            if len(clean_value) not in [11, 14]:
+                raise serializers.ValidationError('Documento deve ser um CPF (11 dígitos) ou CNPJ (14 dígitos)')
         return value
 
 
@@ -469,8 +474,164 @@ class BatchOperationSerializer(serializers.Serializer):
 
 class BatchOperationResultSerializer(serializers.Serializer):
     """Serializer para resultado de operações em lote"""
-    
+
     success_count = serializers.IntegerField()
     error_count = serializers.IntegerField()
     errors = serializers.ListField(child=serializers.DictField())
     processed_objects = serializers.ListField(child=serializers.UUIDField())
+
+
+# Serializers para Documentos e Anexos
+
+class ProcedureDocumentSerializer(serializers.ModelSerializer):
+    """Serializer para documentos de procedimentos"""
+
+    procedure_number = serializers.CharField(source='procedure.process_number', read_only=True)
+    uploaded_by_name = serializers.CharField(source='uploaded_by.name', read_only=True)
+    file_url = serializers.SerializerMethodField()
+    versions_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProcedureDocument
+        fields = [
+            'id', 'name', 'description', 'document_type', 'status',
+            'file', 'file_name', 'file_size', 'file_type', 'file_url',
+            'version', 'is_current', 'parent_document',
+            'procedure', 'procedure_number',
+            'uploaded_by', 'uploaded_by_name',
+            'versions_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'file_name', 'file_size', 'version', 'is_current',
+            'created_at', 'updated_at'
+        ]
+
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+
+    def get_versions_count(self, obj):
+        if obj.parent_document:
+            return obj.parent_document.versions.count()
+        return obj.versions.count()
+
+
+class TaskAttachmentSerializer(serializers.ModelSerializer):
+    """Serializer para anexos de tarefas"""
+
+    task_name = serializers.CharField(source='task.name', read_only=True)
+    uploaded_by_name = serializers.CharField(source='uploaded_by.name', read_only=True)
+    file_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskAttachment
+        fields = [
+            'id', 'name', 'description', 'attachment_type',
+            'file', 'file_name', 'file_size', 'file_type', 'file_url',
+            'thumbnail', 'thumbnail_url',
+            'task', 'task_name',
+            'uploaded_by', 'uploaded_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'file_name', 'file_size', 'attachment_type',
+            'created_at', 'updated_at'
+        ]
+
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+
+    def get_thumbnail_url(self, obj):
+        if obj.thumbnail:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.thumbnail.url)
+            return obj.thumbnail.url
+        return None
+
+
+class WorkflowHistorySerializer(serializers.ModelSerializer):
+    """Serializer para histórico do workflow"""
+
+    performed_by_name = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = WorkflowHistory
+        fields = [
+            'id', 'action', 'action_display', 'description',
+            'old_value', 'new_value',
+            'content_type', 'object_id',
+            'performed_by', 'performed_by_name',
+            'external_performed_by',
+            'ip_address', 'user_agent',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_performed_by_name(self, obj):
+        if obj.performed_by:
+            return obj.performed_by.name
+        elif obj.external_performed_by:
+            return obj.external_performed_by.name
+        return 'Sistema'
+
+
+class ProcedureDocumentUploadSerializer(serializers.Serializer):
+    """Serializer para upload de documentos"""
+
+    file = serializers.FileField()
+    name = serializers.CharField(max_length=255, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    document_type = serializers.ChoiceField(
+        choices=ProcedureDocument.DOCUMENT_TYPE_CHOICES,
+        default='attachment'
+    )
+
+    def validate_file(self, value):
+        # Limite de 50MB
+        max_size = 50 * 1024 * 1024
+        if value.size > max_size:
+            raise serializers.ValidationError('Arquivo muito grande. Tamanho máximo: 50MB')
+
+        # Extensões permitidas
+        allowed_extensions = [
+            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+            'jpg', 'jpeg', 'png', 'gif', 'bmp',
+            'txt', 'csv', 'zip', 'rar'
+        ]
+
+        ext = value.name.split('.')[-1].lower()
+        if ext not in allowed_extensions:
+            raise serializers.ValidationError(
+                f'Extensão não permitida. Extensões permitidas: {", ".join(allowed_extensions)}'
+            )
+
+        return value
+
+
+class TaskAttachmentUploadSerializer(serializers.Serializer):
+    """Serializer para upload de anexos de tarefas"""
+
+    file = serializers.FileField()
+    name = serializers.CharField(max_length=255, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_file(self, value):
+        # Limite de 25MB
+        max_size = 25 * 1024 * 1024
+        if value.size > max_size:
+            raise serializers.ValidationError('Arquivo muito grande. Tamanho máximo: 25MB')
+
+        return value

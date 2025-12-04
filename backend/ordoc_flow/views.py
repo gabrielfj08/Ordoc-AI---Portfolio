@@ -12,7 +12,8 @@ from ordoc_ai.base_viewset import BaseViewSet
 from ordoc_ai.authentication import JWTAuthentication
 from .models import (
     ExternalRequester, WorkflowRequest, GroupRequester, GroupRequesterMember,
-    ProcedureTemplate, Field, FieldValueOption, Procedure, TaskTemplate, Task
+    ProcedureTemplate, Field, FieldValueOption, Procedure, TaskTemplate, Task,
+    ProcedureDocument, TaskAttachment, WorkflowHistory
 )
 from .approval_models import (
     JustificationNote, TaskComment, TaskField, ApprovalWorkflow, ApprovalStep,
@@ -24,7 +25,9 @@ from .serializers import (
     TaskTemplateSerializer, TaskSerializer, JustificationNoteSerializer,
     TaskCommentSerializer, ApprovalWorkflowSerializer, ApprovalInstanceSerializer,
     NotificationTemplateSerializer, NotificationLogSerializer,
-    WorkflowDashboardSerializer, BatchOperationSerializer, BatchOperationResultSerializer
+    WorkflowDashboardSerializer, BatchOperationSerializer, BatchOperationResultSerializer,
+    ProcedureDocumentSerializer, TaskAttachmentSerializer, WorkflowHistorySerializer,
+    ProcedureDocumentUploadSerializer, TaskAttachmentUploadSerializer
 )
 from .filters import (
     ProcedureFilter, TaskFilter, ExternalRequesterFilter, GroupRequesterFilter,
@@ -1070,9 +1073,386 @@ class WorkflowAnalyticsViewSet(BaseViewSet):
                 'period_days': period_days,
                 'generated_at': timezone.now().isoformat()
             })
-            
+
         except Exception as e:
             return Response(
                 {'error': f'Erro ao obter métricas: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# ViewSets para Documentos e Anexos
+
+class ProcedureDocumentViewSet(BaseViewSet):
+    """
+    ViewSet para gerenciar documentos de procedimentos.
+    """
+
+    queryset = ProcedureDocument.objects.all()
+    serializer_class = ProcedureDocumentSerializer
+    search_fields = ['name', 'description', 'file_name']
+    ordering_fields = ['name', 'created_at', 'document_type']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        queryset = queryset.select_related(
+            'procedure__organization', 'uploaded_by', 'parent_document'
+        ).filter(
+            procedure__organization=self.get_current_organization(),
+            deleted_at__isnull=True
+        )
+
+        # Filtro por procedimento
+        procedure_id = self.request.query_params.get('procedure')
+        if procedure_id:
+            queryset = queryset.filter(procedure_id=procedure_id)
+
+        # Filtro por tipo de documento
+        document_type = self.request.query_params.get('document_type')
+        if document_type:
+            queryset = queryset.filter(document_type=document_type)
+
+        # Filtro por versão atual
+        current_only = self.request.query_params.get('current_only', 'true')
+        if current_only.lower() == 'true':
+            queryset = queryset.filter(is_current=True)
+
+        return queryset
+
+    @action(detail=False, methods=['post'])
+    def upload(self, request):
+        """Upload de novo documento"""
+        serializer = ProcedureDocumentUploadSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        procedure_id = request.data.get('procedure')
+        if not procedure_id:
+            return Response(
+                {'error': 'procedure é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            procedure = Procedure.objects.get(
+                id=procedure_id,
+                organization=self.get_current_organization()
+            )
+
+            file = serializer.validated_data['file']
+            document = ProcedureDocument.objects.create(
+                procedure=procedure,
+                file=file,
+                file_name=file.name,
+                file_size=file.size,
+                file_type=file.content_type if hasattr(file, 'content_type') else '',
+                name=serializer.validated_data.get('name', file.name),
+                description=serializer.validated_data.get('description', ''),
+                document_type=serializer.validated_data.get('document_type', 'attachment'),
+                uploaded_by=self.get_current_user()
+            )
+
+            # Registra no histórico
+            WorkflowHistory.log_action(
+                obj=procedure,
+                action='document_added',
+                description=f'Documento "{document.name}" adicionado',
+                performed_by=self.get_current_user(),
+                new_value={'document_id': str(document.id), 'document_name': document.name},
+                request=request
+            )
+
+            return Response(
+                ProcedureDocumentSerializer(document, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+
+        except Procedure.DoesNotExist:
+            return Response(
+                {'error': 'Procedimento não encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['post'])
+    def new_version(self, request, pk=None):
+        """Cria nova versão de um documento"""
+        document = self.get_object()
+        file = request.FILES.get('file')
+
+        if not file:
+            return Response(
+                {'error': 'Arquivo é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        new_doc = document.create_new_version(
+            new_file=file,
+            uploaded_by=self.get_current_user()
+        )
+
+        # Registra no histórico
+        WorkflowHistory.log_action(
+            obj=document.procedure,
+            action='document_added',
+            description=f'Nova versão do documento "{new_doc.name}" (v{new_doc.version})',
+            performed_by=self.get_current_user(),
+            old_value={'version': document.version},
+            new_value={'version': new_doc.version, 'document_id': str(new_doc.id)},
+            request=request
+        )
+
+        return Response(
+            ProcedureDocumentSerializer(new_doc, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['get'])
+    def versions(self, request, pk=None):
+        """Lista todas as versões de um documento"""
+        document = self.get_object()
+
+        if document.parent_document:
+            root_document = document.parent_document
+        else:
+            root_document = document
+
+        # Lista todas as versões
+        versions = ProcedureDocument.objects.filter(
+            Q(id=root_document.id) | Q(parent_document=root_document)
+        ).order_by('-version')
+
+        serializer = ProcedureDocumentSerializer(
+            versions, many=True, context={'request': request}
+        )
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['delete'])
+    def soft_delete(self, request, pk=None):
+        """Soft delete de documento"""
+        document = self.get_object()
+        document.soft_delete()
+
+        # Registra no histórico
+        WorkflowHistory.log_action(
+            obj=document.procedure,
+            action='document_removed',
+            description=f'Documento "{document.name}" removido',
+            performed_by=self.get_current_user(),
+            old_value={'document_id': str(document.id), 'document_name': document.name},
+            request=request
+        )
+
+        return Response({'message': 'Documento removido com sucesso'})
+
+
+class TaskAttachmentViewSet(BaseViewSet):
+    """
+    ViewSet para gerenciar anexos de tarefas.
+    """
+
+    queryset = TaskAttachment.objects.all()
+    serializer_class = TaskAttachmentSerializer
+    search_fields = ['name', 'description', 'file_name']
+    ordering_fields = ['name', 'created_at', 'attachment_type']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        queryset = queryset.select_related(
+            'task__procedure__organization', 'uploaded_by'
+        ).filter(
+            task__procedure__organization=self.get_current_organization(),
+            deleted_at__isnull=True
+        )
+
+        # Filtro por tarefa
+        task_id = self.request.query_params.get('task')
+        if task_id:
+            queryset = queryset.filter(task_id=task_id)
+
+        # Filtro por tipo de anexo
+        attachment_type = self.request.query_params.get('attachment_type')
+        if attachment_type:
+            queryset = queryset.filter(attachment_type=attachment_type)
+
+        return queryset
+
+    @action(detail=False, methods=['post'])
+    def upload(self, request):
+        """Upload de novo anexo"""
+        serializer = TaskAttachmentUploadSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task_id = request.data.get('task')
+        if not task_id:
+            return Response(
+                {'error': 'task é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            task = Task.objects.get(
+                id=task_id,
+                procedure__organization=self.get_current_organization()
+            )
+
+            file = serializer.validated_data['file']
+            attachment = TaskAttachment.objects.create(
+                task=task,
+                file=file,
+                file_name=file.name,
+                file_size=file.size,
+                file_type=file.content_type if hasattr(file, 'content_type') else '',
+                name=serializer.validated_data.get('name', file.name),
+                description=serializer.validated_data.get('description', ''),
+                uploaded_by=self.get_current_user()
+            )
+
+            # Registra no histórico
+            WorkflowHistory.log_action(
+                obj=task,
+                action='document_added',
+                description=f'Anexo "{attachment.name}" adicionado à tarefa',
+                performed_by=self.get_current_user(),
+                new_value={'attachment_id': str(attachment.id), 'attachment_name': attachment.name},
+                request=request
+            )
+
+            return Response(
+                TaskAttachmentSerializer(attachment, context={'request': request}).data,
+                status=status.HTTP_201_CREATED
+            )
+
+        except Task.DoesNotExist:
+            return Response(
+                {'error': 'Tarefa não encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['delete'])
+    def soft_delete(self, request, pk=None):
+        """Soft delete de anexo"""
+        attachment = self.get_object()
+        attachment.soft_delete()
+
+        # Registra no histórico
+        WorkflowHistory.log_action(
+            obj=attachment.task,
+            action='document_removed',
+            description=f'Anexo "{attachment.name}" removido da tarefa',
+            performed_by=self.get_current_user(),
+            old_value={'attachment_id': str(attachment.id), 'attachment_name': attachment.name},
+            request=request
+        )
+
+        return Response({'message': 'Anexo removido com sucesso'})
+
+
+class WorkflowHistoryViewSet(BaseViewSet):
+    """
+    ViewSet para consultar o histórico de ações do workflow.
+    """
+
+    queryset = WorkflowHistory.objects.all()
+    serializer_class = WorkflowHistorySerializer
+    ordering_fields = ['created_at', 'action']
+    ordering = ['-created_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        queryset = queryset.select_related(
+            'performed_by', 'external_performed_by', 'content_type'
+        )
+
+        # Filtro por tipo de objeto
+        content_type = self.request.query_params.get('content_type')
+        if content_type:
+            try:
+                ct = ContentType.objects.get(model=content_type)
+                queryset = queryset.filter(content_type=ct)
+            except ContentType.DoesNotExist:
+                pass
+
+        # Filtro por ID do objeto
+        object_id = self.request.query_params.get('object_id')
+        if object_id:
+            queryset = queryset.filter(object_id=object_id)
+
+        # Filtro por ação
+        action = self.request.query_params.get('action')
+        if action:
+            queryset = queryset.filter(action=action)
+
+        # Filtro por usuário
+        performed_by = self.request.query_params.get('performed_by')
+        if performed_by:
+            queryset = queryset.filter(performed_by_id=performed_by)
+
+        # Filtro por data
+        start_date = self.request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+
+        end_date = self.request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(created_at__lte=end_date)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def procedure_history(self, request):
+        """Histórico de um procedimento específico"""
+        procedure_id = request.query_params.get('procedure_id')
+        if not procedure_id:
+            return Response(
+                {'error': 'procedure_id é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ct = ContentType.objects.get_for_model(Procedure)
+        queryset = self.get_queryset().filter(
+            content_type=ct,
+            object_id=procedure_id
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def task_history(self, request):
+        """Histórico de uma tarefa específica"""
+        task_id = request.query_params.get('task_id')
+        if not task_id:
+            return Response(
+                {'error': 'task_id é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ct = ContentType.objects.get_for_model(Task)
+        queryset = self.get_queryset().filter(
+            content_type=ct,
+            object_id=task_id
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
