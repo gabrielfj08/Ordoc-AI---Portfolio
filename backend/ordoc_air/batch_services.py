@@ -291,27 +291,100 @@ class BatchOperationService:
         """
         solr_service = SolrService()
         items = self.batch_operation.items.filter(status='pending')
-        
+
         for item in items:
             try:
                 item.start_processing()
-                
+
                 # Indexar no Solr
                 result = solr_service.index_document(item.document)
-                
+
                 item.complete_processing({
                     'solr_id': result.solr_id,
                     'indexed_fields': result.indexed_fields,
                     'status': result.status
                 })
-                
+
                 self._update_progress()
-                
+
             except Exception as e:
                 item.fail_processing(str(e))
                 self.batch_operation.failed_items += 1
                 self.batch_operation.save()
-    
+
+    def _execute_export(self):
+        """
+        Executa operação de exportar documentos
+        """
+        import zipfile
+        import io
+        from django.core.files.base import ContentFile
+
+        export_format = self.batch_operation.parameters.get('format', 'zip')
+        include_metadata = self.batch_operation.parameters.get('include_metadata', True)
+        items = self.batch_operation.items.filter(status='pending')
+
+        # Criar arquivo ZIP
+        zip_buffer = io.BytesIO()
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            metadata_list = []
+
+            for item in items:
+                try:
+                    item.start_processing()
+
+                    document = item.document
+
+                    # Adicionar arquivo ao ZIP
+                    if document.file:
+                        file_path = f"{document.directory.name}/{document.name}" if document.directory else document.name
+                        zip_file.writestr(file_path, document.file.read())
+
+                        # Coletar metadados
+                        if include_metadata:
+                            metadata_list.append({
+                                'id': str(document.id),
+                                'name': document.name,
+                                'file_path': file_path,
+                                'file_size': document.file_size,
+                                'mime_type': document.mime_type,
+                                'status': document.status,
+                                'created_at': document.created_at.isoformat() if document.created_at else None,
+                                'created_by': document.created_by.username if document.created_by else None,
+                            })
+
+                    item.complete_processing({
+                        'exported': True,
+                        'file_path': file_path if document.file else None
+                    })
+
+                    self._update_progress()
+
+                except Exception as e:
+                    item.fail_processing(str(e))
+                    self.batch_operation.failed_items += 1
+                    self.batch_operation.save()
+
+            # Adicionar arquivo de metadados
+            if include_metadata and metadata_list:
+                import json
+                metadata_json = json.dumps(metadata_list, indent=2, ensure_ascii=False)
+                zip_file.writestr('_metadata.json', metadata_json)
+
+        # Salvar arquivo ZIP
+        zip_buffer.seek(0)
+        export_filename = f"export_{self.batch_operation.id}.zip"
+
+        # Armazenar resultado
+        self.batch_operation.results = {
+            'export_filename': export_filename,
+            'total_files': len([i for i in items if i.status == 'completed']),
+            'total_size': zip_buffer.tell(),
+            'include_metadata': include_metadata
+        }
+        self.batch_operation.save()
+
     def _update_progress(self):
         """
         Atualiza o progresso da operação

@@ -14,8 +14,41 @@ from .models import (
     ShareableLink,
     RecentDocument,
     Permission,
+    Tag,
+    ActivityLog,
 )
 from ordoc_cloud.models import OrdocUser
+
+
+class TagSerializer(serializers.ModelSerializer):
+    """Serializer for Tag model"""
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'slug', 'color', 'description', 'organization', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    """Serializer for ActivityLog model"""
+
+    user_name = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    entity_type_display = serializers.CharField(source='get_entity_type_display', read_only=True)
+
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id', 'action', 'action_display', 'entity_type', 'entity_type_display',
+            'entity_id', 'entity_name', 'description', 'old_values', 'new_values',
+            'metadata', 'ip_address', 'user', 'user_name', 'organization', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'user_name', 'action_display', 'entity_type_display']
+
+    def get_user_name(self, obj):
+        if obj.user:
+            return obj.user.get_full_name() or obj.user.username
+        return 'Sistema'
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -125,6 +158,16 @@ class DocumentSerializer(serializers.ModelSerializer):
     """Serializer for Document model with versioning support."""
 
     directory_name = serializers.CharField(source='directory.name', read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        many=True,
+        write_only=True,
+        required=False,
+        source='tags'
+    )
+    is_archived = serializers.BooleanField(read_only=True)
+    ocr_content = serializers.CharField(source='extracted_text', read_only=True)
 
     class Meta:
         model = Document
@@ -132,12 +175,16 @@ class DocumentSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'file', 'file_size',
             'mime_type', 'status', 'version', 'is_current_version',
             'parent_document', 'prn', 'directory', 'directory_name',
-            'department', 'created_at', 'updated_at', 'processed_at'
+            'department', 'tags', 'tag_ids', 'extracted_text', 'ocr_content',
+            'ocr_confidence', 'ocr_language', 'storage_key',
+            'is_archived', 'archived_at', 'archived_by',
+            'created_at', 'updated_at', 'processed_at'
         ]
         read_only_fields = [
             'id', 'file_size', 'mime_type', 'status', 'version',
             'is_current_version', 'parent_document', 'prn',
-            'directory_name', 'created_at', 'updated_at', 'processed_at'
+            'directory_name', 'tags', 'ocr_content', 'is_archived',
+            'created_at', 'updated_at', 'processed_at'
         ]
 
 
@@ -162,45 +209,59 @@ class ShareableLinkSerializer(serializers.ModelSerializer):
     """
     Serializer for ShareableLink model
     """
-    
+
     # Computed fields
     is_expired = serializers.SerializerMethodField()
-    access_count = serializers.SerializerMethodField()
+    can_access = serializers.SerializerMethodField()
     document_name = serializers.CharField(source='document.name', read_only=True)
     created_by_name = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = ShareableLink
         fields = [
             'id', 'token', 'document', 'document_name', 'password',
-            'expires_at', 'is_expired', 'max_downloads', 'download_count',
-            'access_count', 'is_active', 'created_by', 'created_by_name',
+            'expires_at', 'is_expired', 'can_access',
+            'max_downloads', 'download_count',
+            'max_access_count', 'access_count',
+            'is_active', 'created_by', 'created_by_name',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'token', 'document_name', 'is_expired', 'access_count',
-            'download_count', 'created_by_name', 'created_at', 'updated_at'
+            'id', 'token', 'document_name', 'is_expired', 'can_access',
+            'access_count', 'download_count', 'created_by_name',
+            'created_at', 'updated_at'
         ]
         extra_kwargs = {
             'password': {'write_only': True}
         }
-    
+
     def get_is_expired(self, obj):
         """Check if link is expired"""
         return obj.is_expired()
-    
-    def get_access_count(self, obj):
-        """Get total access count (placeholder for future implementation)"""
-        return obj.download_count  # For now, use download_count
-    
+
+    def get_can_access(self, obj):
+        """Check if link can be accessed"""
+        return obj.can_access()
+
     def get_created_by_name(self, obj):
         """Get creator name"""
         if obj.created_by:
             try:
                 return obj.created_by.get_full_name() or obj.created_by.username
-            except:
+            except Exception:
                 return obj.created_by.username
         return None
+
+    def create(self, validated_data):
+        """Create shareable link with hashed password if provided"""
+        password = validated_data.pop('password', None)
+        if password:
+            from django.contrib.auth.hashers import make_password
+            validated_data['password'] = make_password(password)
+        if 'token' not in validated_data:
+            import secrets
+            validated_data['token'] = secrets.token_urlsafe(32)
+        return super().create(validated_data)
 
 
 class RecentDocumentSerializer(serializers.ModelSerializer):

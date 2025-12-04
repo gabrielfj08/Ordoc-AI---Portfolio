@@ -19,6 +19,8 @@ from .models import (
     ShareableLink,
     RecentDocument,
     Permission,
+    Tag,
+    ActivityLog,
 )
 from .serializers import (
     OrganizationSerializer,
@@ -31,6 +33,8 @@ from .serializers import (
     DocumentUploadSerializer,
     DocumentStatusUpdateSerializer,
     PermissionSerializer,
+    TagSerializer,
+    ActivityLogSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
 import uuid
@@ -343,19 +347,233 @@ class DocumentViewSet(BaseViewSet):
     def download(self, request, pk=None):
         """Download document file"""
         document = self.get_object()
-        
+
         # Record recent access
-        RecentDocument.objects.create(
+        RecentDocument.objects.update_or_create(
             document=document,
             user=request.user,
-            access_type='download'
+            defaults={'access_type': 'download'}
         )
-        
+
+        # Log activity
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='download',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+            )
+
         # Return file response (implementation depends on storage backend)
         from django.http import HttpResponse
         response = HttpResponse(document.file.read(), content_type=document.mime_type)
         response['Content-Disposition'] = f'attachment; filename="{document.name}"'
         return response
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        """Archive document"""
+        document = self.get_object()
+        document.archive(user=request.user)
+
+        # Log activity
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='archive',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+            )
+
+        return Response({
+            'message': 'Document archived successfully',
+            'archived_at': document.archived_at
+        })
+
+    @action(detail=True, methods=['post'])
+    def unarchive(self, request, pk=None):
+        """Unarchive document"""
+        document = self.get_object()
+        document.unarchive()
+
+        # Log activity
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='restore',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+            )
+
+        return Response({'message': 'Document unarchived successfully'})
+
+    @action(detail=True, methods=['post'])
+    def add_tags(self, request, pk=None):
+        """Add tags to document"""
+        document = self.get_object()
+        tag_ids = request.data.get('tag_ids', [])
+
+        if not tag_ids:
+            return Response({'error': 'tag_ids is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        tags = Tag.objects.filter(id__in=tag_ids)
+        document.tags.add(*tags)
+
+        return Response({
+            'message': 'Tags added successfully',
+            'tags': TagSerializer(document.tags.all(), many=True).data
+        })
+
+    @action(detail=True, methods=['post'])
+    def remove_tags(self, request, pk=None):
+        """Remove tags from document"""
+        document = self.get_object()
+        tag_ids = request.data.get('tag_ids', [])
+
+        if not tag_ids:
+            return Response({'error': 'tag_ids is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        tags = Tag.objects.filter(id__in=tag_ids)
+        document.tags.remove(*tags)
+
+        return Response({
+            'message': 'Tags removed successfully',
+            'tags': TagSerializer(document.tags.all(), many=True).data
+        })
+
+    @action(detail=False, methods=['get'])
+    def archived(self, request):
+        """List archived documents"""
+        queryset = self.get_queryset().filter(archived_at__isnull=False)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """Full-text search in documents"""
+        query = request.query_params.get('q', '')
+        if not query:
+            return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset().filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query) |
+            Q(extracted_text__icontains=query)
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class TagViewSet(BaseViewSet):
+    """ViewSet for Tag management"""
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    filterset_fields = ['organization']
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+
+    def get_queryset(self):
+        """Filter by current organization"""
+        queryset = super().get_queryset()
+        org = self.get_current_organization()
+        if org:
+            return queryset.filter(organization=org)
+        return queryset.none()
+
+    def perform_create(self, serializer):
+        """Set organization on creation"""
+        org = self.get_current_organization()
+        serializer.save(organization=org)
+
+    @action(detail=True, methods=['get'])
+    def documents(self, request, pk=None):
+        """Get documents with this tag"""
+        tag = self.get_object()
+        documents = tag.documents.filter(deleted_at__isnull=True)
+        page = self.paginate_queryset(documents)
+        if page is not None:
+            serializer = DocumentSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = DocumentSerializer(documents, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class ActivityLogViewSet(BaseViewSet):
+    """ViewSet for ActivityLog (read-only)"""
+    queryset = ActivityLog.objects.all()
+    serializer_class = ActivityLogSerializer
+    filterset_fields = ['action', 'entity_type', 'user']
+    search_fields = ['entity_name', 'description']
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
+    http_method_names = ['get', 'head', 'options']  # Read-only
+
+    def get_queryset(self):
+        """Filter by current organization"""
+        queryset = super().get_queryset()
+        org = self.get_current_organization()
+        if org:
+            return queryset.filter(organization=org)
+        return queryset.none()
+
+    @action(detail=False, methods=['get'])
+    def by_entity(self, request):
+        """Get activity logs for a specific entity"""
+        entity_type = request.query_params.get('entity_type')
+        entity_id = request.query_params.get('entity_id')
+
+        if not entity_type or not entity_id:
+            return Response(
+                {'error': 'entity_type and entity_id are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        queryset = self.get_queryset().filter(
+            entity_type=entity_type,
+            entity_id=entity_id
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_user(self, request):
+        """Get activity logs for a specific user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset().filter(user_id=user_id)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class ShareableLinkViewSet(BaseViewSet):

@@ -1,13 +1,15 @@
 import api from '@/services/auth';
 import { DeletedDocument, DeletedDirectory } from '@/types/ordoc-air/recycle-bin';
 
+const BASE_URL = '/api/v1/ordoc-air';
+
 export const recycleBinService = {
   /**
    * Get deleted documents from recycle bin
    */
   async getDeletedDocuments(): Promise<DeletedDocument[]> {
     try {
-      const response = await api.get('/api/v1/air/documents/deleted/');
+      const response = await api.get(`${BASE_URL}/documents/deleted/`);
       return response.data.results || response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Erro ao buscar documentos excluídos');
@@ -19,7 +21,7 @@ export const recycleBinService = {
    */
   async getDeletedDirectories(): Promise<DeletedDirectory[]> {
     try {
-      const response = await api.get('/api/v1/air/directories/deleted/');
+      const response = await api.get(`${BASE_URL}/directories/deleted/`);
       return response.data.results || response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Erro ao buscar diretórios excluídos');
@@ -31,7 +33,7 @@ export const recycleBinService = {
    */
   async restoreDocuments(documentIds: number[]): Promise<void> {
     try {
-      await api.post('/api/v1/air/documents/restore/', {
+      await api.post(`${BASE_URL}/documents/restore/`, {
         document_ids: documentIds,
       });
     } catch (error: any) {
@@ -44,7 +46,7 @@ export const recycleBinService = {
    */
   async restoreDirectories(directoryIds: number[]): Promise<void> {
     try {
-      await api.post('/api/v1/air/directories/restore/', {
+      await api.post(`${BASE_URL}/directories/restore/`, {
         directory_ids: directoryIds,
       });
     } catch (error: any) {
@@ -57,7 +59,7 @@ export const recycleBinService = {
    */
   async permanentlyDeleteDocuments(documentIds: number[]): Promise<void> {
     try {
-      await api.delete('/api/v1/air/documents/permanent-delete/', {
+      await api.delete(`${BASE_URL}/documents/permanent-delete/`, {
         data: { document_ids: documentIds },
       });
     } catch (error: any) {
@@ -70,7 +72,7 @@ export const recycleBinService = {
    */
   async permanentlyDeleteDirectories(directoryIds: number[]): Promise<void> {
     try {
-      await api.delete('/api/v1/air/directories/permanent-delete/', {
+      await api.delete(`${BASE_URL}/directories/permanent-delete/`, {
         data: { directory_ids: directoryIds },
       });
     } catch (error: any) {
@@ -83,7 +85,7 @@ export const recycleBinService = {
    */
   async emptyRecycleBin(): Promise<void> {
     try {
-      await api.delete('/api/v1/air/recycle-bin/empty/');
+      await api.delete(`${BASE_URL}/recycle-bin/empty/`);
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Erro ao esvaziar lixeira');
     }
@@ -98,7 +100,7 @@ export const recycleBinService = {
     total_size: number;
   }> {
     try {
-      const response = await api.get('/api/v1/air/recycle-bin/stats/');
+      const response = await api.get(`${BASE_URL}/recycle-bin/stats/`);
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Erro ao buscar estatísticas da lixeira');
