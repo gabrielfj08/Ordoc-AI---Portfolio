@@ -38,11 +38,38 @@ const showByToken = async (token: string): Promise<ShareableLink> => {
   return response.data;
 };
 
+const activate = async (id: string): Promise<ShareableLink> => {
+  const response = await api.post(`${baseUrl}${id}/activate/`);
+  return response.data;
+};
+
+const deactivate = async (id: string): Promise<ShareableLink> => {
+  const response = await api.post(`${baseUrl}${id}/deactivate/`);
+  return response.data;
+};
+
+const retrieve = async (id: string): Promise<ShareableLink> => {
+  const response = await api.get(`${baseUrl}${id}/`);
+  return response.data;
+};
+
+const update = async (
+  id: string,
+  payload: Partial<CreateShareableLinkPayload>
+): Promise<ShareableLink> => {
+  const response = await api.patch(`${baseUrl}${id}/`, payload);
+  return response.data;
+};
+
 export const shareableLinksService = {
   list,
   create,
   destroy,
   showByToken,
+  activate,
+  deactivate,
+  retrieve,
+  update,
 };
 
 export default shareableLinksService;

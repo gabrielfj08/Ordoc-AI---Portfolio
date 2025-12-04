@@ -104,7 +104,45 @@ class Directory(models.Model):
 
 def document_upload_path(instance, filename):
     """Função para definir o caminho de upload dos documentos"""
-    return f"documents/{instance.directory.department.organization.id}/{instance.directory.id}/{filename}"
+    if instance.directory and instance.directory.department:
+        return f"documents/{instance.directory.department.organization.id}/{instance.directory.id}/{filename}"
+    return f"documents/orphan/{filename}"
+
+
+class Tag(models.Model):
+    """Modelo para etiquetas/tags de documentos"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, verbose_name="Nome")
+    slug = models.SlugField(max_length=100, verbose_name="Slug")
+    color = models.CharField(max_length=7, default="#3B82F6", verbose_name="Cor")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+
+    # Relations
+    organization = models.ForeignKey(
+        'Organization',
+        on_delete=models.CASCADE,
+        related_name='tags',
+        verbose_name="Organização"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Tag"
+        verbose_name_plural = "Tags"
+        ordering = ['name']
+        unique_together = ['organization', 'slug']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
 
 class Document(models.Model):
@@ -155,10 +193,26 @@ class Document(models.Model):
     # OCR and search fields
     extracted_text = models.TextField(blank=True, null=True, verbose_name="Texto Extraído")
     ocr_confidence = models.FloatField(null=True, blank=True, verbose_name="Confiança OCR")
-    
+    ocr_language = models.CharField(max_length=10, blank=True, null=True, verbose_name="Idioma OCR")
+
+    # Storage
+    storage_key = models.CharField(max_length=500, blank=True, null=True, verbose_name="Chave de Armazenamento")
+
+    # Archiving
+    archived_at = models.DateTimeField(null=True, blank=True, verbose_name="Arquivado em")
+    archived_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='archived_documents',
+        verbose_name="Arquivado por"
+    )
+
     # Relations
     directory = models.ForeignKey(Directory, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
     department = models.ForeignKey(Department, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='documents', verbose_name="Tags")
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -258,6 +312,122 @@ class Document(models.Model):
             max_version = self.version
         return max_version + 1
 
+    def archive(self, user=None):
+        """Arquiva o documento"""
+        self.archived_at = timezone.now()
+        if user:
+            self.archived_by = user
+        self.save(update_fields=['archived_at', 'archived_by', 'updated_at'])
+
+    def unarchive(self):
+        """Remove o documento do arquivo"""
+        self.archived_at = None
+        self.archived_by = None
+        self.save(update_fields=['archived_at', 'archived_by', 'updated_at'])
+
+    @property
+    def is_archived(self):
+        """Verifica se o documento está arquivado"""
+        return self.archived_at is not None
+
+    @property
+    def ocr_content(self):
+        """Alias for extracted_text for backward compatibility"""
+        return self.extracted_text
+
+    @ocr_content.setter
+    def ocr_content(self, value):
+        """Setter alias for extracted_text"""
+        self.extracted_text = value
+
+
+class ActivityLog(models.Model):
+    """Modelo para registro de atividades/auditoria"""
+
+    ACTION_CHOICES = [
+        ('create', 'Criação'),
+        ('read', 'Leitura'),
+        ('update', 'Atualização'),
+        ('delete', 'Exclusão'),
+        ('download', 'Download'),
+        ('share', 'Compartilhamento'),
+        ('archive', 'Arquivamento'),
+        ('restore', 'Restauração'),
+        ('move', 'Movimentação'),
+        ('copy', 'Cópia'),
+        ('version', 'Nova Versão'),
+        ('permission', 'Alteração de Permissão'),
+        ('ocr', 'Processamento OCR'),
+    ]
+
+    ENTITY_CHOICES = [
+        ('document', 'Documento'),
+        ('directory', 'Diretório'),
+        ('organization', 'Organização'),
+        ('department', 'Departamento'),
+        ('shareable_link', 'Link Compartilhável'),
+        ('permission', 'Permissão'),
+        ('tag', 'Tag'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, verbose_name="Ação")
+    entity_type = models.CharField(max_length=20, choices=ENTITY_CHOICES, verbose_name="Tipo de Entidade")
+    entity_id = models.UUIDField(verbose_name="ID da Entidade")
+    entity_name = models.CharField(max_length=500, blank=True, null=True, verbose_name="Nome da Entidade")
+
+    # Details
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+    old_values = models.JSONField(blank=True, null=True, verbose_name="Valores Anteriores")
+    new_values = models.JSONField(blank=True, null=True, verbose_name="Novos Valores")
+    metadata = models.JSONField(blank=True, null=True, verbose_name="Metadados")
+
+    # Context
+    ip_address = models.GenericIPAddressField(blank=True, null=True, verbose_name="Endereço IP")
+    user_agent = models.TextField(blank=True, null=True, verbose_name="User Agent")
+
+    # Relations
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='activity_logs')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='activity_logs')
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log de Atividade"
+        verbose_name_plural = "Logs de Atividade"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['entity_type', 'entity_id']),
+            models.Index(fields=['action']),
+            models.Index(fields=['user']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        user_name = self.user.username if self.user else 'Sistema'
+        return f"{user_name} - {self.get_action_display()} - {self.entity_name or self.entity_id}"
+
+    @classmethod
+    def log(cls, action, entity_type, entity_id, user=None, organization=None,
+            entity_name=None, description=None, old_values=None, new_values=None,
+            metadata=None, ip_address=None, user_agent=None):
+        """Helper method to create activity logs"""
+        return cls.objects.create(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            entity_name=entity_name,
+            description=description,
+            old_values=old_values,
+            new_values=new_values,
+            metadata=metadata,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            user=user,
+            organization=organization,
+        )
+
 
 class ShareableLink(models.Model):
     """Modelo para links compartilháveis de documentos"""
@@ -265,46 +435,95 @@ class ShareableLink(models.Model):
     token = models.CharField(max_length=100, unique=True, verbose_name="Token")
     expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Expira em")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
+
+    # Access control
     access_count = models.PositiveIntegerField(default=0, verbose_name="Contador de Acessos")
     max_access_count = models.PositiveIntegerField(null=True, blank=True, verbose_name="Máximo de Acessos")
-    
+    download_count = models.PositiveIntegerField(default=0, verbose_name="Contador de Downloads")
+    max_downloads = models.PositiveIntegerField(null=True, blank=True, verbose_name="Máximo de Downloads")
+
+    # Security
+    password = models.CharField(max_length=128, blank=True, null=True, verbose_name="Senha")
+
     # Relations
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='shareable_links')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_links')
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name = "Link Compartilhável"
         verbose_name_plural = "Links Compartilháveis"
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"Link para {self.document.name}"
+
+    def is_expired(self):
+        """Verifica se o link está expirado"""
+        if not self.is_active:
+            return True
+        if self.expires_at and timezone.now() > self.expires_at:
+            return True
+        if self.max_access_count and self.access_count >= self.max_access_count:
+            return True
+        if self.max_downloads and self.download_count >= self.max_downloads:
+            return True
+        return False
+
+    def can_access(self):
+        """Verifica se o link pode ser acessado"""
+        return not self.is_expired()
+
+    def increment_access(self):
+        """Incrementa o contador de acessos"""
+        self.access_count += 1
+        self.save(update_fields=['access_count', 'updated_at'])
+
+    def increment_download(self):
+        """Incrementa o contador de downloads"""
+        self.download_count += 1
+        self.save(update_fields=['download_count', 'updated_at'])
 
 
 class RecentDocument(models.Model):
     """Modelo para rastrear documentos acessados recentemente"""
+
+    ACCESS_TYPE_CHOICES = [
+        ('view', 'Visualização'),
+        ('download', 'Download'),
+        ('edit', 'Edição'),
+        ('share', 'Compartilhamento'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
+    # Access tracking
+    access_type = models.CharField(
+        max_length=20,
+        choices=ACCESS_TYPE_CHOICES,
+        default='view',
+        verbose_name="Tipo de Acesso"
+    )
+
     # Relations
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='recent_documents')
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='recent_accesses')
-    
+
     # Timestamps
     accessed_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         verbose_name = "Documento Recente"
         verbose_name_plural = "Documentos Recentes"
         ordering = ['-accessed_at']
         unique_together = ['user', 'document']
-    
+
     def __str__(self):
-        return f"{self.user.username} - {self.document.name}"
+        return f"{self.user.username} - {self.document.name} ({self.access_type})"
 
 
 class Permission(models.Model):

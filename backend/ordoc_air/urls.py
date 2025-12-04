@@ -11,6 +11,8 @@ from .views import (
     ShareableLinkViewSet,
     RecentDocumentViewSet,
     PermissionViewSet,
+    TagViewSet,
+    ActivityLogViewSet,
 )
 
 # Create router for OrdocAir API endpoints
@@ -24,12 +26,14 @@ router.register(r'documents', DocumentViewSet, basename='document')
 router.register(r'shareable-links', ShareableLinkViewSet, basename='shareablelink')
 router.register(r'recent-documents', RecentDocumentViewSet, basename='recentdocument')
 router.register(r'permissions', PermissionViewSet, basename='permission')
+router.register(r'tags', TagViewSet, basename='tag')
+router.register(r'activity-logs', ActivityLogViewSet, basename='activitylog')
 
 app_name = 'ordoc_air'
 
 urlpatterns = [
     path('', include(router.urls)),
-    
+
     # Funcionalidades avançadas (Batch Operations, OCR, Solr)
     path('advanced/', include('ordoc_air.batch_urls')),
 ]
