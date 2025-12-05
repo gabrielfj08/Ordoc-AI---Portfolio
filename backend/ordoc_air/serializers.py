@@ -308,7 +308,8 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
             'name', 'description', 'file', 'directory', 'department',
             'prn', 'parent_document', 'version', 'is_current_version'
         ]
-        read_only_fields = ['parent_document', 'version', 'is_current_version']
+        # PRN is auto-generated in create(), so mark as read-only
+        read_only_fields = ['prn', 'parent_document', 'version', 'is_current_version']
 
     def create(self, validated_data):
         """Create document and populate upload metadata."""
