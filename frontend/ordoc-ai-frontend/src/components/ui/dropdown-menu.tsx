@@ -102,3 +102,7 @@ export function DropdownMenuItem({ children, onClick }: DropdownMenuItemProps) {
     </button>
   );
 }
+
+export function DropdownMenuSeparator() {
+  return <div className="my-1 h-px bg-gray-200" />;
+}
