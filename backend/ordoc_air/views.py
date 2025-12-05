@@ -669,6 +669,13 @@ class ShareableLinkViewSet(BaseViewSet):
             
         except ShareableLink.DoesNotExist:
             return Response({'error': 'Invalid token'}, status=404)
+    
+    @action(detail=False, methods=['get'])
+    def shared_with_me(self, request):
+        """Get documents shared with the current user"""
+        # For now, return empty list - this feature needs proper implementation
+        # with a SharedDocument model or similar to track who documents are shared with
+        return Response({'results': [], 'count': 0})
 
 
 class RecentDocumentViewSet(BaseViewSet):
