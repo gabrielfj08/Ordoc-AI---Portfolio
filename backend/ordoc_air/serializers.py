@@ -294,6 +294,13 @@ class RecentDocumentSerializer(serializers.ModelSerializer):
 
 class DocumentUploadSerializer(serializers.ModelSerializer):
     """Serializer used for uploading documents and creating versions."""
+    
+    # Accept directory as UUID
+    directory = serializers.PrimaryKeyRelatedField(
+        queryset=Directory.objects.all(),
+        required=False,
+        allow_null=True
+    )
 
     class Meta:
         model = Document
@@ -305,13 +312,27 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create document and populate upload metadata."""
-        file = validated_data['file']
+        file = validated_data.get('file')
+        if not file:
+            raise serializers.ValidationError({'file': 'File is required.'})
+            
         validated_data.setdefault('name', file.name)
         validated_data['file_size'] = getattr(file, 'size', None)
         validated_data['mime_type'] = getattr(file, 'content_type', None)
         validated_data.setdefault('prn', str(uuid.uuid4()))
+        
+        # Set department from directory or current organization
         if not validated_data.get('department') and validated_data.get('directory'):
             validated_data['department'] = validated_data['directory'].department
+        elif not validated_data.get('department'):
+            # If no department and no directory, use organization's first department
+            org = self.context.get('current_organization')
+            if org:
+                from .models import Department
+                dept = Department.objects.filter(organization=org).first()
+                if dept:
+                    validated_data['department'] = dept
+                    
         validated_data['created_by'] = self.context.get('current_user')
         document = super().create(validated_data)
         from .tasks import process_document_upload
