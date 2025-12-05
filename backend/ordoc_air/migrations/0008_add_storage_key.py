@@ -1,20 +1,14 @@
-# Generated migration to add missing Document fields
+# Migration to add storage_key field
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ordoc_air', '0006_rename_document_fields'),
+        ('ordoc_air', '0007_add_missing_document_fields'),
     ]
 
     operations = [
-        # Add ocr_language field
-        migrations.AddField(
-            model_name='document',
-            name='ocr_language',
-            field=models.CharField(blank=True, max_length=10, null=True, verbose_name='Idioma OCR'),
-        ),
         # Add storage_key field
         migrations.AddField(
             model_name='document',
