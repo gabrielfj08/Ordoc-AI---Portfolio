@@ -126,7 +126,7 @@ class DirectorySerializer(serializers.ModelSerializer):
     """
     
     # Nested fields
-    parent_name = serializers.CharField(source='parent.name', read_only=True)
+    parent_name = serializers.CharField(source='parent_directory.name', read_only=True)
     full_path = serializers.SerializerMethodField()
     children_count = serializers.SerializerMethodField()
     documents_count = serializers.SerializerMethodField()
@@ -134,7 +134,7 @@ class DirectorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Directory
         fields = [
-            'id', 'name', 'description', 'parent', 'parent_name',
+            'id', 'name', 'description', 'parent_directory', 'parent_name',
             'organization', 'department', 'full_path', 'children_count',
             'documents_count', 'created_at', 'updated_at'
         ]
