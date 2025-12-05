@@ -209,6 +209,10 @@ function MyAirContent() {
         message: error.message,
       });
 
+      // Log complete error response as JSON
+      console.error('📋 Full error response (JSON):', JSON.stringify(error.response, null, 2));
+      console.error('📋 Error data only:', JSON.stringify(error.response?.data, null, 2));
+
       const errorMessage = error.response?.data?.detail
         || error.response?.data?.message
         || Object.entries(error.response?.data || {})

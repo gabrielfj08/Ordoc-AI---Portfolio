@@ -303,6 +303,26 @@ class DocumentUploadSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['parent_document', 'version', 'is_current_version']
 
+    def is_valid(self, raise_exception=False):
+        """Override to add debug logging"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.error(f"📥 DocumentUploadSerializer.is_valid() called")
+        logger.error(f"  - initial_data keys: {list(self.initial_data.keys())}")
+        logger.error(f"  - initial_data: {self.initial_data}")
+
+        result = super().is_valid(raise_exception=raise_exception)
+
+        if not result:
+            logger.error(f"❌ Validation FAILED!")
+            logger.error(f"  - errors: {self.errors}")
+        else:
+            logger.error(f"✅ Validation SUCCESS!")
+            logger.error(f"  - validated_data keys: {list(self.validated_data.keys())}")
+
+        return result
+
     def create(self, validated_data):
         """Create document and populate upload metadata."""
         file = validated_data['file']
