@@ -71,11 +71,28 @@ export function DropdownMenuTrigger({
 }
 
 export function DropdownMenuContent({ 
-  align = 'start', 
+  align = 'end', 
   children, 
   ...props 
 }: DropdownMenuContentProps & { isOpen?: boolean }) {
   const { isOpen } = props as any;
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<'bottom' | 'top'>('bottom');
+
+  useEffect(() => {
+    if (isOpen && contentRef.current) {
+      const rect = contentRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      // Se não tiver espaço suficiente abaixo (menos de 200px), abrir para cima
+      if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+        setPosition('top');
+      } else {
+        setPosition('bottom');
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -85,8 +102,15 @@ export function DropdownMenuContent({
     end: 'right-0',
   };
 
+  const positionClasses = position === 'top' 
+    ? 'bottom-full mb-1' 
+    : 'top-full mt-1';
+
   return (
-    <div className={`absolute top-full mt-1 ${alignmentClasses[align]} z-50 min-w-[8rem] overflow-hidden rounded-md border bg-white p-1 shadow-md`}>
+    <div 
+      ref={contentRef}
+      className={`absolute ${positionClasses} ${alignmentClasses[align]} z-50 min-w-[12rem] max-h-[300px] overflow-y-auto rounded-md border bg-white p-1 shadow-lg`}
+    >
       {children}
     </div>
   );

@@ -370,12 +370,15 @@ function MyAirContent() {
 
   const getStatusBadge = (status: Document['status']) => {
     const statusConfig = {
-      pending: { label: 'Pendente', className: 'bg-gray-500' },
-      processing: { label: 'Processando', className: 'bg-blue-500' },
-      completed: { label: 'Concluído', className: 'bg-green-500' },
+      created: { label: 'Criado', className: 'bg-gray-500' },
+      enqueued: { label: 'Na Fila', className: 'bg-yellow-500' },
+      processed: { label: 'Processado', className: 'bg-green-500' },
       failed: { label: 'Falhou', className: 'bg-red-500' },
     };
-    const config = statusConfig[status];
+    const config = statusConfig[status as keyof typeof statusConfig];
+    if (!config) {
+      return <Badge className="bg-gray-400">Desconhecido</Badge>;
+    }
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
