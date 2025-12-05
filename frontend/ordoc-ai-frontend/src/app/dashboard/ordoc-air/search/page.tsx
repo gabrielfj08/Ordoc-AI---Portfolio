@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -35,6 +36,10 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { toast } from '@/components/ui/use-toast';
+
+// Import services
+import { DocumentService, TagService } from '@/services/ordoc-air/documents';
 
 // Types
 interface SearchResult {
@@ -74,10 +79,8 @@ export default function SearchPage() {
 }
 
 function SearchContent() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'name'>('relevance');
   const [filters, setFilters] = useState<SearchFilters>({
@@ -87,83 +90,84 @@ function SearchContent() {
     tags: [],
   });
 
-  // Mock data para desenvolvimento
-  const mockSearchResults: SearchResult[] = [
-    {
-      id: '1',
-      name: 'Relatório Anual 2023',
-      type: 'document',
-      path: '/Documentos/Relatórios',
-      content_preview: 'Este relatório apresenta os resultados consolidados das operações de 2023...',
-      matched_content: 'resultados <mark>consolidados</mark> das operações',
-      file_type: 'application/pdf',
-      file_size: 2457600,
-      created_at: '2024-01-20T10:30:00Z',
-      updated_at: '2024-01-20T10:30:00Z',
-      created_by: { id: '1', username: 'admin' },
-      tags: ['relatório', 'anual', '2023'],
-      relevance_score: 0.95,
+  // Debounce search query
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.length > 2) {
+        setDebouncedSearchQuery(searchQuery);
+      } else {
+        setDebouncedSearchQuery('');
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Fetch search results from API
+  const { data: searchData, isLoading: isSearching, error } = useQuery({
+    queryKey: ['search', debouncedSearchQuery, sortBy, filters],
+    queryFn: async () => {
+      if (!debouncedSearchQuery) return { results: [] };
+
+      try {
+        const params: Record<string, any> = {
+          sort_by: sortBy,
+        };
+
+        // Add filters
+        if (filters.fileTypes.length > 0) {
+          params.file_types = filters.fileTypes.join(',');
+        }
+        if (filters.dateRange !== 'all') {
+          params.date_range = filters.dateRange;
+        }
+        if (filters.tags.length > 0) {
+          params.tags = filters.tags.join(',');
+        }
+        if (filters.minSize) {
+          params.min_size = filters.minSize;
+        }
+        if (filters.maxSize) {
+          params.max_size = filters.maxSize;
+        }
+
+        const result = await DocumentService.search(debouncedSearchQuery, params);
+        return result;
+      } catch (error: any) {
+        console.error('Error searching documents:', error);
+        toast({
+          title: 'Erro na busca',
+          description: error.response?.data?.message || 'Ocorreu um erro ao buscar os documentos.',
+          variant: 'destructive',
+        });
+        return { results: [] };
+      }
     },
-    {
-      id: '2',
-      name: 'Contratos de Fornecedores',
-      type: 'folder',
-      path: '/Juridico/Contratos',
-      created_at: '2024-01-15T08:00:00Z',
-      updated_at: '2024-01-25T11:00:00Z',
-      created_by: { id: '2', username: 'legal.admin' },
-      tags: ['contratos', 'fornecedores'],
-      relevance_score: 0.88,
+    enabled: debouncedSearchQuery.length > 0,
+  });
+
+  const searchResults: SearchResult[] = searchData?.results || searchData || [];
+
+  // Fetch available tags
+  const { data: tagsData } = useQuery({
+    queryKey: ['tags'],
+    queryFn: async () => {
+      try {
+        const result = await TagService.list();
+        return result;
+      } catch (error) {
+        return { results: [] };
+      }
     },
-    {
-      id: '3',
-      name: 'Planilha de Orçamento 2024',
-      type: 'document',
-      path: '/Financeiro',
-      content_preview: 'Projeções orçamentárias para o exercício de 2024 consolidadas por departamento...',
-      matched_content: 'orçamentárias para o exercício de 2024 <mark>consolidadas</mark>',
-      file_type: 'application/vnd.ms-excel',
-      file_size: 1048576,
-      created_at: '2024-01-25T09:00:00Z',
-      updated_at: '2024-01-25T09:00:00Z',
-      created_by: { id: '3', username: 'finance' },
-      tags: ['orçamento', '2024', 'financeiro'],
-      relevance_score: 0.82,
-    },
-    {
-      id: '4',
-      name: 'Política de Segurança',
-      type: 'document',
-      path: '/Documentos/Políticas',
-      content_preview: 'Diretrizes consolidadas sobre segurança da informação e proteção de dados...',
-      matched_content: 'Diretrizes <mark>consolidadas</mark> sobre segurança',
-      file_type: 'application/pdf',
-      file_size: 524288,
-      created_at: '2024-01-10T14:00:00Z',
-      updated_at: '2024-01-22T16:30:00Z',
-      created_by: { id: '4', username: 'security' },
-      tags: ['política', 'segurança', 'TI'],
-      relevance_score: 0.75,
-    },
-  ];
+  });
+
+  const availableTags = tagsData?.results || tagsData || [];
 
   const handleSearch = () => {
-    if (!searchQuery.trim()) return;
-
-    setIsSearching(true);
-    // Simular busca
-    setTimeout(() => {
-      setSearchResults(mockSearchResults);
-      setIsSearching(false);
-    }, 800);
-  };
-
-  useEffect(() => {
-    if (searchQuery.length > 2) {
-      const timeoutId = setTimeout(handleSearch, 500);
-      return () => clearTimeout(timeoutId);
+    if (searchQuery.trim().length > 2) {
+      setDebouncedSearchQuery(searchQuery);
     }
-  }, [searchQuery]);
+  };
 
   const formatFileSize = (bytes: number): string => {
     if (!bytes) return '-';
@@ -200,6 +204,24 @@ function SearchContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Error Banner - Development Mode */}
+        {error && process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <strong>Modo de desenvolvimento:</strong> Não foi possível conectar ao backend. Certifique-se de que o servidor está rodando em http://localhost:8000
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
@@ -316,12 +338,20 @@ function SearchContent() {
                   <Label className="text-sm font-semibold mb-3 block">Tags</Label>
                   <Input placeholder="Buscar tags..." />
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Badge variant="outline" className="cursor-pointer hover:bg-gray-100">
-                      relatório
-                    </Badge>
-                    <Badge variant="outline" className="cursor-pointer hover:bg-gray-100">
-                      financeiro
-                    </Badge>
+                    {availableTags.slice(0, 5).map((tag: any) => (
+                      <Badge
+                        key={tag.id}
+                        variant="outline"
+                        className="cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          if (!filters.tags.includes(tag.name)) {
+                            setFilters({ ...filters, tags: [...filters.tags, tag.name] });
+                          }
+                        }}
+                      >
+                        {tag.name}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
 

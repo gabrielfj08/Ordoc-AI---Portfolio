@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import {
   ClockIcon,
   DocumentIcon,
@@ -42,6 +43,11 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { toast } from '@/components/ui/use-toast';
+
+// Import services
+import recentDocumentsService from '@/services/ordoc-air/recentDocuments';
+import { DocumentService } from '@/services/ordoc-air/documents';
 
 // Types
 interface RecentDocument {
@@ -70,97 +76,67 @@ export default function RecentsPage() {
 }
 
 function RecentsContent() {
-  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState('all'); // all, today, week, month
   const [typeFilter, setTypeFilter] = useState('all'); // all, documents, folders
-  const [recentItems, setRecentItems] = useState<RecentDocument[]>([]);
 
-  // Mock data
-  React.useEffect(() => {
-    const mockRecentItems: RecentDocument[] = [
-      {
-        id: '1',
-        name: 'Relatório Anual 2023',
-        original_filename: 'relatorio-anual-2023.pdf',
-        file_type: 'application/pdf',
-        file_size: 2457600,
-        accessed_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 horas atrás
-        created_at: '2024-01-20T10:30:00Z',
-        accessed_count: 15,
-        directory_path: '/Documentos/Relatórios',
-        created_by: { id: '1', username: 'admin' },
-        type: 'document',
-      },
-      {
-        id: '2',
-        name: 'Contratos',
-        original_filename: 'contratos',
-        file_type: 'folder',
-        file_size: 0,
-        accessed_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 horas atrás
-        created_at: '2024-01-15T08:00:00Z',
-        accessed_count: 8,
-        directory_path: '/Documentos',
-        created_by: { id: '1', username: 'admin' },
-        type: 'folder',
-      },
-      {
-        id: '3',
-        name: 'Planilha Orçamento 2024',
-        original_filename: 'orcamento-2024.xlsx',
-        file_type: 'application/vnd.ms-excel',
-        file_size: 1048576,
-        accessed_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 dia atrás
-        created_at: '2024-01-25T09:00:00Z',
-        accessed_count: 23,
-        directory_path: '/Financeiro',
-        created_by: { id: '3', username: 'finance' },
-        type: 'document',
-      },
-      {
-        id: '4',
-        name: 'Apresentação Q4',
-        original_filename: 'apresentacao-q4.pptx',
-        file_type: 'application/vnd.ms-powerpoint',
-        file_size: 5242880,
-        accessed_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 dias atrás
-        created_at: '2024-01-18T15:00:00Z',
-        accessed_count: 12,
-        directory_path: '/Apresentações',
-        created_by: { id: '1', username: 'admin' },
-        type: 'document',
-      },
-      {
-        id: '5',
-        name: 'Notas Fiscais',
-        original_filename: 'notas-fiscais',
-        file_type: 'folder',
-        file_size: 0,
-        accessed_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 dias atrás
-        created_at: '2024-01-10T14:00:00Z',
-        accessed_count: 45,
-        directory_path: '/Fiscal',
-        created_by: { id: '2', username: 'fiscal.manager' },
-        type: 'folder',
-      },
-      {
-        id: '6',
-        name: 'Manual do Usuário',
-        original_filename: 'manual-usuario.pdf',
-        file_type: 'application/pdf',
-        file_size: 3145728,
-        accessed_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 semana atrás
-        created_at: '2024-01-05T10:00:00Z',
-        accessed_count: 5,
-        directory_path: '/Documentação',
-        created_by: { id: '4', username: 'tech.writer' },
-        type: 'document',
-      },
-    ];
+  // Fetch recent documents from API
+  const { data: recentData, isLoading, error } = useQuery({
+    queryKey: ['recent-documents', timeFilter],
+    queryFn: async () => {
+      try {
+        const params: Record<string, any> = {};
 
-    setRecentItems(mockRecentItems);
-  }, []);
+        // Add time filter to params
+        if (timeFilter === 'today') {
+          params.days = 1;
+        } else if (timeFilter === 'week') {
+          params.days = 7;
+        } else if (timeFilter === 'month') {
+          params.days = 30;
+        }
+
+        const result = await recentDocumentsService.list(params);
+        return result;
+      } catch (error: any) {
+        console.error('Error loading recent documents:', error);
+        toast({
+          title: 'Erro ao carregar documentos recentes',
+          description: error.response?.data?.message || 'Ocorreu um erro ao carregar os documentos recentes.',
+          variant: 'destructive',
+        });
+        return { results: [] };
+      }
+    },
+  });
+
+  const recentItems: RecentDocument[] = recentData?.results || recentData || [];
+
+  // Handler for downloading a document
+  const handleDownload = async (documentId: string, documentName: string) => {
+    try {
+      const blob = await DocumentService.download(documentId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = documentName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Download iniciado',
+        description: `O documento "${documentName}" está sendo baixado.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro no download',
+        description: error.response?.data?.message || 'Ocorreu um erro ao baixar o documento.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '-';
@@ -245,6 +221,24 @@ function RecentsContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Error Banner - Development Mode */}
+        {error && process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <strong>Modo de desenvolvimento:</strong> Não foi possível conectar ao backend. Certifique-se de que o servidor está rodando em http://localhost:8000
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -409,7 +403,7 @@ function RecentsContent() {
                             {item.type === 'folder' ? 'Abrir' : 'Visualizar'}
                           </DropdownMenuItem>
                           {item.type === 'document' && (
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownload(item.id, item.original_filename)}>
                               <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
                               Download
                             </DropdownMenuItem>

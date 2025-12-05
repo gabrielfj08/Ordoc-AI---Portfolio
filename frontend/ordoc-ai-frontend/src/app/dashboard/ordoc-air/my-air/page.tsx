@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   FolderIcon,
   DocumentIcon,
@@ -12,13 +13,14 @@ import {
   EllipsisVerticalIcon,
   HomeIcon,
   ChevronRightIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { FolderOpenIcon } from '@heroicons/react/24/solid';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -45,6 +47,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { useToast } from '@/components/ui/use-toast';
+
+// Import services
+import directoriesService from '@/services/ordoc-air/directories';
+import { DocumentService } from '@/services/ordoc-air/documents';
 
 // Types
 interface Directory {
@@ -52,35 +59,31 @@ interface Directory {
   name: string;
   description?: string;
   path: string;
-  parent_directory_id?: string;
+  parent_directory?: string;
   created_at: string;
   updated_at: string;
-  created_by: {
+  created_by?: {
     id: string;
     username: string;
   };
-  subdirectories_count: number;
-  documents_count: number;
 }
 
 interface Document {
   id: string;
   name: string;
-  original_filename: string;
   description?: string;
   file_type: string;
   file_size: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  directory_id: string;
+  directory?: string;
   created_at: string;
   updated_at: string;
-  created_by: {
+  created_by?: {
     id: string;
     username: string;
   };
   version: number;
-  is_ocr_processed: boolean;
-  tags: string[];
+  tags?: any[];
 }
 
 interface BreadcrumbItem {
@@ -98,112 +101,163 @@ export default function MyAirPage() {
 }
 
 function MyAirContent() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentDirectory, setCurrentDirectory] = useState<Directory | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [currentDirectory, setCurrentDirectory] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
     { id: 'root', name: 'Meu Drive', path: '/' }
   ]);
-  const [directories, setDirectories] = useState<Directory[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderDescription, setNewFolderDescription] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Mock data para desenvolvimento
-  React.useEffect(() => {
-    // Simular carregamento de dados
-    const mockDirectories: Directory[] = [
-      {
-        id: '1',
-        name: 'Documentos Fiscais',
-        description: 'Notas fiscais e documentos contábeis',
-        path: '/documentos-fiscais',
-        created_at: '2024-01-15T10:00:00Z',
-        updated_at: '2024-01-15T10:00:00Z',
-        created_by: { id: '1', username: 'admin' },
-        subdirectories_count: 3,
-        documents_count: 45,
-      },
-      {
-        id: '2',
-        name: 'Contratos',
-        description: 'Contratos com fornecedores e clientes',
-        path: '/contratos',
-        created_at: '2024-01-10T14:30:00Z',
-        updated_at: '2024-01-20T09:15:00Z',
-        created_by: { id: '1', username: 'admin' },
-        subdirectories_count: 5,
-        documents_count: 28,
-      },
-      {
-        id: '3',
-        name: 'RH',
-        description: 'Documentos de recursos humanos',
-        path: '/rh',
-        created_at: '2024-01-05T08:00:00Z',
-        updated_at: '2024-01-25T11:00:00Z',
-        created_by: { id: '2', username: 'rh.manager' },
-        subdirectories_count: 8,
-        documents_count: 156,
-      },
-    ];
+  // Fetch directories
+  const { data: directoriesData, isLoading: isLoadingDirs, error: dirsError } = useQuery({
+    queryKey: ['directories', currentDirectory],
+    queryFn: async () => {
+      try {
+        const params = currentDirectory ? { parent: currentDirectory } : {};
+        const result = await directoriesService.list(params);
+        return result;
+      } catch (error: any) {
+        console.error('Error loading directories:', error);
+        // Return empty array on error to avoid breaking the UI
+        return { results: [] };
+      }
+    },
+  });
 
-    const mockDocuments: Document[] = [
-      {
-        id: 'd1',
-        name: 'Relatório Anual 2023',
-        original_filename: 'relatorio-anual-2023.pdf',
-        description: 'Relatório completo das atividades de 2023',
-        file_type: 'application/pdf',
-        file_size: 2457600, // 2.4 MB
-        status: 'completed',
-        directory_id: currentDirectory?.id || 'root',
-        created_at: '2024-01-20T10:30:00Z',
-        updated_at: '2024-01-20T10:30:00Z',
-        created_by: { id: '1', username: 'admin' },
-        version: 2,
-        is_ocr_processed: true,
-        tags: ['relatório', 'anual', '2023'],
-      },
-      {
-        id: 'd2',
-        name: 'Apresentação Q4',
-        original_filename: 'apresentacao-q4.pptx',
-        file_type: 'application/vnd.ms-powerpoint',
-        file_size: 5242880, // 5 MB
-        status: 'completed',
-        directory_id: currentDirectory?.id || 'root',
-        created_at: '2024-01-18T15:00:00Z',
-        updated_at: '2024-01-18T15:00:00Z',
-        created_by: { id: '1', username: 'admin' },
-        version: 1,
-        is_ocr_processed: false,
-        tags: ['apresentação', 'Q4'],
-      },
-      {
-        id: 'd3',
-        name: 'Planilha Orçamento',
-        original_filename: 'orcamento-2024.xlsx',
-        description: 'Orçamento previsto para 2024',
-        file_type: 'application/vnd.ms-excel',
-        file_size: 1048576, // 1 MB
-        status: 'processing',
-        directory_id: currentDirectory?.id || 'root',
-        created_at: '2024-01-25T09:00:00Z',
-        updated_at: '2024-01-25T09:00:00Z',
-        created_by: { id: '3', username: 'finance' },
-        version: 1,
-        is_ocr_processed: false,
-        tags: ['orçamento', '2024', 'financeiro'],
-      },
-    ];
+  // Fetch documents
+  const { data: documentsData, isLoading: isLoadingDocs, error: docsError } = useQuery({
+    queryKey: ['documents', currentDirectory],
+    queryFn: async () => {
+      try {
+        const params = currentDirectory ? { directory: currentDirectory } : {};
+        const result = await DocumentService.list(params);
+        return result;
+      } catch (error: any) {
+        console.error('Error loading documents:', error);
+        // Return empty array on error
+        return { results: [] };
+      }
+    },
+  });
 
-    setDirectories(mockDirectories);
-    setDocuments(mockDocuments);
-  }, [currentDirectory]);
+  // Create directory mutation
+  const createDirectoryMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string }) => {
+      const payload: any = {
+        name: data.name,
+        description: data.description,
+      };
+      if (currentDirectory) {
+        payload.parent_directory = currentDirectory;
+      }
+      return await directoriesService.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['directories'] });
+      toast({
+        title: 'Pasta criada',
+        description: 'A pasta foi criada com sucesso.',
+      });
+      setShowCreateFolder(false);
+      setNewFolderName('');
+      setNewFolderDescription('');
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao criar pasta',
+        description: error.response?.data?.message || error.message || 'Ocorreu um erro ao criar a pasta.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Upload document mutation
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const data: any = {
+        name: file.name.split('.')[0],
+      };
+      if (currentDirectory) {
+        data.directory = currentDirectory;
+      }
+      return await DocumentService.uploadDocument(file, data, setUploadProgress);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast({
+        title: 'Upload concluído',
+        description: 'O documento foi enviado com sucesso.',
+      });
+      setShowUpload(false);
+      setUploadFile(null);
+      setUploadProgress(0);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro no upload',
+        description: error.response?.data?.message || error.message || 'Ocorreu um erro ao enviar o documento.',
+        variant: 'destructive',
+      });
+      setUploadProgress(0);
+    },
+  });
+
+  // Delete document mutation
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await DocumentService.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      setSelectedItems([]);
+      toast({
+        title: 'Documento excluído',
+        description: 'O documento foi movido para a lixeira.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao excluir',
+        description: error.response?.data?.message || error.message || 'Ocorreu um erro ao excluir o documento.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete directory mutation
+  const deleteDirectoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await directoriesService.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['directories'] });
+      setSelectedItems([]);
+      toast({
+        title: 'Pasta excluída',
+        description: 'A pasta foi movida para a lixeira.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao excluir',
+        description: error.response?.data?.message || error.message || 'Ocorreu um erro ao excluir a pasta.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const directories: Directory[] = directoriesData?.results || directoriesData || [];
+  const documents: Document[] = documentsData?.results || documentsData || [];
+  const isLoading = isLoadingDirs || isLoadingDocs;
+  const hasError = dirsError || docsError;
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -240,8 +294,9 @@ function MyAirContent() {
   };
 
   const handleOpenDirectory = (dir: Directory) => {
-    setCurrentDirectory(dir);
+    setCurrentDirectory(dir.id);
     setBreadcrumbs([...breadcrumbs, { id: dir.id, name: dir.name, path: dir.path }]);
+    setSelectedItems([]);
   };
 
   const handleBreadcrumbClick = (index: number) => {
@@ -250,18 +305,47 @@ function MyAirContent() {
     if (index === 0) {
       setCurrentDirectory(null);
     } else {
-      // Buscar diretório do breadcrumb
-      const dir = directories.find(d => d.id === newBreadcrumbs[index].id);
-      if (dir) setCurrentDirectory(dir);
+      setCurrentDirectory(newBreadcrumbs[index].id);
     }
+    setSelectedItems([]);
   };
 
   const handleCreateFolder = () => {
-    // TODO: Integrar com API
-    console.log('Creating folder:', newFolderName, newFolderDescription);
-    setShowCreateFolder(false);
-    setNewFolderName('');
-    setNewFolderDescription('');
+    if (!newFolderName.trim()) {
+      toast({
+        title: 'Nome obrigatório',
+        description: 'Por favor, informe o nome da pasta.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    createDirectoryMutation.mutate({
+      name: newFolderName,
+      description: newFolderDescription || undefined,
+    });
+  };
+
+  const handleUpload = () => {
+    if (!uploadFile) {
+      toast({
+        title: 'Arquivo não selecionado',
+        description: 'Por favor, selecione um arquivo para enviar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    uploadDocumentMutation.mutate(uploadFile);
+  };
+
+  const handleDeleteSelected = () => {
+    selectedItems.forEach(id => {
+      const isDirectory = directories.some(d => d.id === id);
+      if (isDirectory) {
+        deleteDirectoryMutation.mutate(id);
+      } else {
+        deleteDocumentMutation.mutate(id);
+      }
+    });
   };
 
   const getStatusBadge = (status: Document['status']) => {
@@ -299,6 +383,21 @@ function MyAirContent() {
             </Button>
           </div>
         </div>
+
+        {/* Error message */}
+        {hasError && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <ExclamationTriangleIcon className="h-5 w-5 text-orange-600" />
+              <div>
+                <p className="font-medium text-orange-900">Modo de desenvolvimento</p>
+                <p className="text-sm text-orange-700">
+                  Conecte-se ao backend Django em http://localhost:8000 para visualizar dados reais.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Breadcrumbs */}
         <nav className="flex items-center space-x-2 text-sm text-gray-600">
@@ -350,7 +449,12 @@ function MyAirContent() {
                     <DropdownMenuItem>Copiar</DropdownMenuItem>
                     <DropdownMenuItem>Compartilhar</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={handleDeleteSelected}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -378,6 +482,8 @@ function MyAirContent() {
               onSelectItem={handleSelectItem}
               onSelectAll={handleSelectAll}
               onOpenDirectory={handleOpenDirectory}
+              onDeleteDocument={deleteDocumentMutation.mutate}
+              onDeleteDirectory={deleteDirectoryMutation.mutate}
               formatFileSize={formatFileSize}
               formatDate={formatDate}
               getStatusBadge={getStatusBadge}
@@ -390,6 +496,7 @@ function MyAirContent() {
               selectedItems={selectedItems}
               onSelectItem={handleSelectItem}
               onOpenDirectory={handleOpenDirectory}
+              onDeleteDirectory={deleteDirectoryMutation.mutate}
               formatDate={formatDate}
             />
           </TabsContent>
@@ -399,6 +506,7 @@ function MyAirContent() {
               documents={documents}
               selectedItems={selectedItems}
               onSelectItem={handleSelectItem}
+              onDeleteDocument={deleteDocumentMutation.mutate}
               formatFileSize={formatFileSize}
               formatDate={formatDate}
               getStatusBadge={getStatusBadge}
@@ -439,8 +547,59 @@ function MyAirContent() {
               <Button variant="outline" onClick={() => setShowCreateFolder(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateFolder} disabled={!newFolderName}>
-                Criar Pasta
+              <Button
+                onClick={handleCreateFolder}
+                disabled={!newFolderName || createDirectoryMutation.isPending}
+              >
+                {createDirectoryMutation.isPending ? 'Criando...' : 'Criar Pasta'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Upload Dialog */}
+        <Dialog open={showUpload} onOpenChange={setShowUpload}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Upload de Documento</DialogTitle>
+              <DialogDescription>
+                Envie um documento para o diretório atual
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Input
+                  type="file"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                />
+              </div>
+              {uploadProgress > 0 && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progresso</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowUpload(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleUpload}
+                disabled={!uploadFile || uploadDocumentMutation.isPending}
+              >
+                {uploadDocumentMutation.isPending
+                  ? `Enviando... ${uploadProgress}%`
+                  : 'Enviar'
+                }
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -458,12 +617,30 @@ function AllItemsView({
   onSelectItem,
   onSelectAll,
   onOpenDirectory,
+  onDeleteDocument,
+  onDeleteDirectory,
   formatFileSize,
   formatDate,
   getStatusBadge,
 }: any) {
   const allItems = [...directories, ...documents];
   const allSelected = allItems.length > 0 && selectedItems.length === allItems.length;
+
+  if (allItems.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <FolderOpenIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Pasta vazia
+          </h3>
+          <p className="text-gray-600">
+            Comece criando uma pasta ou fazendo upload de documentos
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -485,7 +662,7 @@ function AllItemsView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {directories.map((dir) => (
+          {directories.map((dir: any) => (
             <TableRow key={dir.id} className="cursor-pointer hover:bg-gray-50">
               <TableCell onClick={(e) => e.stopPropagation()}>
                 <Checkbox
@@ -507,14 +684,12 @@ function AllItemsView({
               <TableCell>
                 <Badge variant="outline">Pasta</Badge>
               </TableCell>
-              <TableCell className="text-gray-500">
-                {dir.documents_count} item(s)
-              </TableCell>
+              <TableCell className="text-gray-500">-</TableCell>
               <TableCell className="text-sm text-gray-500">
                 {formatDate(dir.updated_at)}
               </TableCell>
               <TableCell className="text-sm text-gray-500">
-                {dir.created_by.username}
+                {dir.created_by?.username || 'Sistema'}
               </TableCell>
               <TableCell>
                 <DropdownMenu>
@@ -524,17 +699,24 @@ function AllItemsView({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Abrir</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onOpenDirectory(dir)}>
+                      Abrir
+                    </DropdownMenuItem>
                     <DropdownMenuItem>Renomear</DropdownMenuItem>
                     <DropdownMenuItem>Compartilhar</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={() => onDeleteDirectory(dir.id)}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
             </TableRow>
           ))}
-          {documents.map((doc) => (
+          {documents.map((doc: any) => (
             <TableRow key={doc.id} className="hover:bg-gray-50">
               <TableCell>
                 <Checkbox
@@ -563,7 +745,7 @@ function AllItemsView({
                 {formatDate(doc.updated_at)}
               </TableCell>
               <TableCell className="text-sm text-gray-500">
-                {doc.created_by.username}
+                {doc.created_by?.username || 'Sistema'}
               </TableCell>
               <TableCell>
                 <DropdownMenu>
@@ -578,7 +760,12 @@ function AllItemsView({
                     <DropdownMenuItem>Renomear</DropdownMenuItem>
                     <DropdownMenuItem>Compartilhar</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={() => onDeleteDocument(doc.id)}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
@@ -591,46 +778,70 @@ function AllItemsView({
 }
 
 // Component: Folders View
-function FoldersView({ directories, selectedItems, onSelectItem, onOpenDirectory, formatDate }: any) {
+function FoldersView({ directories, selectedItems, onSelectItem, onOpenDirectory, onDeleteDirectory, formatDate }: any) {
+  if (directories.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <FolderIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Nenhuma pasta
+          </h3>
+          <p className="text-gray-600">
+            Crie uma pasta para organizar seus documentos
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {directories.map((dir: Directory) => (
+      {directories.map((dir: any) => (
         <Card
           key={dir.id}
           className="cursor-pointer hover:shadow-lg transition-shadow"
           onClick={() => onOpenDirectory(dir)}
         >
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div className="flex items-center gap-3">
-              <Checkbox
-                checked={selectedItems.includes(dir.id)}
-                onCheckedChange={() => onSelectItem(dir.id)}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <FolderOpenIcon className="h-10 w-10 text-blue-500" />
+          <CardContent className="p-6">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={selectedItems.includes(dir.id)}
+                  onCheckedChange={() => onSelectItem(dir.id)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <FolderOpenIcon className="h-10 w-10 text-blue-500" />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="sm">
+                    <EllipsisVerticalIcon className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>Abrir</DropdownMenuItem>
+                  <DropdownMenuItem>Renomear</DropdownMenuItem>
+                  <DropdownMenuItem>Compartilhar</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-red-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteDirectory(dir.id);
+                    }}
+                  >
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="sm">
-                  <EllipsisVerticalIcon className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>Abrir</DropdownMenuItem>
-                <DropdownMenuItem>Renomear</DropdownMenuItem>
-                <DropdownMenuItem>Compartilhar</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </CardHeader>
-          <CardContent>
             <h3 className="font-semibold text-lg mb-1">{dir.name}</h3>
             {dir.description && (
               <p className="text-sm text-gray-500 mb-3">{dir.description}</p>
             )}
             <div className="flex justify-between text-sm text-gray-500">
-              <span>{dir.documents_count} documentos</span>
+              <span>Pasta</span>
               <span>{formatDate(dir.updated_at)}</span>
             </div>
           </CardContent>
@@ -645,10 +856,27 @@ function DocumentsView({
   documents,
   selectedItems,
   onSelectItem,
+  onDeleteDocument,
   formatFileSize,
   formatDate,
   getStatusBadge,
 }: any) {
+  if (documents.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <DocumentIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Nenhum documento
+          </h3>
+          <p className="text-gray-600">
+            Faça upload de documentos para começar
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <Table>
@@ -664,7 +892,7 @@ function DocumentsView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {documents.map((doc: Document) => (
+          {documents.map((doc: any) => (
             <TableRow key={doc.id} className="hover:bg-gray-50">
               <TableCell>
                 <Checkbox
@@ -677,7 +905,9 @@ function DocumentsView({
                   <DocumentIcon className="h-8 w-8 text-gray-500" />
                   <div>
                     <div className="font-medium">{doc.name}</div>
-                    <div className="text-sm text-gray-500">{doc.original_filename}</div>
+                    {doc.description && (
+                      <div className="text-sm text-gray-500">{doc.description}</div>
+                    )}
                   </div>
                 </div>
               </TableCell>
@@ -704,7 +934,12 @@ function DocumentsView({
                     <DropdownMenuItem>Editar</DropdownMenuItem>
                     <DropdownMenuItem>Histórico de Versões</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600"
+                      onClick={() => onDeleteDocument(doc.id)}
+                    >
+                      Excluir
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
