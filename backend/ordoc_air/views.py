@@ -151,6 +151,45 @@ class DirectoryViewSet(BaseViewSet):
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
     
+    def perform_create(self, serializer):
+        """Override to set automatic fields on directory creation"""
+        from django.utils.text import slugify
+        import uuid
+        
+        # Get department (required)
+        department = serializer.validated_data.get('department')
+        if not department:
+            # Try to get first department from current organization
+            organization = self.get_current_organization()
+            department = organization.departments.first()
+            if not department:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"department": "No department available"})
+        
+        # Auto-generate path if not provided
+        path = serializer.validated_data.get('path')
+        if not path:
+            name = serializer.validated_data.get('name', 'unnamed')
+            parent = serializer.validated_data.get('parent_directory')
+            if parent:
+                path = f"{parent.path}/{slugify(name)}"
+            else:
+                path = f"/{slugify(name)}"
+        
+        # Auto-generate PRN if not provided
+        prn = serializer.validated_data.get('prn')
+        if not prn:
+            prn = f"dir:{department.prn}:{uuid.uuid4().hex[:12]}"
+        
+        # Save with auto-filled fields
+        serializer.save(
+            department=department,
+            path=path,
+            prn=prn,
+            created_by=self.request.user,
+            updated_by=self.request.user
+        )
+    
     @action(detail=True, methods=['get'])
     def children(self, request, pk=None):
         """Get directory children"""
