@@ -131,6 +131,13 @@ class DirectorySerializer(serializers.ModelSerializer):
     children_count = serializers.SerializerMethodField()
     documents_count = serializers.SerializerMethodField()
     
+    # Make department optional - will be auto-filled by perform_create
+    department = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    
     class Meta:
         model = Directory
         fields = [
