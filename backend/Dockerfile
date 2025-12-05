@@ -30,11 +30,11 @@ RUN apt-get update \
 RUN pip install poetry==1.7.1
 
 # Copy poetry files
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml ./
 
-# Configure poetry and install dependencies
+# Configure poetry and install dependencies (sem usar lock file para evitar conflitos)
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev \
+    && poetry install --only main --no-root \
     && rm -rf $POETRY_CACHE_DIR
 
 # Copy project

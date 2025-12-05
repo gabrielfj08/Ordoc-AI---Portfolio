@@ -95,7 +95,12 @@ class OrdocUser(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     # Relations
-    organizations = models.ManyToManyField(Organization, through='UserOrganizationRole', related_name='ordoc_users')
+    organizations = models.ManyToManyField(
+        Organization,
+        through='UserOrganizationRole',
+        through_fields=('user', 'organization'),
+        related_name='ordoc_users'
+    )
 
     class Meta:
         verbose_name = "Usuário Ordoc"
