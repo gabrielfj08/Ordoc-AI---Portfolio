@@ -1,5 +1,3 @@
-version: '3.8'
-
 # As credenciais abaixo sao apenas para desenvolvimento local.
 # Em producao defina valores seguros via variaveis de ambiente
 # (por exemplo usando um arquivo `.env`). Veja `.env.example`
