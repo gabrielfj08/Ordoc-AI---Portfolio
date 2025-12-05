@@ -188,6 +188,8 @@ function MyAirContent() {
       if (currentDirectory) {
         data.directory = currentDirectory;
       }
+
+      console.log('📤 Uploading document:', { file: file.name, data });
       return await DocumentService.uploadDocument(file, data, setUploadProgress);
     },
     onSuccess: () => {
@@ -201,9 +203,23 @@ function MyAirContent() {
       setUploadProgress(0);
     },
     onError: (error: any) => {
+      console.error('❌ Upload error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+
+      const errorMessage = error.response?.data?.detail
+        || error.response?.data?.message
+        || Object.entries(error.response?.data || {})
+            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+            .join('; ')
+        || error.message
+        || 'Ocorreu um erro ao enviar o documento.';
+
       toast({
         title: 'Erro no upload',
-        description: error.response?.data?.message || error.message || 'Ocorreu um erro ao enviar o documento.',
+        description: errorMessage,
         variant: 'destructive',
       });
       setUploadProgress(0);

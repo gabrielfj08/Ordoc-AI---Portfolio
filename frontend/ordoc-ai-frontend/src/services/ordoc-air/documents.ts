@@ -58,10 +58,18 @@ export const DocumentService = {
   ): Promise<Document> {
     const formData = new FormData();
     formData.append('file', file);
+
+    // Log FormData contents for debugging
+    console.log('🔍 FormData being sent:', {
+      file: { name: file.name, size: file.size, type: file.type },
+      additionalData: data
+    });
+
     if (data) {
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           formData.append(key, String(value));
+          console.log(`  ✓ Added field: ${key} = ${value}`);
         }
       });
     }
