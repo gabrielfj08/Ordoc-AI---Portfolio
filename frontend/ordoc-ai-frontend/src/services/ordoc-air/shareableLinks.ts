@@ -19,6 +19,15 @@ const list = async (
   return [];
 };
 
+const listSharedWithMe = async (params?: Record<string, any>): Promise<ShareableLink[]> => {
+  const response = await api.get(`${baseUrl}shared_with_me/`, { params });
+  const data = response.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.results)) return data.results;
+  if (Array.isArray(data.shareableLinks)) return data.shareableLinks;
+  return [];
+};
+
 const create = async (
   objectType: 'document' | 'directory',
   objectId: number,
@@ -63,6 +72,7 @@ const update = async (
 
 export const shareableLinksService = {
   list,
+  listSharedWithMe,
   create,
   destroy,
   showByToken,

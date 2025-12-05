@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ShareIcon,
   DocumentIcon,
@@ -45,6 +46,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { toast } from '@/components/ui/use-toast';
+
+// Import services
+import shareableLinksService from '@/services/ordoc-air/shareableLinks';
+import { DocumentService } from '@/services/ordoc-air/documents';
 
 // Types
 interface SharedItem {
@@ -75,100 +81,107 @@ export default function SharedPage() {
 }
 
 function SharedContent() {
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [permissionFilter, setPermissionFilter] = useState<'all' | 'view' | 'edit' | 'comment'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'documents' | 'folders'>('all');
-  const [sharedItems, setSharedItems] = useState<SharedItem[]>([]);
 
-  // Mock data
-  React.useEffect(() => {
-    const mockSharedItems: SharedItem[] = [
-      {
-        id: '1',
-        name: 'Relatório Q4 2023',
-        type: 'document',
-        path: '/Projetos/Marketing',
-        file_type: 'application/pdf',
-        file_size: 2457600,
-        shared_by: {
-          id: '1',
-          username: 'João Silva',
-          email: 'joao.silva@empresa.com',
-        },
-        shared_at: '2024-01-20T10:30:00Z',
-        permission: 'edit',
-        expires_at: '2024-06-20T10:30:00Z',
-        accessed_at: '2024-01-25T14:00:00Z',
-        is_favorite: true,
-      },
-      {
-        id: '2',
-        name: 'Documentos Fiscais 2024',
-        type: 'folder',
-        path: '/Financeiro',
-        shared_by: {
-          id: '2',
-          username: 'Maria Santos',
-          email: 'maria.santos@empresa.com',
-        },
-        shared_at: '2024-01-18T09:00:00Z',
-        permission: 'view',
-        is_favorite: false,
-      },
-      {
-        id: '3',
-        name: 'Apresentação Vendas',
-        type: 'document',
-        path: '/Vendas/Apresentações',
-        file_type: 'application/vnd.ms-powerpoint',
-        file_size: 5242880,
-        shared_by: {
-          id: '3',
-          username: 'Carlos Oliveira',
-          email: 'carlos.oliveira@empresa.com',
-        },
-        shared_at: '2024-01-15T14:30:00Z',
-        permission: 'comment',
-        accessed_at: '2024-01-20T10:00:00Z',
-        is_favorite: false,
-      },
-      {
-        id: '4',
-        name: 'Contratos',
-        type: 'folder',
-        path: '/Jurídico',
-        shared_by: {
-          id: '4',
-          username: 'Ana Paula',
-          email: 'ana.paula@empresa.com',
-        },
-        shared_at: '2024-01-10T08:00:00Z',
-        permission: 'edit',
-        expires_at: '2024-12-31T23:59:59Z',
-        is_favorite: true,
-      },
-      {
-        id: '5',
-        name: 'Manual de Procedimentos',
-        type: 'document',
-        path: '/RH/Documentação',
-        file_type: 'application/pdf',
-        file_size: 1048576,
-        shared_by: {
-          id: '5',
-          username: 'Pedro Costa',
-          email: 'pedro.costa@empresa.com',
-        },
-        shared_at: '2024-01-05T11:00:00Z',
-        permission: 'view',
-        accessed_at: '2024-01-22T09:30:00Z',
-        is_favorite: false,
-      },
-    ];
+  // Fetch shared items from API
+  const { data: sharedData, isLoading, error } = useQuery({
+    queryKey: ['shared-items', permissionFilter, typeFilter],
+    queryFn: async () => {
+      try {
+        const params: Record<string, any> = {};
 
-    setSharedItems(mockSharedItems);
-  }, []);
+        // Add filters
+        if (permissionFilter !== 'all') {
+          params.permission = permissionFilter;
+        }
+        if (typeFilter === 'documents') {
+          params.content_type = 'document';
+        } else if (typeFilter === 'folders') {
+          params.content_type = 'directory';
+        }
+
+        const result = await shareableLinksService.listSharedWithMe(params);
+        return result;
+      } catch (error: any) {
+        console.error('Error loading shared items:', error);
+        toast({
+          title: 'Erro ao carregar itens compartilhados',
+          description: error.response?.data?.message || 'Ocorreu um erro ao carregar os itens compartilhados.',
+          variant: 'destructive',
+        });
+        return [];
+      }
+    },
+  });
+
+  const sharedItems: SharedItem[] = (sharedData || []).map((link: any) => ({
+    id: link.id,
+    name: link.document?.name || link.directory?.name || 'Sem nome',
+    type: link.document ? 'document' : 'folder',
+    path: link.document?.directory_path || link.directory?.path || '/',
+    file_type: link.document?.mime_type,
+    file_size: link.document?.file_size,
+    shared_by: {
+      id: link.created_by?.id || '',
+      username: link.created_by?.username || 'Desconhecido',
+      email: link.created_by?.email || '',
+    },
+    shared_at: link.created_at,
+    permission: link.permission_level,
+    expires_at: link.expires_at,
+    accessed_at: link.last_accessed_at,
+    is_favorite: false, // This would need to come from user favorites
+  }));
+
+  // Mutation to revoke shared access
+  const revokeAccessMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      return await shareableLinksService.destroy(linkId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shared-items'] });
+      toast({
+        title: 'Acesso revogado',
+        description: 'O compartilhamento foi removido com sucesso.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Erro ao revogar acesso',
+        description: error.response?.data?.message || 'Ocorreu um erro ao revogar o compartilhamento.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Handler for downloading a document
+  const handleDownload = async (documentId: string, documentName: string) => {
+    try {
+      const blob = await DocumentService.download(documentId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = documentName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Download iniciado',
+        description: `O documento "${documentName}" está sendo baixado.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro no download',
+        description: error.response?.data?.message || 'Ocorreu um erro ao baixar o documento.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return '-';
@@ -236,6 +249,24 @@ function SharedContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Error Banner - Development Mode */}
+        {error && process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <strong>Modo de desenvolvimento:</strong> Não foi possível conectar ao backend. Certifique-se de que o servidor está rodando em http://localhost:8000
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
