@@ -11,6 +11,10 @@ import {
   Home,
   AlertTriangle,
   Trash2,
+  Search,
+  Clock,
+  Share2,
+  FolderOpen,
 } from 'lucide-react';
 import {
   useMutation,
@@ -24,6 +28,8 @@ import documentsService from '@/services/ordoc-air/documents';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { RecentDocuments } from '@/components/ordoc-air';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface Directory {
   id: number;
@@ -468,6 +474,75 @@ function OrdocAirContent() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Access Cards */}
+        {currentDir === null && path.length === 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <Link href="/dashboard/ordoc-air/my-air">
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-blue-400">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <FolderOpen className="h-6 w-6 text-blue-600" />
+                    Meu Drive
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Navegue e gerencie seus documentos e pastas
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/dashboard/ordoc-air/recents">
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-green-400">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-6 w-6 text-green-600" />
+                    Recentes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Acesse rapidamente documentos visualizados recentemente
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/dashboard/ordoc-air/search">
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-purple-400">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Search className="h-6 w-6 text-purple-600" />
+                    Buscar
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Busca full-text avançada em todos os documentos
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/dashboard/ordoc-air/shared">
+              <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-orange-400">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Share2 className="h-6 w-6 text-orange-600" />
+                    Compartilhado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription>
+                    Documentos compartilhados com você por outros usuários
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center text-sm text-gray-600 space-x-1">
             <button
