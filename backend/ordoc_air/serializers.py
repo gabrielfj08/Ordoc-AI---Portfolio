@@ -135,11 +135,11 @@ class DirectorySerializer(serializers.ModelSerializer):
         model = Directory
         fields = [
             'id', 'name', 'description', 'parent_directory', 'parent_name',
-            'organization', 'department', 'full_path', 'children_count',
-            'documents_count', 'created_at', 'updated_at'
+            'department', 'full_path', 'children_count', 'prn', 'path',
+            'documents_count', 'created_at', 'updated_at', 'is_active'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'parent_name', 
-                           'full_path', 'children_count', 'documents_count']
+                           'full_path', 'children_count', 'documents_count', 'prn', 'path']
     
     def get_full_path(self, obj):
         """Get full directory path"""
@@ -147,7 +147,7 @@ class DirectorySerializer(serializers.ModelSerializer):
     
     def get_children_count(self, obj):
         """Get number of child directories"""
-        return obj.children.filter(deleted_at__isnull=True).count()
+        return obj.subdirectories.filter(deleted_at__isnull=True).count()
     
     def get_documents_count(self, obj):
         """Get number of documents in directory"""
