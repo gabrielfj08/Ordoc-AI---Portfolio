@@ -22,11 +22,16 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from .auth_views import login, logout, refresh_token, me, change_password, validate_password_strength, password_requirements
 from .registration_views import register_user, register_external_requester, check_email, create_demo_organization
+from .health_views import health_check, readiness_check
 
 # Create API router
 api_router = DefaultRouter()
 
 urlpatterns = [
+    # Health check endpoints
+    path('health/', health_check, name='health_check'),
+    path('readiness/', readiness_check, name='readiness_check'),
+    
     path('admin/', admin.site.urls),
     
     # Authentication endpoints
