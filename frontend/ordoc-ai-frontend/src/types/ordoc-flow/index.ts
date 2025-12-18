@@ -185,3 +185,20 @@ export interface TableProps<T> {
   sortKey?: string;
   sortDirection?: 'asc' | 'desc';
 }
+
+// Subject types
+export interface Subject extends BaseEntity {
+  name: string;
+  description?: string;
+  status: 'active' | 'inactive';
+  procedure_template_id: number;
+  field_type: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'checkbox';
+  is_required: boolean;
+  order: number;
+  options?: string[];
+}
+
+export interface FilterSubjectsParams extends BaseFilterParams {
+  status: 'active' | 'inactive' | '';
+  procedure_template_id?: number;
+}
