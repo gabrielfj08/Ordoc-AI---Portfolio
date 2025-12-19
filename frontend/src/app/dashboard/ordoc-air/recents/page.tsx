@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import LoadingScreen from '@/components/ui/LoadingScreen';
+import { TableSkeleton } from '@/components/ui/skeletons';
 import { toast } from '@/components/ui/use-toast';
 
 // Import services
@@ -215,7 +215,13 @@ function RecentsContent() {
   };
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <TableSkeleton rows={10} columns={7} />
+        </div>
+      </div>
+    );
   }
 
   return (
