@@ -239,7 +239,7 @@ class IntegrationRequest(models.Model):
     )
 
     organization = models.ForeignKey(
-        'ordoc_cloud.Organization',
+        'ordoc_air.Organization',
         on_delete=models.CASCADE,
         related_name='integration_requests',
         verbose_name=_('Organização')
