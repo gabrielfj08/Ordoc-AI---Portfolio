@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { NewProcedureFields } from '@/components/ordoc-cidadao/NewProcedureFields';
 import { ExternalProcedureService } from '@/services/ordoc-cidadao';
 import type { ShowExternalProcedure } from '@/services/ordoc-cidadao';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { FormSkeleton } from '@/components/ui/skeletons';
 import { ErrorState } from '@/components/ui/ErrorState';
 
 export default function ProcedureFieldsPage() {
@@ -45,7 +45,13 @@ export default function ProcedureFieldsPage() {
   };
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-4xl mx-auto">
+          <FormSkeleton fields={6} columns={1} showTitle />
+        </div>
+      </div>
+    );
   }
 
   if (error) {

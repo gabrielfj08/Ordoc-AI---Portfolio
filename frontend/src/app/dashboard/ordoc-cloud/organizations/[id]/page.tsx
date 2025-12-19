@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import LoadingScreen from '@/components/ui/LoadingScreen';
+import { CardSkeleton } from '@/components/ui/skeletons';
 import organizationsService from '@/services/organizations';
 import { Organization } from '@/components/ordoc-cloud/organizations/edit/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -179,7 +179,13 @@ export default function OrganizationDetailsPage() {
   };
 
   if (loading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <CardSkeleton cards={4} variant="detailed" showHeader />
+        </div>
+      </div>
+    );
   }
 
   if (error || !organization) {

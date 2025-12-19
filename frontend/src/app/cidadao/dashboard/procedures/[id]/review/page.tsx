@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { ReviewProcedureFields } from '@/components/ordoc-cidadao/ReviewProcedureFields';
 import { ExternalProcedureService } from '@/services/ordoc-cidadao';
 import type { ShowExternalProcedure } from '@/services/ordoc-cidadao';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { CardSkeleton } from '@/components/ui/skeletons';
 import { ErrorState } from '@/components/ui/ErrorState';
 
 export default function ProcedureReviewPage() {
@@ -57,7 +57,13 @@ export default function ProcedureReviewPage() {
   };
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen p-6">
+        <div className="max-w-4xl mx-auto">
+          <CardSkeleton cards={3} variant="detailed" showHeader showFooter />
+        </div>
+      </div>
+    );
   }
 
   if (error) {

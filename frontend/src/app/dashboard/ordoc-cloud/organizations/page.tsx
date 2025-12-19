@@ -40,7 +40,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import LoadingScreen from '@/components/ui/LoadingScreen';
+import { TableSkeleton } from '@/components/ui/skeletons';
 import organizationsService, { OrganizationListResponse } from '@/services/organizations';
 import { Organization } from '@/components/ordoc-cloud/organizations/edit/types';
 import { useToast } from '@/components/ui/use-toast';
@@ -277,7 +277,13 @@ export default function OrganizationsPage() {
   };
 
   if (loading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <TableSkeleton rows={10} columns={7} />
+        </div>
+      </div>
+    );
   }
 
   return (
