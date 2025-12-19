@@ -1,0 +1,295 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.65rem;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+  }
+
+  .dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.488 0.243 264.376);
+    --chart-2: oklch(0.696 0.17 162.48);
+    --chart-3: oklch(0.769 0.188 70.08);
+    --chart-4: oklch(0.627 0.265 303.9);
+    --chart-5: oklch(0.645 0.246 16.439);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    border-radius: 4px;
+    opacity: 0.3;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+    opacity: 0.8;
+  }
+}
+
+/* LANDING PAGE STYLES - COMPONENT LAYER */
+@layer components {
+
+  /* HEADER & NAV */
+  .header {
+    @apply fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b border-transparent;
+  }
+
+  .nav {
+    @apply container mx-auto flex h-20 items-center justify-between px-4;
+  }
+
+  .logo {
+    @apply flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity;
+  }
+
+  .logo-icon {
+    @apply flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold;
+  }
+
+  .nav-links {
+    @apply hidden md:flex items-center gap-8;
+  }
+
+  .nav-link {
+    @apply text-sm font-medium text-muted-foreground hover:text-foreground transition-colors;
+  }
+
+  .nav-cta {
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring;
+  }
+
+  .user-icon-btn {
+    @apply ml-2 p-2 rounded-full hover:bg-secondary transition-colors text-foreground;
+  }
+
+  .user-icon {
+    @apply w-6 h-6;
+  }
+
+  /* FOOTER */
+  .footer {
+    @apply bg-secondary border-t py-16 mt-20;
+  }
+
+  .footer-content {
+    @apply container mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 px-4 mb-12;
+  }
+
+  .footer-section h4 {
+    @apply font-bold mb-6;
+  }
+
+  .footer-section a {
+    @apply block text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors;
+  }
+
+  .footer-bottom {
+    @apply container mx-auto px-4 pt-8 border-t text-center text-sm text-muted-foreground;
+  }
+
+  .hero {
+    @apply flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center relative overflow-hidden;
+  }
+
+  .hero-label {
+    @apply mb-6 inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-medium text-muted-foreground bg-secondary backdrop-blur-sm;
+  }
+
+  .hero-title {
+    @apply text-5xl font-extrabold tracking-tight sm:text-7xl mb-6 bg-gradient-to-b from-foreground to-foreground bg-clip-text text-transparent;
+  }
+
+  .hero-subtitle {
+    @apply max-w-[42rem] leading-normal text-muted-foreground sm:text-xl sm:leading-8 mb-10;
+  }
+
+  .hero-buttons {
+    @apply flex flex-col sm:flex-row gap-4 items-center justify-center;
+  }
+
+  /* Revelations */
+  .revelation {
+    @apply py-32 px-4 relative overflow-hidden min-h-[80vh] flex flex-col items-center justify-center;
+  }
+
+  .revelation-container {
+    @apply container mx-auto max-w-5xl;
+  }
+
+  .revelation-header {
+    @apply flex flex-col items-start gap-4 mb-12;
+  }
+
+  .revelation-number {
+    @apply text-sm font-mono text-primary font-bold tracking-widest uppercase mb-2;
+  }
+
+  .revelation-title {
+    @apply text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl max-w-3xl leading-tight;
+  }
+
+  .revelation-text {
+    @apply text-xl text-muted-foreground mt-6 max-w-2xl leading-relaxed;
+  }
+
+  .revelation-quote {
+    @apply mt-12 border-l-4 border-primary pl-6 py-2 italic text-2xl text-foreground/80 font-serif;
+  }
+
+  /* Comparison Section */
+  .comparison {
+    @apply py-32 bg-secondary;
+  }
+
+  .comparison-card {
+    @apply p-8 rounded-2xl border bg-card backdrop-blur-sm transition-all duration-300;
+  }
+
+  .comparison-card.pain {
+    @apply border-destructive bg-destructive;
+  }
+
+  .comparison-card.gain {
+    @apply border-primary shadow-lg shadow-primary;
+  }
+
+  .comparison-title {
+    @apply text-2xl font-bold mb-6 flex items-center gap-3;
+  }
+
+  .comparison-list {
+    @apply space-y-4;
+  }
+
+  .comparison-item {
+    @apply flex items-start gap-3 text-muted-foreground;
+  }
+
+  /* Product Section */
+  .product {
+    @apply py-32 relative bg-zinc-950 text-white overflow-hidden;
+  }
+
+  .product-content {
+    @apply relative z-10 container mx-auto px-4 text-center;
+  }
+
+  .product-tag {
+    @apply text-primary font-bold tracking-widest uppercase text-sm mb-4 block;
+  }
+
+  .product-title {
+    @apply text-5xl font-bold mb-8 tracking-tight;
+  }
+
+  .product-grid {
+    @apply grid gap-8 md:grid-cols-3 mt-20 text-left max-w-6xl mx-auto;
+  }
+
+  .feature-item {
+    @apply p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors;
+  }
+
+  .feature-icon {
+    @apply h-10 w-10 text-primary mb-4;
+  }
+
+  .feature-title {
+    @apply text-xl font-bold mb-2 text-white;
+  }
+
+  .feature-desc {
+    @apply text-zinc-400 leading-relaxed;
+  }
+}
