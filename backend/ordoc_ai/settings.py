@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "ordoc_cloud",
     "ordoc_sign",
     "ordoc_reports",
+    "ordoc_integrations",  # Sistema de integrações externas
 ]
 
 MIDDLEWARE = [
