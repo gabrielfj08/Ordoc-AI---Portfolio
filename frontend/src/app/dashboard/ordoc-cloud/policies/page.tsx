@@ -42,7 +42,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import LoadingScreen from '@/components/ui/LoadingScreen';
+import { TableSkeleton } from '@/components/ui/skeletons';
 
 // Types
 interface Policy {
@@ -222,7 +222,13 @@ export default function PoliciesPage() {
   };
 
   if (loading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <TableSkeleton rows={10} columns={8} />
+        </div>
+      </div>
+    );
   }
 
   return (
