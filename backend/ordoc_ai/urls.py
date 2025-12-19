@@ -57,6 +57,7 @@ urlpatterns = [
         path('ordoc-cloud/', include('ordoc_cloud.urls')),
         path('ordoc-sign/', include('ordoc_sign.urls')),
         path('ordoc-reports/', include('ordoc_reports.urls')),
+        path('integrations/', include('ordoc_integrations.urls')),  # Integrações externas
     ])),
     
     # External APIs for OrdocCidadao
@@ -69,6 +70,7 @@ urlpatterns = [
         path('ordoc-cloud/', include(('ordoc_cloud.urls', 'ordoc_cloud'), namespace='ordoc_cloud_v2')),
         path('ordoc-sign/', include(('ordoc_sign.urls', 'ordoc_sign'), namespace='ordoc_sign_v2')),
         path('ordoc-reports/', include(('ordoc_reports.urls', 'ordoc_reports'), namespace='ordoc_reports_v2')),
+        path('integrations/', include(('ordoc_integrations.urls', 'ordoc_integrations'), namespace='ordoc_integrations_v2')),
     ])),
     
     # API v3 (latest)
@@ -78,6 +80,7 @@ urlpatterns = [
         path('ordoc-cloud/', include(('ordoc_cloud.urls', 'ordoc_cloud'), namespace='ordoc_cloud_v3')),
         path('ordoc-sign/', include(('ordoc_sign.urls', 'ordoc_sign'), namespace='ordoc_sign_v3')),
         path('ordoc-reports/', include(('ordoc_reports.urls', 'ordoc_reports'), namespace='ordoc_reports_v3')),
+        path('integrations/', include(('ordoc_integrations.urls', 'ordoc_integrations'), namespace='ordoc_integrations_v3')),
     ])),
 ]
 
