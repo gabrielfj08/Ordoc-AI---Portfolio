@@ -1,1 +1,0 @@
-export { BaseDirectory } from './directory';
