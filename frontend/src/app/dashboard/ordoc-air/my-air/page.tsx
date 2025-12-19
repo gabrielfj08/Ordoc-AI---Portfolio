@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import LoadingScreen from '@/components/ui/LoadingScreen';
+import { TreeSkeleton } from '@/components/ui/skeletons';
 import { useToast } from '@/components/ui/use-toast';
 
 // Import services
@@ -383,7 +383,13 @@ function MyAirContent() {
   };
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <TreeSkeleton depth={3} items={8} />
+        </div>
+      </div>
+    );
   }
 
   return (
