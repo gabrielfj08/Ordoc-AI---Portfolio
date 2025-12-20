@@ -2,46 +2,80 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeftIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import {
+    UsersIcon,
+    GlobeAltIcon,
+    ArrowRightIcon,
+    ArrowLeftIcon
+} from '@heroicons/react/24/outline';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function ConstructionPage() {
+export default function CloudGroupsSelectionPage() {
+    const options = [
+        {
+            title: 'Grupos da Organização',
+            description: 'Gerenciar grupos e permissões organizacionais',
+            icon: UsersIcon,
+            href: '/dashboard/ordoc-flow/groups/management',
+            color: 'text-green-600',
+            bgColor: 'bg-green-100',
+            borderColor: 'hover:border-green-600',
+        },
+        {
+            title: 'Grupos Externos',
+            description: 'Em desenvolvimento - Gestão de grupos externos',
+            icon: GlobeAltIcon,
+            href: '/dashboard/ordoc-flow/groups/external',
+            color: 'text-blue-600',
+            bgColor: 'bg-blue-100',
+            borderColor: 'hover:border-blue-600',
+        }
+    ];
+
     return (
         <ProtectedRoute>
-            <div className="min-h-screen bg-gray-50 flex flex-col">
+            <div className="min-h-screen bg-gray-50">
                 {/* Header */}
                 <div className="bg-white shadow-sm border-b border-gray-200">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
                             <div className="flex items-center space-x-4">
-                                <Link href="/dashboard" className="text-gray-500 hover:text-gray-700">
+                                <Link href="/dashboard/ordoc-cloud" className="text-gray-500 hover:text-gray-700">
                                     <ArrowLeftIcon className="w-6 h-6" />
                                 </Link>
-                                <h1 className="text-2xl font-bold text-gray-900">Em Construção</h1>
+                                <h1 className="text-2xl font-bold text-gray-900">Grupos de Acesso</h1>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 flex flex-col items-center justify-center p-8">
-                    <div className="text-center max-w-md mx-auto">
-                        <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <WrenchScrewdriverIcon className="w-12 h-12 text-blue-600" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">Funcionalidade em Breve</h2>
-                        <p className="text-gray-500 mb-8">
-                            Estamos trabalhando duro para trazer esta funcionalidade para você.
-                            Por favor, verifique novamente mais tarde.
-                        </p>
-                        <div className="flex justify-center space-x-4">
-                            <Link href="/dashboard">
-                                <Button variant="outline">
-                                    Voltar ao Dashboard
-                                </Button>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                        {options.map((option) => (
+                            <Link key={option.title} href={option.href} className="group">
+                                <Card className={`h-full transition-all duration-200 border-2 border-transparent ${option.borderColor} hover:shadow-lg cursor-pointer`}>
+                                    <CardHeader>
+                                        <div className={`w-12 h-12 rounded-lg ${option.bgColor} flex items-center justify-center mb-4`}>
+                                            <option.icon className={`w-8 h-8 ${option.color}`} />
+                                        </div>
+                                        <CardTitle className="text-xl group-hover:text-gray-900">
+                                            {option.title}
+                                        </CardTitle>
+                                        <CardDescription className="text-base text-gray-500 mt-2">
+                                            {option.description}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex items-center text-sm font-medium text-gray-600 group-hover:text-gray-900">
+                                            Acessar
+                                            <ArrowRightIcon className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </Link>
-                        </div>
+                        ))}
                     </div>
                 </div>
             </div>
