@@ -1,5 +1,6 @@
-import { AppSidebar } from '@/components/layout/app-sidebar'
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+'use client';
+
+
 import { Separator } from '@/components/ui/separator'
 import {
   Breadcrumb,
@@ -9,18 +10,23 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { usePathname } from 'next/navigation'
+import { DashboardHeader } from '@/components/dashboard/minha-mesa/header'
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname();
+  const isDashboardHome = pathname === '/dashboard';
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="sticky top-0 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4 z-10">
-          <SidebarTrigger className="-ml-1" />
+    <div className="flex flex-col min-h-screen bg-background">
+      {isDashboardHome ? (
+        <DashboardHeader />
+      ) : (
+        <header className="sticky top-0 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4 z-10 transition-all duration-300">
           <Separator orientation="vertical" className="mr-2 h-4" />
           <Breadcrumb>
             <BreadcrumbList>
@@ -36,10 +42,10 @@ export default function DashboardLayout({
             </BreadcrumbList>
           </Breadcrumb>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+      )}
+      <main className="flex-1 flex flex-col gap-4 p-4">
+        {children}
+      </main>
+    </div>
   )
 }
