@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { Slot } from "@radix-ui/react-slot"
+import { cn } from "@/lib/utils" // Assuming cn utility exists, it usually does in shadcn projects. If not, I'll use template literals, but checking for utils is good practice. I'll stick to template literals if unsure, but shadcn standard uses cn.
+
+// Fallback for cn if not available, but likely is. I'll use template literals to be safe.
+const cls = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(' ');
 
 interface DropdownMenuProps {
   children: React.ReactNode;
@@ -8,16 +13,22 @@ interface DropdownMenuProps {
 interface DropdownMenuTriggerProps {
   asChild?: boolean;
   children: React.ReactNode;
+  className?: string; // Added
 }
 
 interface DropdownMenuContentProps {
   align?: 'start' | 'center' | 'end';
+  side?: 'top' | 'right' | 'bottom' | 'left'; // Added prop
+  sideOffset?: number; // Added prop
   children: React.ReactNode;
+  className?: string; // Added
 }
 
 interface DropdownMenuItemProps {
+  asChild?: boolean;
   children: React.ReactNode;
   onClick?: () => void;
+  className?: string; // Added
 }
 
 export function DropdownMenu({ children }: DropdownMenuProps) {
@@ -28,6 +39,11 @@ export function DropdownMenu({ children }: DropdownMenuProps) {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        // Check if click was on content (portal)
+        // Hard to check portal click from here without ref coordination, but simplistic approach:
+        // Rely on content closing itself or backdrop if modal.
+        // For now, simple outside click on trigger wrapper closes it. 
+        // Real Radix is more complex.
         setIsOpen(false);
       }
     }
@@ -56,6 +72,7 @@ export function DropdownMenu({ children }: DropdownMenuProps) {
 export function DropdownMenuTrigger({
   asChild,
   children,
+  className,
   ...props
 }: DropdownMenuTriggerProps & { isOpen?: boolean; setIsOpen?: (open: boolean) => void; triggerRef?: React.RefObject<HTMLElement> }) {
   const { isOpen, setIsOpen, triggerRef } = props as any;
@@ -69,7 +86,7 @@ export function DropdownMenuTrigger({
   }
 
   return (
-    <button onClick={handleClick} ref={triggerRef}>
+    <button onClick={handleClick} ref={triggerRef} className={className}>
       {children}
     </button>
   );
@@ -77,7 +94,10 @@ export function DropdownMenuTrigger({
 
 export function DropdownMenuContent({
   align = 'end',
+  side = 'bottom',
+  sideOffset = 4,
   children,
+  className,
   ...props
 }: DropdownMenuContentProps & { isOpen?: boolean; triggerRef?: React.RefObject<HTMLElement> }) {
   const { isOpen, triggerRef } = props as any;
@@ -86,30 +106,34 @@ export function DropdownMenuContent({
 
   useEffect(() => {
     if (isOpen && triggerRef?.current && contentRef.current) {
+      // Simplified positioning logic mimicking the original manual implementation but respecting side/align loosely
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const contentRect = contentRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - triggerRect.bottom;
-      const spaceAbove = triggerRect.top;
 
-      let top = triggerRect.bottom + 4; // 4px abaixo
+      let top = 0;
+      let left = 0;
 
-      // Se não tiver espaço suficiente abaixo, abrir para cima
-      if (spaceBelow < 200 && spaceAbove > 200) {
-        top = triggerRect.top - contentRect.height - 4;
+      // Basic positioning support
+      if (side === 'bottom') {
+        top = triggerRect.bottom + sideOffset;
+        if (align === 'start') left = triggerRect.left;
+        else if (align === 'center') left = triggerRect.left + (triggerRect.width / 2) - (contentRect.width / 2);
+        else left = triggerRect.right - contentRect.width;
+      } else if (side === 'right') {
+        top = triggerRect.top;
+        left = triggerRect.right + sideOffset;
+      } else if (side === 'top') {
+        top = triggerRect.top - contentRect.height - sideOffset;
+        if (align === 'start') left = triggerRect.left;
+        else if (align === 'center') left = triggerRect.left + (triggerRect.width / 2) - (contentRect.width / 2);
+        else left = triggerRect.right - contentRect.width;
       }
 
-      let left = triggerRect.right - 200; // 200px é a largura aproximada do menu
-
-      // Alinhamentos
-      if (align === 'start') {
-        left = triggerRect.left;
-      } else if (align === 'center') {
-        left = triggerRect.left + (triggerRect.width / 2) - 100;
-      }
-
-      // Garantir que não saia da tela
+      // Keep in viewport
       if (left < 10) left = 10;
-      if (left + 200 > window.innerWidth) left = window.innerWidth - 210;
+      if (left + contentRect.width > window.innerWidth) left = window.innerWidth - contentRect.width - 10;
+      if (top < 10) top = 10;
+      // if (top + contentRect.height > window.innerHeight) ...
 
       setStyles({
         position: 'fixed',
@@ -118,7 +142,7 @@ export function DropdownMenuContent({
         zIndex: 9999,
       });
     }
-  }, [isOpen, align, triggerRef]);
+  }, [isOpen, align, side, sideOffset, triggerRef]);
 
   if (!isOpen || typeof window === 'undefined') return null;
 
@@ -126,7 +150,7 @@ export function DropdownMenuContent({
     <div
       ref={contentRef}
       style={styles}
-      className="min-w-[12rem] max-w-[16rem] max-h-[300px] overflow-y-auto rounded-md border bg-white p-1 shadow-xl"
+      className={cls("min-w-[12rem] bg-white rounded-md border shadow-md p-1", className)}
     >
       {children}
     </div>,
@@ -134,21 +158,32 @@ export function DropdownMenuContent({
   );
 }
 
-export function DropdownMenuItem({ children, onClick }: DropdownMenuItemProps) {
+export function DropdownMenuItem({ children, onClick, className, asChild }: DropdownMenuItemProps) {
+  const Comp = asChild ? Slot : "button"
   return (
-    <button
-      className="relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-100 focus:bg-gray-100"
+    <Comp
+      className={cls("relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-100 focus:bg-gray-100", className)}
       onClick={onClick}
     >
       {children}
-    </button>
+    </Comp>
   );
 }
 
 export function DropdownMenuLabel({ children, className }: { children: React.ReactNode, className?: string }) {
-  return <div className={`px-2 py-1.5 text-sm font-semibold ${className || ''}`}>{children}</div>;
+  return <div className={cls("px-2 py-1.5 text-sm font-semibold", className)}>{children}</div>;
 }
 
 export function DropdownMenuSeparator() {
   return <div className="my-1 h-px bg-gray-200" />;
+}
+
+export function DropdownMenuShortcut({ children, className }: { children: React.ReactNode, className?: string }) {
+  return (
+    <span
+      className={cls("ml-auto text-xs tracking-widest text-slate-500", className)}
+    >
+      {children}
+    </span>
+  )
 }

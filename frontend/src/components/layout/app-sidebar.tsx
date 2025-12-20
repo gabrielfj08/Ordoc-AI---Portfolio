@@ -27,6 +27,9 @@ import {
   Settings,
   ChevronRight,
   LogOut,
+  Command,
+  ChevronsUpDown,
+  Plus
 } from 'lucide-react'
 
 import {
@@ -57,85 +60,106 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
-// Navigation structure with intuitive names (no "Ordoc" prefix)
-const navItems = [
+// Teams Data (Simulating functionality)
+const teams = [
   {
-    title: 'Dashboard',
-    url: '/dashboard',
-    icon: LayoutDashboard,
+    name: 'Ordoc Inc.',
+    logo: Command,
+    plan: 'Enterprise',
   },
   {
-    title: 'Controle de Acesso',
-    icon: Shield,
+    name: 'Development',
+    logo: Command,
+    plan: 'Free',
+  },
+]
+
+// Navigation Groups based on Dashboard-01 Structure
+const navMain = [
+  {
+    title: 'Platform',
     items: [
-      { title: 'Usuários', url: '/dashboard/ordoc-cloud/users', icon: Users },
-      { title: 'Grupos', url: '/dashboard/ordoc-cloud/groups', icon: UserCircle },
-      { title: 'Permissões', url: '/dashboard/ordoc-cloud/permissions', icon: Shield },
-      { title: 'Perfis', url: '/dashboard/ordoc-cloud/profiles', icon: Users },
-      { title: 'Auditoria', url: '/dashboard/ordoc-cloud/audit', icon: FileText },
-    ],
+      {
+        title: 'Dashboard',
+        url: '/dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        title: 'OrdocAir',
+        url: '/dashboard/ordoc-air',
+        icon: FileText,
+        isActive: true,
+        items: [
+          { title: 'Documentos', url: '/dashboard/ordoc-air/documents' },
+          { title: 'Categorias', url: '/dashboard/ordoc-air/categories' },
+          { title: 'Templates', url: '/dashboard/ordoc-air/templates' },
+          { title: 'Arquivos', url: '/dashboard/ordoc-air/files' },
+        ]
+      },
+      {
+        title: 'OrdocFlow',
+        url: '/dashboard/ordoc-flow',
+        icon: Workflow,
+        items: [
+          { title: 'Procedimentos', url: '/dashboard/ordoc-flow/procedures' },
+          { title: 'Tarefas', url: '/dashboard/ordoc-flow/tasks' },
+        ]
+      },
+      {
+        title: 'OrdocSign',
+        url: '/dashboard/ordoc-sign',
+        icon: FileSignature,
+        items: [
+          { title: 'Pendentes', url: '/dashboard/ordoc-sign/pending' },
+          { title: 'Assinados', url: '/dashboard/ordoc-sign/signed' },
+          { title: 'Histórico', url: '/dashboard/ordoc-sign/history' },
+        ]
+      },
+      {
+        title: 'OrdocReports',
+        url: '/dashboard/ordoc-reports',
+        icon: BarChart3,
+        items: [
+          { title: 'Visão Geral', url: '/dashboard/ordoc-reports/overview' },
+          { title: 'Métricas', url: '/dashboard/ordoc-reports/metrics' },
+          { title: 'Exportações', url: '/dashboard/ordoc-reports/exports' },
+        ]
+      },
+    ]
   },
   {
-    title: 'Gestão Documental',
-    icon: FileText,
+    title: 'Admin',
     items: [
-      { title: 'Documentos', url: '/dashboard/ordoc-air/documents', icon: FileStack },
-      { title: 'Categorias', url: '/dashboard/ordoc-air/categories', icon: Folder },
-      { title: 'Templates', url: '/dashboard/ordoc-air/templates', icon: FileText },
-      { title: 'Arquivos', url: '/dashboard/ordoc-air/files', icon: FileStack },
-      { title: 'Busca Avançada', url: '/dashboard/ordoc-air/search', icon: Search },
-    ],
-  },
-  {
-    title: 'Fluxo de Trabalho',
-    icon: Workflow,
-    items: [
-      { title: 'Procedimentos', url: '/dashboard/ordoc-flow/procedures', icon: ClipboardList },
-      { title: 'Tarefas', url: '/dashboard/ordoc-flow/tasks', icon: CheckSquare },
-      { title: 'Templates de Processo', url: '/dashboard/ordoc-flow/procedure-templates', icon: FileText },
-      { title: 'Solicitantes', url: '/dashboard/ordoc-flow/requesters', icon: Users },
-      { title: 'Grupos', url: '/dashboard/ordoc-flow/groups', icon: UserCircle },
-      { title: 'Assuntos', url: '/dashboard/ordoc-flow/subjects', icon: MessageSquare },
-    ],
-  },
-  {
-    title: 'Portal Público',
-    icon: Building2,
-    items: [
-      { title: 'Solicitações Públicas', url: '/dashboard/ordoc-cidadao/requests', icon: ClipboardList },
-      { title: 'Acompanhamento', url: '/dashboard/ordoc-cidadao/tracking', icon: Search },
-      { title: 'Consultas', url: '/dashboard/ordoc-cidadao/queries', icon: MessageSquare },
-    ],
-  },
-  {
-    title: 'Assinatura Digital',
-    icon: FileSignature,
-    items: [
-      { title: 'Documentos para Assinar', url: '/dashboard/ordoc-sign/pending', icon: FileClock },
-      { title: 'Assinados', url: '/dashboard/ordoc-sign/signed', icon: FileCheck },
-      { title: 'Histórico', url: '/dashboard/ordoc-sign/history', icon: History },
-    ],
-  },
-  {
-    title: 'Relatórios e Analytics',
-    icon: BarChart3,
-    items: [
-      { title: 'Dashboard', url: '/dashboard/ordoc-reports', icon: LayoutDashboard },
-      { title: 'Métricas', url: '/dashboard/ordoc-reports/metrics', icon: TrendingUp },
-      { title: 'Exportações', url: '/dashboard/ordoc-reports/exports', icon: Download },
-    ],
-  },
+      {
+        title: 'Controle de Acesso',
+        url: '#',
+        icon: Shield,
+        items: [
+          { title: 'Usuários', url: '/dashboard/ordoc-cloud/users' },
+          { title: 'Grupos', url: '/dashboard/ordoc-cloud/groups' },
+          { title: 'Permissões', url: '/dashboard/ordoc-cloud/permissions' },
+        ]
+      },
+      {
+        title: 'Auditoria',
+        url: '/dashboard/ordoc-cloud/audit',
+        icon: FileText
+      }
+    ]
+  }
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
   const { isMobile } = useSidebar()
+  const [activeTeam, setActiveTeam] = React.useState(teams[0])
 
-  // User data (will be fetched from API in the future)
+  // User data
   const user = {
     name: 'Usuário Admin',
     email: 'admin@ordoc.ai',
@@ -152,39 +176,81 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" scroll={false}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Building2 className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">OrdocAI</span>
-                  <span className="text-xs text-muted-foreground">
-                    Gestão Inteligente
-                  </span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-indigo-600 text-sidebar-primary-foreground">
+                    <activeTeam.logo className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">
+                      {activeTeam.name}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {activeTeam.plan}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                align="start"
+                side={isMobile ? 'bottom' : 'right'}
+                sideOffset={4}
+              >
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Teams
+                </DropdownMenuLabel>
+                {teams.map((team, index) => (
+                  <DropdownMenuItem
+                    key={team.name}
+                    onClick={() => setActiveTeam(team)}
+                    className="gap-2 p-2"
+                  >
+                    <div className="flex size-6 items-center justify-center rounded-sm border">
+                      <team.logo className="size-4 shrink-0" />
+                    </div>
+                    {team.name}
+                    <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="gap-2 p-2">
+                  <div className="flex size-6 items-center justify-center rounded-md border bg-background">
+                    <Plus className="size-4" />
+                  </div>
+                  <div className="font-medium text-muted-foreground">Add team</div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
+        {navMain.map((group) => (
+          <SidebarGroup key={group.title}>
+            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {group.items.map((item) => {
+                // Check if active (if subitem is active, parent is active)
+                const isActive = pathname === item.url || (item.items && item.items.some(sub => pathname === sub.url));
+
+                // If no subitems, simple link
                 if (!item.items) {
-                  const isActive = pathname === item.url
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={isActive}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
                         <Link href={item.url!} scroll={false}>
-                          <item.icon />
+                          {item.icon && <item.icon />}
                           <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -192,33 +258,30 @@ export function AppSidebar() {
                   )
                 }
 
-                const isGroupActive = item.items.some(
-                  (subItem) => pathname === subItem.url
-                )
-
+                // Collapsible with subitems
                 return (
                   <Collapsible
                     key={item.title}
-                    defaultOpen={isGroupActive}
+                    asChild
+                    defaultOpen={isActive}
                     className="group/collapsible"
                   >
                     <SidebarMenuItem>
                       <CollapsibleTrigger asChild>
-                        <SidebarMenuButton>
-                          <item.icon />
+                        <SidebarMenuButton tooltip={item.title}>
+                          {item.icon && <item.icon />}
                           <span>{item.title}</span>
-                          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                          <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <SidebarMenuSub>
                           {item.items.map((subItem) => {
-                            const isActive = pathname === subItem.url
+                            const isSubActive = pathname === subItem.url;
                             return (
                               <SidebarMenuSubItem key={subItem.title}>
-                                <SidebarMenuSubButton asChild isActive={isActive}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive}>
                                   <Link href={subItem.url} scroll={false}>
-                                    <subItem.icon className="size-4" />
                                     <span>{subItem.title}</span>
                                   </Link>
                                 </SidebarMenuSubButton>
@@ -232,8 +295,8 @@ export function AppSidebar() {
                 )
               })}
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>
@@ -241,7 +304,10 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src={user.avatar} alt={user.name} />
                     <AvatarFallback className="rounded-lg">
@@ -254,6 +320,7 @@ export function AppSidebar() {
                       {user.email}
                     </span>
                   </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -281,11 +348,11 @@ export function AppSidebar() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <UserCircle className="mr-2 h-4 w-4" />
-                  Meu Perfil
+                  <span>Meu Perfil</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <Settings className="mr-2 h-4 w-4" />
-                  Configurações
+                  <span>Configurações</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-destructive focus:text-destructive">
@@ -297,7 +364,6 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
       <SidebarRail />
     </Sidebar>
   )
