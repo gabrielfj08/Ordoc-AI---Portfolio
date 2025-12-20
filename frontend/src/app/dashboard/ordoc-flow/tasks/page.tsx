@@ -6,19 +6,44 @@ import {
   Plus,
   Search,
   Filter,
-  CheckSquare,
   MoreVertical,
   Edit,
   Trash2,
   Eye,
+  CheckSquare,
   Clock,
   User,
   AlertCircle
 } from 'lucide-react';
-import EmptyState from '@/components/ui/EmptyState';
 import { tasksService } from '@/services/ordoc-flow/tasks';
 import { Task, FilterTasksParams } from '@/types/ordoc-flow';
-import ErrorState from '@/components/ui/ErrorState';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const TasksPage = () => {
   const router = useRouter();
@@ -27,7 +52,8 @@ const TasksPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [totalObjects, setTotalObjects] = useState(0);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [params, setParams] = useState<FilterTasksParams>({
     direction: 'asc',
     order: 'name',
@@ -35,14 +61,15 @@ const TasksPage = () => {
     perPage: 20,
     q: '',
     status: '',
-    procedure_id: undefined,
-    assignee_id: undefined,
     priority: '',
   });
 
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showActions, setShowActions] = useState<number | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setParams(prev => ({ ...prev, q: searchTerm, page: 1 }));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadTasks();
@@ -64,30 +91,6 @@ const TasksPage = () => {
     }
   };
 
-  const handleSearch = (value: string) => {
-    setParams(prev => ({ ...prev, q: value, page: 1 }));
-  };
-
-  const handleStatusFilter = (status: string) => {
-    setParams(prev => ({ ...prev, status: status as 'pending' | 'in_progress' | 'completed' | 'cancelled' | '', page: 1 }));
-  };
-
-  const handlePriorityFilter = (priority: string) => {
-    setParams(prev => ({ ...prev, priority: priority as 'low' | 'medium' | 'high' | 'urgent' | '', page: 1 }));
-  };
-
-  const handleSort = (field: string) => {
-    setParams(prev => ({
-      ...prev,
-      order: field,
-      direction: prev.order === field && prev.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  };
-
-  const handlePageChange = (page: number) => {
-    setParams(prev => ({ ...prev, page }));
-  };
-
   const handleToggleStatus = async (task: Task) => {
     try {
       await tasksService.toggleTaskStatus(task.id);
@@ -97,309 +100,178 @@ const TasksPage = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', text: 'Pendente' },
-      in_progress: { color: 'bg-blue-100 text-blue-800', text: 'Em Andamento' },
-      completed: { color: 'bg-green-100 text-green-800', text: 'Concluída' },
-      cancelled: { color: 'bg-red-100 text-red-800', text: 'Cancelada' },
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-    
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.text}
-      </span>
-    );
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'pending': return 'secondary';
+      case 'in_progress': return 'default'; // Blue usually
+      case 'completed': return 'default'; // Green
+      case 'cancelled': return 'destructive';
+      default: return 'outline';
+    }
   };
 
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      low: { color: 'bg-gray-100 text-gray-800', text: 'Baixa' },
-      medium: { color: 'bg-blue-100 text-blue-800', text: 'Média' },
-      high: { color: 'bg-orange-100 text-orange-800', text: 'Alta' },
-      urgent: { color: 'bg-red-100 text-red-800', text: 'Urgente' },
-    };
+  const getStatusColorClass = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
+      case 'in_progress': return 'bg-blue-600 hover:bg-blue-700';
+      case 'completed': return 'bg-green-600 hover:bg-green-700';
+      case 'cancelled': return '';
+      default: return '';
+    }
+  };
 
-    const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.medium;
-    
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        {config.text}
-      </span>
-    );
+  const getPriorityColorClass = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'bg-slate-100 text-slate-800 hover:bg-slate-200';
+      case 'medium': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
+      case 'high': return 'bg-orange-100 text-orange-800 hover:bg-orange-200';
+      case 'urgent': return 'bg-red-100 text-red-800 hover:bg-red-200';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+    <ProtectedRoute>
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between space-y-2">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tarefas</h1>
-            <p className="text-gray-600">Gerencie tarefas do sistema</p>
+            <h2 className="text-3xl font-bold tracking-tight">Tarefas</h2>
+            <p className="text-muted-foreground">
+              Acompanhe e execute suas tarefas pendentes.
+            </p>
           </div>
-          <button
-            onClick={() => router.push('/dashboard/ordoc-flow/tasks/new')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Tarefa
-          </button>
+          <div className="flex items-center space-x-2">
+            <Button onClick={() => router.push('/dashboard/ordoc-flow/tasks/new')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Tarefa
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 mb-4">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
+        <div className="flex items-center space-x-2 py-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
               placeholder="Buscar tarefas..."
-              value={params.q}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
             />
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-          >
-            <Filter className="w-4 h-4" />
-            Filtros
-          </button>
         </div>
 
-        {showFilters && (
-          <div className="bg-gray-50 p-4 rounded-lg mb-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={params.status}
-                  onChange={(e) => handleStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Todos</option>
-                  <option value="pending">Pendente</option>
-                  <option value="in_progress">Em Andamento</option>
-                  <option value="completed">Concluída</option>
-                  <option value="cancelled">Cancelada</option>
-                </select>
+        <Card>
+          <CardHeader>
+            <CardTitle>Minhas Tarefas</CardTitle>
+            <CardDescription>
+              Lista de atividades atribuídas ou supervisionadas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center p-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
-                <select
-                  value={params.priority}
-                  onChange={(e) => handlePriorityFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Todas</option>
-                  <option value="low">Baixa</option>
-                  <option value="medium">Média</option>
-                  <option value="high">Alta</option>
-                  <option value="urgent">Urgente</option>
-                </select>
+            ) : tasks.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                Nenhuma tarefa encontrada.
               </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-lg shadow">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600">Carregando tarefas...</p>
-          </div>
-        ) : error ? (
-          <ErrorState message="Erro ao conectar com o servidor" />
-        ) : tasks.length === 0 ? (
-          <EmptyState
-            icon={CheckSquare}
-            title="Nenhuma tarefa configurada"
-            description="Configure tarefas para automatizar seus workflows"
-            actionButton={{ text: 'Criar Tarefa', onClick: () => router.push('/dashboard/ordoc-flow/tasks/new') }}
-          />
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('name')}
-                    >
-                      Nome
-                      {params.order === 'name' && (
-                        <span className="ml-1">
-                          {params.direction === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Procedimento
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('status')}
-                    >
-                      Status
-                      {params.order === 'status' && (
-                        <span className="ml-1">
-                          {params.direction === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('priority')}
-                    >
-                      Prioridade
-                      {params.order === 'priority' && (
-                        <span className="ml-1">
-                          {params.direction === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Responsável
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('due_date')}
-                    >
-                      Prazo
-                      {params.order === 'due_date' && (
-                        <span className="ml-1">
-                          {params.direction === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tarefa</TableHead>
+                    <TableHead>Procedimento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Prioridade</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Prazo</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {tasks.map((task) => (
-                    <tr key={task.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{task.name}</div>
-                        <div className="text-sm text-gray-500">{task.description}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{task.procedure?.name || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(task.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getPriorityBadge(task.priority)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">{task.assignee?.name || 'Não atribuído'}</span>
+                    <TableRow key={task.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span>{task.name}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">
-                            {task.due_date ? new Date(task.due_date).toLocaleDateString('pt-BR') : '-'}
-                          </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">{task.procedure?.name || '-'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={'secondary'} // Using custom colors
+                          className={getStatusColorClass(task.status)}
+                        >
+                          {task.status === 'pending' ? 'Pendente' :
+                            task.status === 'in_progress' ? 'Em Andamento' :
+                              task.status === 'completed' ? 'Concluída' : 'Cancelada'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={'secondary'}
+                          className={getPriorityColorClass(task.priority)}
+                        >
+                          {task.priority === 'low' ? 'Baixa' :
+                            task.priority === 'medium' ? 'Média' :
+                              task.priority === 'high' ? 'Alta' : 'Urgente'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <User className="mr-1 h-3 w-3" />
+                          {task.assignee?.name || 'Não atribuído'}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="relative">
-                          <button
-                            onClick={() => setShowActions(showActions === task.id ? null : task.id)}
-                            className="text-gray-400 hover:text-gray-600 p-1"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                          {showActions === task.id && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                              <button
-                                onClick={() => {
-                                  router.push(`/dashboard/ordoc-flow/tasks/${task.id}`);
-                                  setShowActions(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                              >
-                                <Eye className="w-4 h-4" />
-                                Visualizar
-                              </button>
-                              <button
-                                onClick={() => {
-                                  router.push(`/dashboard/ordoc-flow/tasks/${task.id}/edit`);
-                                  setShowActions(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                              >
-                                <Edit className="w-4 h-4" />
-                                Editar
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleToggleStatus(task);
-                                  setShowActions(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                              >
-                                <CheckSquare className="w-4 h-4" />
-                                Alterar Status
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedTask(task);
-                                  setShowActions(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Excluir
-                              </button>
-                            </div>
-                          )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Clock className="mr-1 h-3 w-3" />
+                          {task.due_date ? new Date(task.due_date).toLocaleDateString('pt-BR') : '-'}
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Abrir menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/ordoc-flow/tasks/${task.id}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Visualizar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/dashboard/ordoc-flow/tasks/${task.id}/edit`)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleToggleStatus(task)}>
+                              <CheckSquare className="mr-2 h-4 w-4" />
+                              Alterar Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Mostrando {((params.page - 1) * params.perPage) + 1} a {Math.min(params.page * params.perPage, totalObjects)} de {totalObjects} tarefas
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handlePageChange(params.page - 1)}
-                    disabled={params.page === 1}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    Anterior
-                  </button>
-                  <span className="text-sm text-gray-700">
-                    Página {params.page} de {totalPages}
-                  </span>
-                  <button
-                    onClick={() => handlePageChange(params.page + 1)}
-                    disabled={params.page === totalPages}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                  >
-                    Próxima
-                  </button>
-                </div>
-              </div>
+                </TableBody>
+              </Table>
             )}
-          </>
-        )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 

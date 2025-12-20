@@ -2,276 +2,221 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, X } from 'lucide-react';
+import { ArrowLeft, Save, Activity, Settings } from 'lucide-react';
 import { proceduresService } from '@/services/ordoc-flow/procedures';
-import { Procedure, FormErrors } from '@/types/ordoc-flow';
+import { FormErrors } from '@/types/ordoc-flow';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription
+} from "@/components/ui/card"
 
 const NewProcedurePage = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
-  
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    status: 'draft' as 'draft' | 'active' | 'completed' | 'cancelled',
+    status: 'draft',
     procedure_template_id: '',
     requester_id: '',
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Nome é obrigatório';
-    } else if (formData.name.length < 2) {
-      newErrors.name = 'Nome deve ter pelo menos 2 caracteres';
-    } else if (formData.name.length > 100) {
-      newErrors.name = 'Nome deve ter no máximo 100 caracteres';
-    }
-
-    if (formData.description && formData.description.length > 500) {
-      newErrors.description = 'Descrição deve ter no máximo 500 caracteres';
-    }
-
-    if (!formData.procedure_template_id) {
-      newErrors.procedure_template_id = 'Template de procedimento é obrigatório';
-    }
-
-    if (!formData.requester_id) {
-      newErrors.requester_id = 'Requerente é obrigatório';
-    }
-
+    if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório';
+    if (!formData.procedure_template_id) newErrors.procedure_template_id = 'Template é obrigatório';
+    if (!formData.requester_id) newErrors.requester_id = 'Requerente é obrigatório';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
     setLoading(true);
-    
+
     try {
       const submitData = {
         name: formData.name,
         description: formData.description,
-        status: formData.status,
+        status: formData.status as any,
         procedure_template_id: parseInt(formData.procedure_template_id),
         requester_id: parseInt(formData.requester_id),
       };
 
       const response = await proceduresService.createProcedure(submitData);
-      
+
       if (response.success) {
         router.push('/dashboard/ordoc-flow/procedures');
       } else {
         setErrors(response.errors || {});
       }
     } catch (error) {
-      console.error('Erro ao criar procedimento:', error);
-      setErrors({ general: 'Erro interno do servidor. Tente novamente.' });
+      console.error('Erro ao criar:', error);
+      setErrors({ general: 'Erro interno do servidor.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
-    router.push('/dashboard/ordoc-flow/procedures');
-  };
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={handleCancel}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Novo Procedimento</h1>
-            <p className="text-gray-600">Crie um novo procedimento</p>
+    <ProtectedRoute>
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        {/* Header with Actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button variant="outline" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Novo Procedimento</h2>
+              <p className="text-muted-foreground">Preencha os dados para iniciar um workflow.</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" onClick={() => router.back()}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={loading}>
+              <Save className="mr-2 h-4 w-4" />
+              {loading ? 'Salvando...' : 'Salvar Procedimento'}
+            </Button>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-2xl">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {errors.general && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-800 text-sm">{errors.general}</p>
-            </div>
-          )}
+        {/* Split Layout */}
+        <div className="grid gap-6 md:grid-cols-3">
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Informações Básicas
-            </h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome *
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.name ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="Digite o nome do procedimento"
-                  maxLength={100}
-                />
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+          {/* Main Content - Left Column (2/3) */}
+          <div className="md:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-gray-500" />
+                  Informações Principais
+                </CardTitle>
+                <CardDescription>Dados essenciais para identificação do procedimento.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {errors.general && (
+                  <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded">
+                    {errors.general}
+                  </div>
                 )}
-                <p className="mt-1 text-sm text-gray-500">
-                  {formData.name.length}/100 caracteres
-                </p>
-              </div>
 
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.description ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="Digite uma descrição para o procedimento (opcional)"
-                  maxLength={500}
-                />
-                {errors.description && (
-                  <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-                )}
-                <p className="mt-1 text-sm text-gray-500">
-                  {formData.description.length}/500 caracteres
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome do Procedimento *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Ex: Contratação de Fornecedor X"
+                    className="text-lg font-medium"
+                  />
+                  {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="procedure_template_id" className="block text-sm font-medium text-gray-700 mb-1">
-                    Template de Procedimento *
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição Detalhada</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    placeholder="Descreva o objetivo e os passos deste procedimento..."
+                    className="min-h-[150px] resize-none"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar - Right Column (1/3) */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-gray-500" />
+                  Configurações
+                </CardTitle>
+                <CardDescription>Parâmetros técnicos e vinculações.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="procedure_template_id">Template Base (ID) *</Label>
+                  <Input
                     type="number"
                     id="procedure_template_id"
                     name="procedure_template_id"
                     value={formData.procedure_template_id}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.procedure_template_id ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="ID do template"
+                    placeholder="123"
                   />
-                  {errors.procedure_template_id && (
-                    <p className="mt-1 text-sm text-red-600">{errors.procedure_template_id}</p>
-                  )}
-                  <p className="mt-1 text-sm text-gray-500">
-                    Template base para este procedimento
-                  </p>
+                  {errors.procedure_template_id && <p className="text-xs text-red-500">{errors.procedure_template_id}</p>}
+                  <p className="text-[0.8rem] text-muted-foreground">ID do modelo de workflow a ser seguido.</p>
                 </div>
 
-                <div>
-                  <label htmlFor="requester_id" className="block text-sm font-medium text-gray-700 mb-1">
-                    Requerente *
-                  </label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="requester_id">Requerente (ID) *</Label>
+                  <Input
                     type="number"
                     id="requester_id"
                     name="requester_id"
                     value={formData.requester_id}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.requester_id ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    placeholder="ID do requerente"
+                    placeholder="456"
                   />
-                  {errors.requester_id && (
-                    <p className="mt-1 text-sm text-red-600">{errors.requester_id}</p>
-                  )}
-                  <p className="mt-1 text-sm text-gray-500">
-                    Pessoa responsável pela solicitação
-                  </p>
+                  {errors.requester_id && <p className="text-xs text-red-500">{errors.requester_id}</p>}
+                  <p className="text-[0.8rem] text-muted-foreground">ID do usuário solicitante.</p>
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="draft">Rascunho</option>
-                  <option value="active">Ativo</option>
-                  <option value="completed">Concluído</option>
-                  <option value="cancelled">Cancelado</option>
-                </select>
-                <p className="mt-1 text-sm text-gray-500">
-                  Status atual do procedimento
-                </p>
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status Inicial</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(val) => handleSelectChange('status', val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Rascunho</SelectItem>
+                      <SelectItem value="active">Ativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              <X className="w-4 h-4" />
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Salvar Procedimento
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 
