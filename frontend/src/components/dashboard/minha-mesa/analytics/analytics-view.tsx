@@ -5,14 +5,15 @@ import {
     LayoutDashboard,
     FileBarChart,
     ShieldAlert,
-    Settings
+    Brain
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AnalyticsCharts } from './analytics-charts';
 import { ReportsManager } from './reports-manager';
 import { GlobalAudit } from './global-audit';
+import { IntelligenceDashboard } from './intelligence-dashboard';
 
-type View = 'dashboard' | 'reports' | 'audit';
+type View = 'dashboard' | 'reports' | 'audit' | 'intelligence';
 
 export const AnalyticsView = () => {
     const [view, setView] = useState<View>('dashboard');
@@ -32,6 +33,13 @@ export const AnalyticsView = () => {
                         >
                             <LayoutDashboard className={`w-5 h-5 ${view === 'dashboard' ? 'text-orange-600' : 'text-muted-foreground'}`} />
                             <span className="text-sm">Visão Geral</span>
+                        </button>
+                        <button
+                            onClick={() => setView('intelligence')}
+                            className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-colors ${view === 'intelligence' ? 'bg-orange-50 text-orange-700 font-medium' : 'hover:bg-secondary/80 text-foreground'}`}
+                        >
+                            <Brain className={`w-5 h-5 ${view === 'intelligence' ? 'text-orange-600' : 'text-muted-foreground'}`} />
+                            <span className="text-sm">Intelligence</span>
                         </button>
                         <button
                             onClick={() => setView('reports')}
@@ -61,6 +69,10 @@ export const AnalyticsView = () => {
                         </div>
                         <AnalyticsCharts />
                     </div>
+                )}
+
+                {view === 'intelligence' && (
+                    <IntelligenceDashboard />
                 )}
 
                 {view === 'reports' && (

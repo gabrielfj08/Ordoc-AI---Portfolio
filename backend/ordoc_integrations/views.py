@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.db.models import Q, Count, Avg, Sum
 from datetime import timedelta
 
-from .models import IntegrationService, IntegrationRequest, IntegrationCache
+from .models import IntegrationService, IntegrationRequest, IntegrationCache, GovBrProfile
 from .serializers import (
     IntegrationServiceSerializer,
     IntegrationServiceListSerializer,
@@ -28,6 +28,11 @@ from .serializers import (
     CreditCheckSerializer,
 )
 from .services.base import IntegrationException
+from .services.govbr import GovBrService
+from django.contrib.auth import login
+from django.shortcuts import redirect
+from django.conf import settings
+import secrets
 
 
 class IntegrationServiceViewSet(viewsets.ModelViewSet):
@@ -389,12 +394,42 @@ class IntegrationExecuteViewSet(viewsets.ViewSet):
         """
         serializer = CNPJValidationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        cnpj = serializer.validated_data['cnpj']
+        
+        try:
+            from .services.receita_federal import ReceitaFederalService
+            
+            # Pass user context for logging and request tracking
+            organization_id = getattr(request.current_organization, 'id', None) if hasattr(request, 'current_organization') else None
+            # Fallback to user's organization if current_organization not present in request (e.g. usage outside middleware scope)
+            if not organization_id and hasattr(request.user, 'organization_id'):
+                 organization_id = request.user.organization_id
 
-        # TODO: Implementar validação real
-        return Response({
-            'message': 'Validação de CNPJ ainda não implementada',
-            'cnpj': serializer.validated_data['cnpj'],
-        }, status=status.HTTP_501_NOT_IMPLEMENTED)
+            service = ReceitaFederalService(
+                organization_id=organization_id,
+                user_id=request.user.id
+            )
+            data = service.get_company_data(cnpj)
+            
+            if not data:
+                return Response(
+                    {'error': 'CNPJ not found or service unavailable'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+                
+            return Response(data)
+            
+        except IntegrationException as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': f"Internal error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['post'], url_path='check-credit')
     def check_credit(self, request):
@@ -412,7 +447,159 @@ class IntegrationExecuteViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
 
         # TODO: Implementar consulta real
-        return Response({
-            'message': 'Consulta de crédito ainda não implementada',
-            'cpf': serializer.validated_data['cpf'],
-        }, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+class GovBrAuthViewSet(viewsets.ViewSet):
+    """
+    ViewSet para autenticação Gov.br (OAuth 2.0)
+    """
+    permission_classes = [] # Público para permitir login
+
+    @action(detail=False, methods=['get'])
+    def login(self, request):
+        """
+        Inicia fluxo de login Gov.br
+        
+        Gera URL de autorização e redireciona usuário (ou retorna URL)
+        """
+        # Gerar state e nonce aleatórios
+        state = secrets.token_urlsafe(16)
+        nonce = secrets.token_urlsafe(16)
+        
+        # Armazenar na sessão para validação posterior
+        request.session['govbr_state'] = state
+        request.session['govbr_nonce'] = nonce
+        
+        try:
+            service = GovBrService()
+            auth_url = service.get_authorization_url(state, nonce)
+            
+            return Response({'auth_url': auth_url})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'])
+    def callback(self, request):
+        """
+        Callback do Login Gov.br
+        
+        Recebe code, valida state, troca por token, obtém perfil e loga usuário.
+        """
+        code = request.query_params.get('code')
+        state = request.query_params.get('state')
+        error = request.query_params.get('error')
+        
+        if error:
+            return Response({'error': f"Erro no login Gov.br: {error}"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not code or not state:
+            return Response({'error': 'Parâmetros obrigatórios (code, state) ausentes'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Validar State (CSRF Protection)
+        stored_state = request.session.get('govbr_state')
+        if not stored_state or state != stored_state:
+             return Response({'error': 'Estado inválido (Possível ataque CSRF)'}, status=status.HTTP_400_BAD_REQUEST)
+             
+        try:
+            service = GovBrService()
+            
+            # 1. Trocar Code por Tokens
+            token_data = service.exchange_code_for_token(code)
+            access_token = token_data.get('access_token')
+            
+            if not access_token:
+                raise IntegrationException("Access Token não retornado pelo Gov.br")
+            
+            # 2. Obter dados do usuário
+            user_info = service.get_user_info(access_token)
+            
+            # Extrair dados principais
+            sub = user_info.get('sub') # Identificador único Gov.br
+            cpf = user_info.get('cpf')
+            name = user_info.get('name')
+            email = user_info.get('email')
+            email_verified = user_info.get('email_verified', False)
+            photo_url = user_info.get('picture')
+            
+            if not sub:
+                 raise IntegrationException("Dados do usuário incompletos (sub ausente)")
+
+            # 3. Lógica de Vinculação/Criação de Usuário
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = None
+            
+            # A) Tentar encontrar perfil Gov.br existente
+            try:
+                profile = GovBrProfile.objects.get(sub=sub)
+                user = profile.user
+            except GovBrProfile.DoesNotExist:
+                pass
+                
+            # B) Se não tem perfil, tentar encontrar usuário por CPF (se existir campo cpf no User)
+            if not user and cpf and hasattr(User, 'cpf'):
+                 # Limpar CPF para busca se necessário
+                 try:
+                     user = User.objects.get(cpf=cpf)
+                 except User.DoesNotExist:
+                     pass
+
+            # C) Tentar encontrar por Email (apenas se verificado)
+            if not user and email and email_verified:
+                try:
+                    user = User.objects.get(email=email)
+                except User.DoesNotExist:
+                    pass
+            
+            # D) Se ainda não achou, criar novo usuário
+            if not user:
+                # Username: usar CPF (ideal) ou email ou sub
+                username = cpf if cpf else (email if email else sub)
+                
+                # Garantir username único
+                counter = 0
+                original_username = username
+                while User.objects.filter(username=username).exists():
+                    counter += 1
+                    username = f"{original_username}_{counter}"
+                
+                user = User.objects.create_user(
+                    username=username,
+                    email=email or '',
+                    first_name=name.split()[0] if name else '',
+                    last_name=' '.join(name.split()[1:]) if name else ''
+                )
+                
+                # Definir CPF no user se o campo existir
+                if cpf and hasattr(user, 'cpf'):
+                    user.cpf = cpf
+                    user.save()
+
+            # 4. Atualizar/Criar Perfil Gov.br
+            GovBrProfile.objects.update_or_create(
+                user=user,
+                defaults={
+                    'sub': sub,
+                    'name': name or user.get_full_name(),
+                    'email': email,
+                    'email_verified': email_verified,
+                    'cpf': cpf or '',
+                    'picture': photo_url,
+                    'access_token': access_token,
+                    'id_token': token_data.get('id_token'),
+                    'refresh_token': token_data.get('refresh_token'),
+                    # 'token_expires_at': calcular...
+                }
+            )
+            
+            # 5. Logar usuário na sessão Django
+            login(request, user)
+            
+            # 6. Redirecionar para Dashboard no Frontend
+            # Ler URL do frontend das settings ou usar default
+            frontend_url = getattr(settings, 'CORS_ALLOWED_ORIGINS', ['http://localhost:3000'])[0]
+            if isinstance(frontend_url, list): frontend_url = frontend_url[0] # Em caso de lista na tuple
+            
+            return redirect(f"{frontend_url}/dashboard?login_success=true")
+            
+        except Exception as e:
+             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

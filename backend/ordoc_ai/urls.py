@@ -58,6 +58,7 @@ urlpatterns = [
         path('ordoc-sign/', include('ordoc_sign.urls')),
         path('ordoc-reports/', include('ordoc_reports.urls')),
         path('integrations/', include('ordoc_integrations.urls')),  # Integrações externas
+        path('intelligence/', include('intelligence.api.urls')),    # IA com aprendizado
     ])),
     
     # External APIs for OrdocCidadao

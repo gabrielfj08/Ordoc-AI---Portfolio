@@ -50,16 +50,12 @@ class OrdocUser(models.Model):
     # Profile fields
     phone = models.CharField(
         max_length=20,
-        validators=[RegexValidator(
-            regex=r'^(\(\d{2}\)\s?\d{4,5}-\d{4}|\d{2}\s?\d{4,5}-\d{4}|\+55\s?\d{2}\s?\d{4,5}-?\d{4})$',
-            message="Formato de telefone inválido. Use: (11) 99999-9999 ou 11 99999-9999"
-        )],
         blank=True,
-        null=True
+        null=True,
+        verbose_name="Telefone"
     )
     cpf = models.CharField(
         max_length=14,
-        validators=[RegexValidator(regex=r'^\d{3}\.\d{3}\.\d{3}-\d{2}$', message="CPF deve estar no formato XXX.XXX.XXX-XX")],
         blank=True,
         null=True,
         verbose_name="CPF"

@@ -124,6 +124,10 @@ class JWTAuthentication(BaseAuthentication):
         """
         subdomain = request.META.get('HTTP_X_API_SUBDOMAIN')
         if not subdomain:
+            # Fallback to older header name
+            subdomain = request.META.get('HTTP_X_SUBDOMAIN')
+            
+        if not subdomain:
             return None
         
         try:
@@ -151,6 +155,9 @@ class OrganizationMiddleware:
     def __call__(self, request):
         # Get organization from subdomain header
         subdomain = request.META.get('HTTP_X_API_SUBDOMAIN')
+        if not subdomain:
+            subdomain = request.META.get('HTTP_X_SUBDOMAIN')
+            
         if subdomain:
             try:
                 organization = Organization.objects.get(

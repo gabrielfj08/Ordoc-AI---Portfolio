@@ -24,19 +24,19 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen bg-transparent">
 
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <main className="flex-1 w-full px-4 py-6 space-y-6">
 
           {activeTab === 'home' && (
             <>
               {/* Seção Superior: Resumos */}
               <DaySummaryWidget />
-              <ImpactWidget />
 
               {/* Grid Principal */}
               <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
                 {/* Coluna Principal: Tarefas e Workflows */}
-                <div className="xl:col-span-2 flex flex-col gap-6">
+                <div className="xl:col-span-2 flex flex-col gap-6 h-full">
+                  <ImpactWidget />
                   <PriorityList />
 
                   {/* Monitor de Workflows */}
@@ -81,8 +81,11 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
             <AnalyticsView />
           )}
 
-          {activeTab === 'settings' && (
-            <SettingsView />
+          {['settings', 'profile', 'users', 'groups', 'organizations', 'policies'].includes(activeTab) && (
+            <SettingsView
+              key={activeTab} // Força remount ao trocar entre tabs
+              initialView={(activeTab === 'settings' ? 'users' : activeTab) as any}
+            />
           )}
 
         </main>

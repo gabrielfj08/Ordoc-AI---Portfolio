@@ -459,3 +459,114 @@ class IntegrationCache(models.Model):
         """Incrementa contador de hits"""
         self.hits += 1
         self.save(update_fields=['hits', 'last_accessed_at'])
+
+class GovBrProfile(models.Model):
+    """
+    Perfil do usuário Gov.br
+    
+    Armazena dados retornados pelo Login Único
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='govbr_profile',
+        verbose_name=_('Usuário')
+    )
+    
+    sub = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name=_('Subject ID'),
+        help_text=_('Identificador único no Gov.br')
+    )
+    
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_('Nome Completo')
+    )
+    
+    email = models.EmailField(
+        verbose_name=_('E-mail'),
+        blank=True,
+        null=True
+    )
+    
+    email_verified = models.BooleanField(
+        default=False,
+        verbose_name=_('E-mail Verificado')
+    )
+    
+    cpf = models.CharField(
+        max_length=14,
+        verbose_name=_('CPF'),
+        db_index=True
+    )
+    
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name=_('Telefone')
+    )
+    
+    phone_number_verified = models.BooleanField(
+        default=False,
+        verbose_name=_('Telefone Verificado')
+    )
+    
+    # Níveis: bronze, prata, ouro
+    account_level = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name=_('Nível da Conta'),
+        help_text=_('bronze, prata, ouro')
+    )
+    
+    picture = models.URLField(
+        blank=True,
+        null=True,
+        verbose_name=_('Foto de Perfil')
+    )
+    
+    access_token = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name=_('Access Token')
+    )
+    
+    id_token = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name=_('ID Token')
+    )
+    
+    refresh_token = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name=_('Refresh Token')
+    )
+    
+    token_expires_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=_('Token Expira em')
+    )
+    
+    last_login = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_('Último Login Gov.br')
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('Vinculado em')
+    )
+
+    class Meta:
+        db_table = 'ordoc_govbr_profiles'
+        verbose_name = _('Perfil Gov.br')
+        verbose_name_plural = _('Perfis Gov.br')
+        
+    def __str__(self):
+        return f"Gov.br: {self.cpf} ({self.user.username})"

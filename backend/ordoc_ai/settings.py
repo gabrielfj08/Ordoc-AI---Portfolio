@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "ordoc_sign",
     "ordoc_reports",
     "ordoc_integrations",  # Sistema de integrações externas
+    "intelligence",        # Sistema de IA com aprendizado hierárquico
 ]
 
 MIDDLEWARE = [

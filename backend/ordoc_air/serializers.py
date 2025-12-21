@@ -71,7 +71,11 @@ class OrganizationSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_storage_used', 
-                           'total_documents', 'total_users']
+                           'total_documents', 'total_users', 'prn']
+        extra_kwargs = {
+            'subdomain': {'required': False},
+            'cnpj': {'max_length': 20}  # Allow mask characters
+        }
     
     def get_total_storage_used(self, obj):
         """Calculate total storage used by organization"""
@@ -97,7 +101,36 @@ class OrganizationSerializer(serializers.ModelSerializer):
             user__deleted_at__isnull=True
         ).count()
 
-
+    def create(self, validated_data):
+        """Auto-generate PRN and Subdomain if missing"""
+        # Ensure PRN is set (frontend doesn't send it)
+        if not validated_data.get('prn'):
+            validated_data['prn'] = str(uuid.uuid4())
+        
+        # Auto-generate subdomain from corporate name if missing
+        if not validated_data.get('subdomain'):
+            from django.utils.text import slugify
+            base_slug = slugify(validated_data.get('corporate_name', ''))[:50]
+            if not base_slug:
+                base_slug = "org"
+            
+            # Ensure unique subdomain
+            slug = base_slug
+            counter = 1
+            while Organization.objects.filter(subdomain=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            validated_data['subdomain'] = slug
+            
+        return super().create(validated_data)
+        
+    def validate_cnpj(self, value):
+        """Clean CNPJ format to ensure digits only"""
+        import re
+        clean_value = re.sub(r'[^0-9]', '', value)
+        if len(clean_value) != 14:
+            raise serializers.ValidationError("CNPJ deve ter 14 dígitos")
+        return clean_value
 class DepartmentSerializer(serializers.ModelSerializer):
     """
     Serializer for Department model

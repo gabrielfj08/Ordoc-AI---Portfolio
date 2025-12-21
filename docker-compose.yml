@@ -195,6 +195,27 @@ services:
       timeout: 10s
       retries: 3
 
+  # Ollama - Local LLM Server for Intelligence Council
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ordoc_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ordoc_network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   postgres_data:
     driver: local
@@ -207,6 +228,8 @@ volumes:
   static_files:
     driver: local
   celery_beat_data:
+    driver: local
+  ollama_data:
     driver: local
 
 networks:

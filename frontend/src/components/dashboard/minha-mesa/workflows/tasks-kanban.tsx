@@ -43,7 +43,7 @@ const PriorityBadge = ({ priority }: { priority: string }) => {
     const p = (priority in styles) ? priority as keyof typeof styles : 'medium';
 
     return (
-        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${styles[p]} uppercase tracking-wide`}>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded border ${styles[p]} uppercase tracking-wide`}>
             {labels[p]}
         </span>
     );
@@ -93,11 +93,11 @@ export const TasksKanban = () => {
                                 <div className="flex items-center justify-between pt-2 border-t border-border/30">
                                     <div className="flex items-center gap-1.5">
                                         <Avatar className="h-5 w-5">
-                                            <AvatarFallback className="text-[9px] bg-orange-100 text-orange-700">{task.assignee.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                            <AvatarFallback className="text-[10px] bg-orange-100 text-orange-700">{task.assignee.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                                         </Avatar>
-                                        <span className="text-[10px] text-muted-foreground">{task.assignee.name}</span>
+                                        <span className="text-xs text-muted-foreground">{task.assignee.name}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                         <Clock className="w-3 h-3" />
                                         <span>{new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
                                     </div>

@@ -231,11 +231,11 @@ def login_internal_user(email: str, password: str, organization: Organization = 
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH'])
 def me(request):
     """
-    Get current user data from JWT token
-    Used for token validation and user data retrieval
+    Get or update current user data from JWT token
+    Used for token validation and user data retrieval/update
     """
     try:
         # Get user from request (set by JWT authentication middleware)
@@ -256,6 +256,36 @@ def me(request):
                 'status': 404
             }, status=status.HTTP_404_NOT_FOUND)
         
+        # Handle Profile Update
+        if request.method == 'PATCH':
+            data = request.data
+            
+            # Update User fields
+            if 'first_name' in data:
+                user.first_name = data['first_name']
+            if 'last_name' in data:
+                user.last_name = data['last_name']
+            if 'email' in data:
+                # Optional: Add email change logic (might require verification)
+                pass 
+                
+            user.save()
+            
+            # Update OrdocUser fields
+            if 'phone' in data:
+                ordoc_user.phone = data['phone']
+            if 'cpf' in data:
+                ordoc_user.cpf = data['cpf']
+            if 'language' in data:
+                ordoc_user.language = data['language']
+            if 'timezone' in data:
+                ordoc_user.timezone = data['timezone']
+            # Add other fields as needed
+            
+            ordoc_user.save()
+            
+            logger.info(f"User profile updated for {user.email}")
+        
         # Get user's organization (if any)
         organization = ordoc_user.organization if hasattr(ordoc_user, 'organization') else None
         
@@ -263,10 +293,19 @@ def me(request):
         return Response({
             'user': {
                 'id': str(ordoc_user.id),
+                'username': user.username,
                 'name': user.get_full_name() or user.username,
                 'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
                 'user_type': 'internal',
                 'is_active': ordoc_user.is_active_user,
+                'phone': ordoc_user.phone,
+                'cpf': ordoc_user.cpf,
+                'avatar': ordoc_user.avatar.url if ordoc_user.avatar else None,
+                'language': ordoc_user.language,
+                'timezone': ordoc_user.timezone,
+                'profile_complete': ordoc_user.profile_complete,
                 'permissions': [],  # TODO: Implement permissions
             },
             'organization': {
@@ -279,7 +318,7 @@ def me(request):
     except Exception as e:
         logger.exception("Error in /api/auth/me/ endpoint")
         return Response({
-            'error': 'Failed to get user data',
+            'error': 'Failed to get/update user data',
             'status': 500
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

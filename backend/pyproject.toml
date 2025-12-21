@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Ordoc-AI Backend - Django REST API for document management and workflow platform"
 authors = ["Ricardo"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -29,6 +30,9 @@ drf-spectacular = "^0.27.2"
 requests = "^2.31.0"
 cryptography = "^45.0.5"
 pyotp = "^2.9.0"
+# Intelligence module dependencies
+gliner2 = "^1.2.0"           # Entity extraction (CPU-friendly)
+ollama = "^0.4.0"            # Local LLM client for Council
 
 
 [tool.poetry.group.dev.dependencies]

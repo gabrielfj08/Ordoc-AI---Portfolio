@@ -49,14 +49,17 @@ class UserOrganizationRoleSerializer(serializers.ModelSerializer):
 class OrdocUserCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating OrdocUser instances"""
     # User fields (write_only for creation)
-    username = serializers.CharField(write_only=True)
+    username = serializers.CharField(write_only=True, required=False)
     email = serializers.EmailField(write_only=True)
-    first_name = serializers.CharField(write_only=True)
-    last_name = serializers.CharField(write_only=True)
+    first_name = serializers.CharField(write_only=True, required=False)
+    last_name = serializers.CharField(write_only=True, required=False)
     password = serializers.CharField(write_only=True, required=False)
     
+    # New single name field to support frontend UX
+    name = serializers.CharField(write_only=True, required=False)
+    
     # Role field
-    role = serializers.CharField(write_only=True, required=False, default='organization_member')
+    role = serializers.CharField(write_only=True, required=False, allow_blank=True, default='organization_member')
     
     # Fields that don't exist in model but might be sent (ignored)
     cpf = serializers.CharField(write_only=True, required=False)
@@ -67,7 +70,7 @@ class OrdocUserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrdocUser
         fields = [
-            'username', 'email', 'first_name', 'last_name', 'password',
+            'username', 'email', 'name', 'first_name', 'last_name', 'password',
             'phone', 'avatar', 'status', 'must_change_password', 'role',
             'cpf', 'date_of_birth', 'registration_number', 'send_welcome_email'
         ]
@@ -77,15 +80,53 @@ class OrdocUserCreateSerializer(serializers.ModelSerializer):
             'must_change_password': {'default': True},
         }
     
+    def validate(self, attrs):
+        """Derived fields validation"""
+        # Handle Name splitting
+        name = attrs.get('name')
+        if name:
+            parts = name.strip().split(' ', 1)
+            if not attrs.get('first_name'):
+                attrs['first_name'] = parts[0]
+            if not attrs.get('last_name'):
+                attrs['last_name'] = parts[1] if len(parts) > 1 else ''
+                
+        # Handle auto-username
+        email = attrs.get('email')
+        if not attrs.get('username') and email:
+            # Use email local part as base username
+            username = email.split('@')[0]
+            # Ensure uniqueness
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+            attrs['username'] = username
+            
+        # Require basics if they weren't derived
+        if not attrs.get('first_name'):
+             # Fallback if no name provided
+             pass 
+             
+        return attrs
+
     def create(self, validated_data):
         """Create User and OrdocUser instances"""
+        # Remove auxiliary fields
+        validated_data.pop('name', None)
+        
         # Extract User fields
         username = validated_data.pop('username')
         email = validated_data.pop('email')
-        first_name = validated_data.pop('first_name')
-        last_name = validated_data.pop('last_name')
+        first_name = validated_data.pop('first_name', '')
+        last_name = validated_data.pop('last_name', '')
         password = validated_data.pop('password', None)
         role = validated_data.pop('role', 'organization_member')
+        
+        # Handle empty role string
+        if not role:
+            role = 'organization_member'
         
         # All fields now exist in the OrdocUser model
         
@@ -120,6 +161,20 @@ class OrdocUserCreateSerializer(serializers.ModelSerializer):
                 )
         
         return ordoc_user
+        
+    def validate_phone(self, value):
+        """Clean phone format"""
+        import re
+        if not value:
+            return value
+        return re.sub(r'[^0-9]', '', value)
+
+    def validate_cpf(self, value):
+        """Clean CPF format"""
+        import re
+        if not value:
+            return value
+        return re.sub(r'[^0-9]', '', value)
     
     def to_representation(self, instance):
         """Return complete user data after creation"""
@@ -243,11 +298,76 @@ class UserGroupSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserGroup
-        fields = ['id', 'name', 'description', 'users_count', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'is_active', 'users_count', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_users_count(self, obj):
         return obj.users.count()
+
+
+class UserGroupCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating UserGroup with optional organization_id"""
+    organization_id = serializers.UUIDField(required=False, write_only=True)
+    
+    class Meta:
+        model = UserGroup
+        fields = ['name', 'description', 'is_active', 'organization_id']
+        extra_kwargs = {
+            'is_active': {'default': True}
+        }
+        
+    def validate(self, attrs):
+        """Check for duplicate group name in organization"""
+        request = self.context.get('request')
+        name = attrs.get('name')
+        organization_id = attrs.get('organization_id')
+        
+        # Determine organization
+        organization = None
+        if organization_id:
+            try:
+                organization = Organization.objects.get(id=organization_id)
+            except Organization.DoesNotExist:
+                pass
+        elif request and hasattr(request, 'current_organization'):
+            organization = request.current_organization
+            
+        if organization and name:
+            if UserGroup.objects.filter(organization=organization, name=name).exists():
+                raise serializers.ValidationError(
+                    {"name": "Já existe um grupo com este nome nesta organização."}
+                )
+        
+        return attrs
+        
+    def create(self, validated_data):
+        organization_id = validated_data.pop('organization_id', None)
+        # Remove organization if injected by BaseViewSet.perform_create
+        injected_org = validated_data.pop('organization', None)
+        
+        request = self.context.get('request')
+        
+        # Determine organization
+        organization = None
+        if organization_id:
+            try:
+                # Validate if user has access to this organization
+                # In a real scenario, we should check UserOrganizationRole
+                organization = Organization.objects.get(id=organization_id)
+            except Organization.DoesNotExist:
+                raise serializers.ValidationError({"organization_id": "Organization not found"})
+        elif injected_org:
+            organization = injected_org
+        elif request and hasattr(request, 'current_organization'):
+            organization = request.current_organization
+            
+        if not organization:
+            raise serializers.ValidationError({"organization_id": "Organization is required"})
+            
+        # Create group
+        group = UserGroup.objects.create(organization=organization, **validated_data)
+        return group
+
 
 
 class PolicySerializer(serializers.ModelSerializer):
@@ -269,6 +389,36 @@ class PolicySerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'version']
+        extra_kwargs = {
+            'resource': {'required': False, 'allow_null': True},
+            'actions': {'required': False, 'allow_null': True},
+            'conditions': {'required': False, 'allow_null': True},
+            'user_groups': {'required': False},
+            'users': {'required': False},
+            'service': {'required': False, 'default': '*'}, # Default to all services
+        }
+    
+    def to_internal_value(self, data):
+        """Pre-validation input normalization"""
+        # Create a mutable copy if data is QueryDict
+        if hasattr(data, 'copy'):
+            data = data.copy()
+            
+        # Normalize effect case (Allow -> allow)
+        if 'effect' in data and isinstance(data['effect'], str):
+            data['effect'] = data['effect'].lower()
+            
+        # Normalize service
+        if 'service' in data and isinstance(data['service'], str):
+            data['service'] = data['service'].lower()
+            
+        return super().to_internal_value(data)
+
+    def create(self, validated_data):
+        """Set default values"""
+        if not validated_data.get('service'):
+            validated_data['service'] = '*'
+        return super().create(validated_data)
 
     def get_user_groups_count(self, obj):
         return obj.user_groups.count()

@@ -1,13 +1,22 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { Slot } from "@radix-ui/react-slot"
-import { cn } from "@/lib/utils" // Assuming cn utility exists, it usually does in shadcn projects. If not, I'll use template literals, but checking for utils is good practice. I'll stick to template literals if unsure, but shadcn standard uses cn.
+import { cn } from "@/lib/utils"
 
-// Fallback for cn if not available, but likely is. I'll use template literals to be safe.
+// Fallback for cn if not available
 const cls = (...classes: (string | undefined | null | false)[]) => classes.filter(Boolean).join(' ');
+
+// Create Context
+const DropdownContext = React.createContext<{
+  isOpen: boolean;
+  setIsOpen: (value: boolean) => void;
+  triggerRef: React.RefObject<any>;
+} | null>(null);
 
 interface DropdownMenuProps {
   children: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 interface DropdownMenuTriggerProps {
@@ -22,28 +31,35 @@ interface DropdownMenuContentProps {
   sideOffset?: number; // Added prop
   children: React.ReactNode;
   className?: string; // Added
+  onMouseDown?: (e: React.MouseEvent) => void;
 }
 
 interface DropdownMenuItemProps {
   asChild?: boolean;
   children: React.ReactNode;
-  onClick?: () => void;
+  onClick?: (event: React.MouseEvent) => void;
   className?: string; // Added
 }
 
-export function DropdownMenu({ children }: DropdownMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function DropdownMenu({ children, open, onOpenChange }: DropdownMenuProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<any>(null);
+
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : uncontrolledOpen;
+  const setIsOpen = (value: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(value);
+    }
+    if (!isControlled) {
+      setUncontrolledOpen(value);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        // Check if click was on content (portal)
-        // Hard to check portal click from here without ref coordination, but simplistic approach:
-        // Rely on content closing itself or backdrop if modal.
-        // For now, simple outside click on trigger wrapper closes it. 
-        // Real Radix is more complex.
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
@@ -55,17 +71,14 @@ export function DropdownMenu({ children }: DropdownMenuProps) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, onOpenChange, isControlled, setIsOpen, triggerRef]);
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
-      {React.Children.map(children, (child) => {
-        if (React.isValidElement(child)) {
-          return React.cloneElement(child, { isOpen, setIsOpen, triggerRef } as any);
-        }
-        return child;
-      })}
-    </div>
+    <DropdownContext.Provider value={{ isOpen, setIsOpen, triggerRef }}>
+      <div className="relative inline-block" ref={dropdownRef}>
+        {children}
+      </div>
+    </DropdownContext.Provider>
   );
 }
 
@@ -74,11 +87,13 @@ export function DropdownMenuTrigger({
   children,
   className,
   ...props
-}: DropdownMenuTriggerProps & { isOpen?: boolean; setIsOpen?: (open: boolean) => void; triggerRef?: React.RefObject<HTMLElement> }) {
-  const { isOpen, setIsOpen, triggerRef } = props as any;
+}: DropdownMenuTriggerProps) {
+  const context = useContext(DropdownContext);
+  if (!context) throw new Error("DropdownMenuTrigger must be used within DropdownMenu");
+  const { isOpen, setIsOpen, triggerRef } = context;
 
   const handleClick = () => {
-    setIsOpen?.(!isOpen);
+    setIsOpen(!isOpen);
   };
 
   if (asChild && React.isValidElement(children)) {
@@ -99,14 +114,18 @@ export function DropdownMenuContent({
   children,
   className,
   ...props
-}: DropdownMenuContentProps & { isOpen?: boolean; triggerRef?: React.RefObject<HTMLElement> }) {
-  const { isOpen, triggerRef } = props as any;
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [styles, setStyles] = useState<React.CSSProperties>({});
+}: DropdownMenuContentProps) {
+  const context = useContext(DropdownContext);
+  if (!context) return null; // Or throw
+  const { isOpen, triggerRef } = context;
 
-  useEffect(() => {
+  const contentRef = useRef<HTMLDivElement>(null);
+  // Start hidden to avoid FOUC (Flash of Unpositioned Content)
+  const [styles, setStyles] = useState<React.CSSProperties>({ opacity: 0, position: 'fixed', top: 0, left: 0 });
+
+  // Use useLayoutEffect to measure and position before paint
+  React.useLayoutEffect(() => {
     if (isOpen && triggerRef?.current && contentRef.current) {
-      // Simplified positioning logic mimicking the original manual implementation but respecting side/align loosely
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const contentRect = contentRef.current.getBoundingClientRect();
 
@@ -129,17 +148,29 @@ export function DropdownMenuContent({
         else left = triggerRect.right - contentRect.width;
       }
 
-      // Keep in viewport
+      // Keep in viewport logic...
       if (left < 10) left = 10;
-      if (left + contentRect.width > window.innerWidth) left = window.innerWidth - contentRect.width - 10;
-      if (top < 10) top = 10;
-      // if (top + contentRect.height > window.innerHeight) ...
+      // Note: window might not be available in SSR, but this effect runs on client.
+      if (typeof window !== 'undefined') {
+        if (left + contentRect.width > window.innerWidth) left = window.innerWidth - contentRect.width - 10;
+
+        // Simple bottom overflow check
+        if (top + contentRect.height > window.innerHeight) {
+          // If flipping to top is better? For now just clamp or let it be.
+          // A robust implementation would flip side.
+          // Let's at least try to flip if side was bottom
+          if (side === 'bottom' && (triggerRect.top - contentRect.height > 0)) {
+            top = triggerRect.top - contentRect.height - sideOffset;
+          }
+        }
+      }
 
       setStyles({
         position: 'fixed',
         top: `${top}px`,
         left: `${left}px`,
         zIndex: 9999,
+        opacity: 1, // Reveal
       });
     }
   }, [isOpen, align, side, sideOffset, triggerRef]);
@@ -151,6 +182,7 @@ export function DropdownMenuContent({
       ref={contentRef}
       style={styles}
       className={cls("min-w-[12rem] bg-white rounded-md border shadow-md p-1", className)}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {children}
     </div>,
@@ -159,11 +191,17 @@ export function DropdownMenuContent({
 }
 
 export function DropdownMenuItem({ children, onClick, className, asChild }: DropdownMenuItemProps) {
+  const context = useContext(DropdownContext);
+  const setIsOpen = context?.setIsOpen;
+
   const Comp = asChild ? Slot : "button"
   return (
     <Comp
       className={cls("relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-100 focus:bg-gray-100", className)}
-      onClick={onClick}
+      onClick={(e: React.MouseEvent) => {
+        onClick?.(e);
+        setIsOpen?.(false); // Close automatically
+      }}
     >
       {children}
     </Comp>

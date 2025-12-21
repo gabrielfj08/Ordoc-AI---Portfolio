@@ -42,17 +42,18 @@ export interface UsersListParams {
 }
 
 export interface UsersListResponse {
-  users: User[];
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
+  results: User[];
+  users?: User[]; // Deprecated/Fallback
+  count: number;
+  next?: string | null;
+  previous?: string | null;
+  total_pages?: number;
 }
 
 class UsersService {
   async getUsers(params: UsersListParams = {}): Promise<UsersListResponse> {
     const searchParams = new URLSearchParams();
-    
+
     if (params.q) searchParams.append('q', params.q);
     if (params.status) searchParams.append('status', params.status);
     if (params.role) searchParams.append('role', params.role);
@@ -80,7 +81,7 @@ class UsersService {
         // Server responded with error status
         const status = error.response.status;
         const data = error.response.data;
-        
+
         if (status === 401) {
           throw new Error('Não autorizado. Faça login novamente.');
         } else if (status === 403) {

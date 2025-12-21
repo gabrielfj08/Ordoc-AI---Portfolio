@@ -14,20 +14,20 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        postgresql-client \
-        build-essential \
-        libpq-dev \
-        curl \
-        git \
-        tesseract-ocr \
-        tesseract-ocr-por \
-        libtesseract-dev \
-        poppler-utils \
-        libmagic1 \
+    postgresql-client \
+    build-essential \
+    libpq-dev \
+    curl \
+    git \
+    tesseract-ocr \
+    tesseract-ocr-por \
+    libtesseract-dev \
+    poppler-utils \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-RUN pip install poetry==1.7.1
+RUN pip install poetry==2.0.0
 
 # Copy poetry files
 COPY pyproject.toml ./

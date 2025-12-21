@@ -21,14 +21,14 @@ const mockLogs = [
 
 export const SignHistoryView = () => {
     return (
-        <Card className="animate-in fade-in slide-in-from-bottom-4 duration-500 border-border/50 shadow-sm bg-card/50">
+        <Card className="dashboard-card animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Table>
                 <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[200px]">Ação</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Detalhes</TableHead>
-                        <TableHead className="text-right">Data/Hora</TableHead>
+                        <TableHead className="w-[200px] text-sm font-semibold">Ação</TableHead>
+                        <TableHead className="text-sm font-semibold">Descrição</TableHead>
+                        <TableHead className="text-sm font-semibold">Detalhes</TableHead>
+                        <TableHead className="text-right text-sm font-semibold">Data/Hora</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -37,23 +37,23 @@ export const SignHistoryView = () => {
                             <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
                                     <Activity className="h-4 w-4 text-orange-500" />
-                                    <span className="text-xs uppercase font-semibold tracking-wide text-muted-foreground">{log.action.replace('_', ' ')}</span>
+                                    <span className="text-sm uppercase font-semibold tracking-wide text-muted-foreground">{log.action.replace('_', ' ')}</span>
                                 </div>
                             </TableCell>
                             <TableCell>
                                 <span className="text-sm text-foreground">{log.description}</span>
                             </TableCell>
                             <TableCell>
-                                <div className="flex flex-col text-[10px] text-muted-foreground gap-0.5">
+                                <div className="flex flex-col text-sm text-muted-foreground gap-0.5">
                                     <div className="flex items-center gap-1">
-                                        <User className="h-3 w-3" /> User #{log.user_id}
+                                        <User className="h-3.5 w-3.5" /> User #{log.user_id}
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Globe className="h-3 w-3" /> {log.ip_address}
+                                        <Globe className="h-3.5 w-3.5" /> {log.ip_address}
                                     </div>
                                 </div>
                             </TableCell>
-                            <TableCell className="text-right whitespace-nowrap text-xs text-muted-foreground">
+                            <TableCell className="text-right whitespace-nowrap text-sm text-muted-foreground">
                                 {new Date(log.created_at).toLocaleString('pt-BR')}
                             </TableCell>
                         </TableRow>
@@ -63,3 +63,4 @@ export const SignHistoryView = () => {
         </Card>
     );
 };
+

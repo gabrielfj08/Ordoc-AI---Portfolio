@@ -40,11 +40,12 @@ export interface PoliciesListParams {
 }
 
 export interface PoliciesListResponse {
-  policies: Policy[];
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
+  results: Policy[];
+  policies?: Policy[]; // Deprecated/Fallback
+  count: number;
+  next?: string | null;
+  previous?: string | null;
+  total_pages?: number;
 }
 
 export interface PolicyAction {
@@ -57,7 +58,7 @@ export interface PolicyAction {
 class PoliciesService {
   async getPolicies(params: PoliciesListParams = {}): Promise<PoliciesListResponse> {
     const searchParams = new URLSearchParams();
-    
+
     if (params.q) searchParams.append('q', params.q);
     if (params.status) searchParams.append('status', params.status);
     if (params.effect) searchParams.append('effect', params.effect);

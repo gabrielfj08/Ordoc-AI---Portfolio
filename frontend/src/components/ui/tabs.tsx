@@ -44,7 +44,7 @@ export function Tabs({ children, defaultValue, className = '' }: TabsProps) {
 
 export function TabsList({ children, className = '' }: TabsListProps) {
   return (
-    <div className={`inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-500 ${className}`}>
+    <div className={`inline-flex items-center gap-2 rounded-lg bg-transparent p-0 ${className}`}>
       {children}
     </div>
   );
@@ -63,14 +63,14 @@ export function TabsTrigger({ children, value, className = '' }: TabsTriggerProp
     <button
       type="button"
       onClick={() => setActiveTab(value)}
+      data-state={isActive ? 'active' : 'inactive'}
       className={`
-        inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium 
-        ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 
-        focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none 
-        disabled:opacity-50
-        ${isActive 
-          ? 'bg-white text-gray-950 shadow-sm' 
-          : 'text-gray-600 hover:text-gray-900'
+        inline-flex items-center justify-center whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2
+        disabled:pointer-events-none disabled:opacity-50 border border-transparent
+        ${isActive
+          ? 'bg-orange-50 text-orange-700 shadow-none border-orange-100'
+          : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
         }
         ${className}
       `}
@@ -87,7 +87,7 @@ export function TabsContent({ children, value, className = '' }: TabsContentProp
   }
 
   const { activeTab } = context;
-  
+
   if (activeTab !== value) {
     return null;
   }

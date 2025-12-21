@@ -9,7 +9,7 @@ from ordoc_ai.base_viewset import BaseViewSet
 from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog
 from .serializers import (
     OrdocUserSerializer, OrdocUserCreateSerializer, OrdocUserListSerializer,
-    UserGroupSerializer, PolicySerializer, UserOrganizationRoleSerializer,
+    UserGroupSerializer, UserGroupCreateSerializer, PolicySerializer, UserOrganizationRoleSerializer,
     AuditLogSerializer
 )
 from .permissions import (
@@ -433,21 +433,37 @@ class UserGroupViewSet(BaseViewSet):
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
     
+    def get_serializer_class(self):
+        """Use appropriate serializer for each action"""
+        if self.action == 'create':
+            return UserGroupCreateSerializer
+        return UserGroupSerializer
+    
     def get_queryset(self):
-        """Filter user groups by current organization"""
-        queryset = super().get_queryset()
+        """Filter user groups by user access"""
+        # Bypass BaseViewSet automatic filtering which enforces current_organization
+        queryset = UserGroup.objects.all()
         
-        if hasattr(self.request, 'current_organization') and self.request.current_organization:
-            queryset = queryset.filter(organization=self.request.current_organization)
+        # Get current user (OrdocUser)
+        ordoc_user = getattr(self.request, 'ordoc_user', None)
+        if not ordoc_user and hasattr(self.request.user, 'ordoc_profile'):
+            ordoc_user = self.request.user.ordoc_profile
+            
+        if ordoc_user:
+            # Allow user to see groups from all their organizations
+            # This solves the issue where creating a group for Org A while in Org B context (subdomain)
+            # would make the group invisible.
+            queryset = queryset.filter(organization__in=ordoc_user.organizations.all())
+            
+        # Optional: Allow filtering by specific organization via query param
+        org_id = self.request.query_params.get('organization_id')
+        if org_id:
+            queryset = queryset.filter(organization_id=org_id)
         
         # Exclude deleted groups
         queryset = queryset.filter(deleted_at__isnull=True)
         
         return queryset
-    
-    def perform_create(self, serializer):
-        """Set organization when creating user group"""
-        serializer.save(organization=self.get_current_organization())
     
     @action(detail=True, methods=['post'])
     def add_users(self, request, pk=None):
@@ -618,8 +634,32 @@ class PolicyViewSet(BaseViewSet):
             'users': serializer.data
         })
 
+    @action(detail=True, methods=['patch'])
+    def toggle_status(self, request, pk=None):
+        """Toggle policy status between active and inactive"""
+        policy = self.get_object()
+        
+        # Check permissions (optional, better detailed logic in permissions.py)
+        # For now assume viewset permissions handle basic access
+        
+        if policy.is_active:
+            policy.is_active = False
+            new_status = 'inactive'
+        else:
+            policy.is_active = True
+            new_status = 'active'
+            
+        policy.save()
+        
+        # Log action if needed
+        # AuditLog.log(...)
 
-class AuditLogViewSet(BaseViewSet):
+        return Response({
+            'status': new_status,
+            'message': f'Policy status changed to {new_status}',
+            'id': policy.id
+        })
+
     """
     ViewSet for viewing audit logs (read-only)
     """

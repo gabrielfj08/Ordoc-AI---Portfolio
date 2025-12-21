@@ -86,6 +86,80 @@
 
   html {
     @apply scroll-smooth;
+    font-size: 16px;
+    /* Base font size for better readability */
+  }
+}
+
+/* Dashboard Layout Utilities */
+@layer components {
+
+  /* Page Container - consistent padding and max-width */
+  .dashboard-page {
+    @apply w-full max-w-7xl mx-auto px-6 py-6;
+  }
+
+  /* Section spacing */
+  .dashboard-section {
+    @apply mb-8;
+  }
+
+  /* Page header */
+  .dashboard-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .dashboard-title {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .dashboard-subtitle {
+    @apply text-base text-muted-foreground mt-1;
+  }
+
+  /* Standard card */
+  .dashboard-card {
+    @apply p-5 rounded-xl border border-border/60 bg-card shadow-sm;
+  }
+
+  /* Grid layouts */
+  .dashboard-grid-2 {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+
+  .dashboard-grid-3 {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+  }
+
+  .dashboard-grid-4 {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+
+  /* Sidebar + Content layout */
+  .dashboard-with-sidebar {
+    @apply grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6;
+  }
+
+  /* Table text sizes */
+  .dashboard-table {
+    @apply w-full text-sm;
+  }
+
+  .dashboard-table th {
+    @apply text-left font-semibold text-foreground py-3 px-4 border-b;
+  }
+
+  .dashboard-table td {
+    @apply py-3 px-4 border-b text-muted-foreground;
+  }
+
+  /* Better readability text classes */
+  .text-readable {
+    @apply text-base leading-relaxed;
+  }
+
+  .text-readable-sm {
+    @apply text-sm leading-relaxed;
   }
 }
 
@@ -114,6 +188,19 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: var(--muted-foreground);
     opacity: 0.8;
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 }
 

@@ -12,6 +12,7 @@ from .views import (
     IntegrationRequestViewSet,
     IntegrationCacheViewSet,
     IntegrationExecuteViewSet,
+    GovBrAuthViewSet,
 )
 
 app_name = 'ordoc_integrations'
@@ -22,6 +23,7 @@ router.register(r'services', IntegrationServiceViewSet, basename='integration-se
 router.register(r'requests', IntegrationRequestViewSet, basename='integration-request')
 router.register(r'cache', IntegrationCacheViewSet, basename='integration-cache')
 router.register(r'execute', IntegrationExecuteViewSet, basename='integration-execute')
+router.register(r'auth/govbr', GovBrAuthViewSet, basename='govbr-auth')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -53,4 +55,7 @@ POST   /api/integrations/execute/execute/               - Executa integração g
 POST   /api/integrations/execute/validate-cpf/          - Valida CPF
 POST   /api/integrations/execute/validate-cnpj/         - Valida CNPJ
 POST   /api/integrations/execute/check-credit/          - Consulta crédito
+
+GET    /api/integrations/auth/govbr/login/              - Inicia login Gov.br
+GET    /api/integrations/auth/govbr/callback/           - Callback login Gov.br
 """

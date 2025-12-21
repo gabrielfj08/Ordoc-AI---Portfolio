@@ -11,6 +11,12 @@ interface LoginResponse {
     type: string;
     status: string;
     must_change_password?: boolean;
+    phone?: string;
+    cpf?: string;
+    avatar?: string | null;
+    language?: string;
+    timezone?: string;
+    profile_complete?: boolean;
   };
   token: string;
   organization?: {
@@ -46,34 +52,34 @@ api.interceptors.request.use((config) => {
     config.headers['X-Subdomain'] = 'demo';
     return config;
   }
-  
+
   // Get subdomain from hostname
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     const subdomain = hostname.split('.')[0];
-    
+
     // Only add subdomain if it's not localhost or IP
     if (subdomain && !hostname.includes('localhost') && !hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
       config.headers['X-Api-Subdomain'] = subdomain;
     }
   }
-  
+
   // Optional override for development via environment variable
   if (!config.headers['X-Api-Subdomain'] && process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN) {
     config.headers['X-Api-Subdomain'] = process.env.NEXT_PUBLIC_DEFAULT_SUBDOMAIN;
   }
-  
+
   // Force subdomain for development if not set
   if (!config.headers['X-Api-Subdomain']) {
-    config.headers['X-Subdomain'] = 'demo';
+    config.headers['X-Api-Subdomain'] = 'demo';
   }
-  
+
   // Add auth token if available
   const token = localStorage.getItem('ordoc_token');
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   return config;
 });
 
@@ -89,7 +95,7 @@ api.interceptors.response.use(
       method: error.config?.method,
       headers: error.config?.headers
     });
-    
+
     if (error.response?.status === 401) {
       console.warn('🔒 Token expired or invalid - redirecting to login');
       // Token expired or invalid
@@ -114,12 +120,12 @@ export const authService = {
         password,
         user_type: userType,
       };
-      
+
       // Add Turnstile token if provided for anti-bot verification
       if (turnstileToken) {
         requestData.turnstile_token = turnstileToken;
       }
-      
+
       console.log('Making login request:', {
         url: `${API_BASE_URL}/api/auth/login/`,
         data: { ...requestData, password: '[HIDDEN]' },
@@ -129,7 +135,7 @@ export const authService = {
           'Accept': 'application/json'
         }
       });
-      
+
       // Make direct axios call without interceptors for login
       const response = await axios.post(`${API_BASE_URL}/api/auth/login/`, requestData, {
         headers: {
@@ -140,7 +146,7 @@ export const authService = {
         timeout: 30000,
         withCredentials: false
       });
-      
+
       return response.data;
     } catch (error: any) {
       console.error('Login error details:', {
@@ -154,7 +160,7 @@ export const authService = {
         stack: error?.stack || null,
         fullError: error
       });
-      
+
       if (error.code === 'ECONNREFUSED') {
         throw new Error('Não foi possível conectar com o servidor. Verifique se o backend está rodando.');
       } else if (error.code === 'ETIMEDOUT') {
@@ -192,7 +198,7 @@ export const authService = {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       return response.data.user;
     } catch (error: any) {
       const apiError: ApiError = error.response?.data || { error: 'Token validation failed', status: 401 };
@@ -210,7 +216,7 @@ export const authService = {
           'Authorization': `Bearer ${currentToken}`,
         },
       });
-      
+
       return response.data.token;
     } catch (error: any) {
       const apiError: ApiError = error.response?.data || { error: 'Token refresh failed', status: 401 };
@@ -256,6 +262,19 @@ export const authService = {
       });
     } catch (error: any) {
       const apiError: ApiError = error.response?.data || { error: 'Password change failed', status: 500 };
+      throw new Error(apiError.error);
+    }
+  },
+
+  /**
+   * Update current user profile
+   */
+  async updateProfile(data: Partial<LoginResponse['user']>): Promise<LoginResponse['user']> {
+    try {
+      const response: AxiosResponse<{ user: LoginResponse['user'] }> = await api.patch('/api/auth/me/', data);
+      return response.data.user;
+    } catch (error: any) {
+      const apiError: ApiError = error.response?.data || { error: 'Profile update failed', status: 500 };
       throw new Error(apiError.error);
     }
   },
