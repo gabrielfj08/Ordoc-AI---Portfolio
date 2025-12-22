@@ -143,20 +143,30 @@ class BaseKnowledgeRepository(IKnowledgeStore, ABC):
         **kwargs
     ) -> List[Dict[str, Any]]:
         """Find patterns that match a document."""
+        from ..matchers import SimplePatternMatcher
+
         # Get all active patterns for this scope
         patterns = await self.get_patterns(
             document_type=document_metadata.get('document_type', ''),
             min_confidence=0.5,
             **kwargs
         )
-        
-        matched = []
-        for pattern in patterns:
-            # TODO: Implement JSONLogic evaluation
-            # For now, return all patterns as potential matches
-            pattern['matched'] = True
-            matched.append(pattern)
-        
+
+        # Use simple pattern matcher
+        matcher = SimplePatternMatcher()
+
+        # Preparar dados do documento para matching
+        document_data = {
+            'document_type': document_metadata.get('document_type', ''),
+            'content': document_content[:1000],  # Primeiros 1000 chars
+            'trigger': document_metadata.get('trigger', 'on_create'),
+            **document_metadata  # Outros metadados
+        }
+
+        # Fazer matching
+        matched = matcher.match_all(patterns, document_data)
+
+        logger.debug(f"Pattern matching: {len(matched)}/{len(patterns)} matched")
         return matched
     
     async def aggregate_from_layer(
@@ -164,11 +174,77 @@ class BaseKnowledgeRepository(IKnowledgeStore, ABC):
         source_layer: KnowledgeLayer,
         aggregation_config: Dict[str, Any]
     ) -> int:
-        """Aggregate knowledge from a lower layer."""
-        # This would typically be implemented in a Celery task
-        # to aggregate patterns from user -> org, org -> sector, etc.
-        logger.info(f"Aggregation from {source_layer.value} to {self._layer.value}")
-        return 0
+        """
+        Aggregate knowledge from a lower layer.
+
+        Implementação SIMPLES:
+        - Busca feedbacks não processados da camada fonte
+        - Identifica padrões recorrentes (3+ ocorrências)
+        - Cria LearnedPatterns na camada atual
+        """
+        from django.db.models import Count
+
+        # Determinar mínimo de ocorrências (default: 3)
+        min_occurrences = aggregation_config.get('min_occurrences', 3)
+
+        # Buscar correções recorrentes da camada fonte
+        recurrent_feedbacks = KnowledgeFeedback.objects.filter(
+            layer=source_layer.value,
+            processed=False,
+            action_type='correction'
+        ).values(
+            'document_type',
+            'corrected_value',
+            'organization_id' if self._layer == KnowledgeLayer.ORGANIZATION else 'sector'
+        ).annotate(
+            count=Count('id')
+        ).filter(count__gte=min_occurrences)
+
+        patterns_created = 0
+
+        for feedback_group in recurrent_feedbacks:
+            # Criar padrão agregado
+            feedbacks = KnowledgeFeedback.objects.filter(
+                layer=source_layer.value,
+                document_type=feedback_group['document_type'],
+                corrected_value=feedback_group['corrected_value'],
+                processed=False
+            )
+
+            if feedbacks.exists():
+                # Criar LearnedPattern
+                pattern = LearnedPattern.objects.create(
+                    layer=self._layer.value,
+                    pattern_type='aggregated_correction',
+                    name=f"Padrão agregado: {feedback_group['document_type']}",
+                    description=f"Agregado de {feedbacks.count()} correções similares",
+                    condition={
+                        'document_type': feedback_group['document_type'],
+                        'trigger': 'on_create'
+                    },
+                    action={
+                        'type': 'suggestion',
+                        'message': f"Valor sugerido: {feedback_group['corrected_value'][:100]}",
+                        'auto_applicable': False
+                    },
+                    confidence=min(0.95, 0.5 + (feedbacks.count() * 0.1)),
+                    occurrences=feedbacks.count()
+                )
+
+                # Vincular feedbacks
+                for fb in feedbacks:
+                    PatternFeedbackLink.objects.create(
+                        pattern=pattern,
+                        feedback=fb,
+                        contribution_weight=1.0 / feedbacks.count()
+                    )
+
+                # Marcar como processados
+                feedbacks.update(processed=True, processed_at=timezone.now())
+                patterns_created += 1
+
+        logger.info(f"Aggregation complete: {patterns_created} patterns created from {source_layer.value} to {self._layer.value}")
+        return patterns_created
     
     def update_pattern_confidence(
         self,
