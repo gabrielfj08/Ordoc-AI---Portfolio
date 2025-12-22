@@ -28,10 +28,10 @@ interface PatternCardProps {
 
 function PatternCard({ pattern }: PatternCardProps) {
   const layerColors = {
-    user: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-700',
-    organization: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-700',
-    sector: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-700',
-    platform: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700',
+    user: 'bg-purple-100 text-purple-700 border-purple-300',
+    organization: 'bg-blue-100 text-blue-700 border-blue-300',
+    sector: 'bg-green-100 text-green-700 border-green-300',
+    platform: 'bg-amber-100 text-amber-700 border-amber-300',
   };
 
   const layerLabels = {
@@ -41,9 +41,9 @@ function PatternCard({ pattern }: PatternCardProps) {
     platform: 'Plataforma',
   };
 
-  const confidenceColor = pattern.confidence >= 0.8 ? 'text-green-600 dark:text-green-400' :
-                          pattern.confidence >= 0.6 ? 'text-amber-600 dark:text-amber-400' :
-                          'text-red-600 dark:text-red-400';
+  const confidenceColor = pattern.confidence >= 0.8 ? 'text-green-600' :
+                          pattern.confidence >= 0.6 ? 'text-amber-600' :
+                          'text-red-600';
 
   return (
     <div className="rounded-lg border bg-card p-4 hover:shadow-md transition-shadow">
@@ -53,7 +53,7 @@ function PatternCard({ pattern }: PatternCardProps) {
           <h4 className="font-semibold text-sm">{pattern.name}</h4>
         </div>
         {pattern.is_active ? (
-          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+          <CheckCircle className="h-4 w-4 text-green-600" />
         ) : (
           <XCircle className="h-4 w-4 text-gray-400" />
         )}
@@ -65,7 +65,7 @@ function PatternCard({ pattern }: PatternCardProps) {
         <span className={cn('text-xs px-2 py-1 rounded-full border', layerColors[pattern.layer as keyof typeof layerColors] || layerColors.platform)}>
           {layerLabels[pattern.layer as keyof typeof layerLabels] || pattern.layer}
         </span>
-        <span className="text-xs px-2 py-1 rounded-full border bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">
+        <span className="text-xs px-2 py-1 rounded-full border bg-gray-100 text-gray-700 border-gray-300">
           {pattern.pattern_type}
         </span>
       </div>
@@ -134,7 +134,7 @@ export function PatternsView() {
             <Brain className="h-5 w-5 text-muted-foreground" />
             <h3 className="font-semibold">Padrões Aprendidos</h3>
             {activeCount > 0 && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                 {activeCount} ativo{activeCount > 1 ? 's' : ''}
               </span>
             )}

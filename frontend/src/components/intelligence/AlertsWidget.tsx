@@ -53,8 +53,8 @@ export function AlertsWidget() {
             <span className={cn(
               'text-xs px-2 py-0.5 rounded-full font-medium',
               criticalAlerts.length > 0
-                ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-blue-100 text-blue-700'
             )}>
               {pendingAlerts.length}
             </span>
@@ -153,7 +153,7 @@ function AlertItem({ alert, onAccept, onReject }: AlertItemProps) {
                   e.stopPropagation();
                   onAccept();
                 }}
-                className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 dark:hover:bg-green-800 transition-colors"
+                className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
               >
                 Aceitar
               </button>
@@ -162,7 +162,7 @@ function AlertItem({ alert, onAccept, onReject }: AlertItemProps) {
                   e.stopPropagation();
                   onReject();
                 }}
-                className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800 transition-colors"
+                className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
               >
                 Rejeitar
               </button>
