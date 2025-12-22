@@ -204,7 +204,7 @@ function MyComponent() {
 - 6 cards de métricas em tempo real
 - Total de alertas, pendentes, críticos, compliance
 - Taxa de aceitação, alertas aceitos
-- Suporte a dark mode
+- Interface limpa e responsiva
 
 **InsightsPanel** (`frontend/src/components/intelligence/InsightsPanel.tsx`)
 - Exibe últimos 6 insights/alertas

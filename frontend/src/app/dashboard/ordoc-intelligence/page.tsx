@@ -38,28 +38,28 @@ export default function IntelligenceDashboard() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center space-x-4">
-                <Link href="/dashboard" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                <Link href="/dashboard" className="text-gray-500 hover:text-gray-700">
                   ← Voltar
                 </Link>
-                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                <div className="h-6 w-px bg-gray-300" />
                 <Brain className="h-6 w-6 text-primary" />
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Central de Inteligência</h1>
+                <h1 className="text-xl font-bold text-gray-900">Central de Inteligência</h1>
               </div>
 
-              <button className="flex items-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <button className="flex items-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors">
                 <Settings className="h-4 w-4" />
                 Configurações
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 mt-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-1 mt-2 border-b border-gray-200">
               <TabButton
                 active={activeTab === 'overview'}
                 onClick={() => setActiveTab('overview')}
@@ -98,7 +98,7 @@ export default function IntelligenceDashboard() {
             <div className="space-y-6">
               {/* Métricas */}
               <section>
-                <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Métricas em Tempo Real</h2>
+                <h2 className="text-lg font-semibold mb-4 text-gray-900">Métricas em Tempo Real</h2>
                 <AlertsMetrics />
               </section>
 
@@ -125,21 +125,21 @@ export default function IntelligenceDashboard() {
                   gerando insights proativos, detectando padrões e alertando sobre compliance e segurança.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-1">Análise Automática</h4>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-700 mb-1">Análise Automática</h4>
+                    <p className="text-xs text-blue-600">
                       Documentos analisados automaticamente no upload com extração de entidades e classificação
                     </p>
                   </div>
-                  <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg border border-green-200 dark:border-green-800">
-                    <h4 className="font-semibold text-green-700 dark:text-green-300 mb-1">Aprendizado Contínuo</h4>
-                    <p className="text-xs text-green-600 dark:text-green-400">
+                  <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                    <h4 className="font-semibold text-green-700 mb-1">Aprendizado Contínuo</h4>
+                    <p className="text-xs text-green-600">
                       Sistema aprende com suas ações e feedback, criando padrões hierárquicos
                     </p>
                   </div>
-                  <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <h4 className="font-semibold text-amber-700 dark:text-amber-300 mb-1">Alertas Proativos</h4>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    <h4 className="font-semibold text-amber-700 mb-1">Alertas Proativos</h4>
+                    <p className="text-xs text-amber-600">
                       Compliance, segurança e problemas detectados automaticamente antes de se tornarem críticos
                     </p>
                   </div>
@@ -151,7 +151,7 @@ export default function IntelligenceDashboard() {
           {activeTab === 'alerts' && (
             <section>
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Todos os Alertas</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Todos os Alertas</h2>
                 <p className="text-sm text-muted-foreground">
                   Visualize e gerencie todos os alertas gerados pela IA
                 </p>
@@ -169,7 +169,7 @@ export default function IntelligenceDashboard() {
           {activeTab === 'patterns' && (
             <section>
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Padrões Aprendidos</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Padrões Aprendidos</h2>
                 <p className="text-sm text-muted-foreground">
                   Padrões identificados pelo sistema de aprendizado hierárquico
                 </p>
@@ -181,7 +181,7 @@ export default function IntelligenceDashboard() {
           {activeTab === 'insights' && (
             <section>
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Insights e Descobertas</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Insights e Descobertas</h2>
                 <p className="text-sm text-muted-foreground">
                   Análises e descobertas geradas automaticamente pela IA
                 </p>
@@ -210,7 +210,7 @@ function TabButton({ active, onClick, icon: Icon, children }: TabButtonProps) {
         'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
         active
           ? 'border-primary text-primary'
-          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          : 'border-transparent text-gray-500 hover:text-gray-700'
       )}
     >
       <Icon className="h-4 w-4" />

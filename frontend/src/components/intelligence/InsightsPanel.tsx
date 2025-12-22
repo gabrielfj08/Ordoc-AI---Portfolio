@@ -19,9 +19,9 @@ interface InsightItemProps {
 
 function InsightItem({ icon: Icon, title, description, severity, timestamp }: InsightItemProps) {
   const severityConfig = {
-    info: 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-    warning: 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-    error: 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+    info: 'bg-blue-50 text-blue-700 border-blue-200',
+    warning: 'bg-amber-50 text-amber-700 border-amber-200',
+    error: 'bg-red-50 text-red-700 border-red-200',
   };
 
   return (
