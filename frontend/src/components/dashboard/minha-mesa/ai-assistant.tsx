@@ -131,7 +131,7 @@ export const AIAssistant = () => {
                     {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
                 </h2>
                 <p className="text-sm text-muted-foreground mb-3">
-                    IA analisou seus documentos e processos.
+                    Análise de documentos e processos em andamento.
                 </p>
                 <div className="space-y-2 text-sm">
                     {/* Sugestões de automação */}

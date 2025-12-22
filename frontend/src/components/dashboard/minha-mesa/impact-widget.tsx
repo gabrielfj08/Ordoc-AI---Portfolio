@@ -45,7 +45,7 @@ export const ImpactWidget = () => {
                         Impacto estimado do dia
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        Se você concluir as principais tarefas hoje, a IA estima:
+                        Se você concluir as principais tarefas hoje:
                     </p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
