@@ -660,6 +660,7 @@ class PolicyViewSet(BaseViewSet):
             'id': policy.id
         })
 
+class AuditLogViewSet(BaseViewSet):
     """
     ViewSet for viewing audit logs (read-only)
     """
