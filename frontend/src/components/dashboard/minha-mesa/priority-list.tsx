@@ -42,7 +42,7 @@ export const PriorityList = () => {
                     <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                         Tarefas que precisam de você hoje
                         <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
-                            IA priorizou {totalPrioritized} tarefas
+                            {totalPrioritized} tarefas priorizadas
                         </Badge>
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">

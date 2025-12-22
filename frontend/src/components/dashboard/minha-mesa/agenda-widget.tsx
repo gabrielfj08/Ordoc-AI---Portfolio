@@ -1,25 +1,51 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, BrainCircuit } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, BrainCircuit, Loader2 } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import dashboardService, { AgendaEvent, AgendaInsight } from '@/services/dashboard';
 
 export const AgendaWidget = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [events, setEvents] = useState<Record<string, AgendaEvent>>({});
+    const [insights, setInsights] = useState<AgendaInsight[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [insightsLoading, setInsightsLoading] = useState(true);
 
-    // Mock events
-    const events: Record<string, { title: string; time: string; type: 'meeting' | 'deadline' | 'other' }> = {
-        '2025-12-22': { title: 'Reunião de Orçamento', time: '14:00', type: 'meeting' },
-        '2025-12-24': { title: 'Recesso Administrativo', time: 'Dia todo', type: 'other' },
-        '2025-12-29': { title: 'Entrega Relatório Anual', time: '10:00', type: 'deadline' },
-        '2025-12-20': { title: 'Revisão de Metas', time: '16:00', type: 'meeting' } // Hoje
+    useEffect(() => {
+        loadAgendaData();
+    }, []);
+
+    const loadAgendaData = async () => {
+        setLoading(true);
+        setInsightsLoading(true);
+        try {
+            const [eventsData, insightsData] = await Promise.all([
+                dashboardService.getAgendaEvents(),
+                dashboardService.getAgendaInsights(),
+            ]);
+
+            // Converter array de eventos para Record<date, event>
+            const eventsMap: Record<string, AgendaEvent> = {};
+            eventsData.forEach(event => {
+                eventsMap[event.date] = event;
+            });
+
+            setEvents(eventsMap);
+            setInsights(insightsData);
+        } catch (error) {
+            console.error('Failed to load agenda data:', error);
+        } finally {
+            setLoading(false);
+            setInsightsLoading(false);
+        }
     };
 
     const getDaysInMonth = (date: Date) => {
@@ -133,21 +159,47 @@ export const AgendaWidget = () => {
             <div className="mt-auto pt-4 border-t border-border/50">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                     <BrainCircuit className="w-4 h-4 text-primary" />
-                    Insights da IA
+                    Insights
                 </h3>
-                <div className="space-y-2">
-                    <div className="bg-primary/5 dark:bg-primary/10 p-2.5 rounded-lg border border-primary/20">
-                        <p className="text-xs text-foreground leading-snug">
-                            <span className="font-semibold text-primary">Padrão identificado:</span> Alta demanda de processos nas últimas 48h.
-                        </p>
+                {insightsLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-xs text-muted-foreground">Carregando insights...</span>
                     </div>
-                    <div className="flex items-start gap-2 p-2 rounded-lg hover:bg-secondary/50 transition-colors">
-                        <div className="mt-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
-                        <p className="text-xs text-muted-foreground leading-snug">
-                            Sugestão: Reserve a sexta-feira para revisão de contratos acumulados.
-                        </p>
+                ) : insights.length === 0 ? (
+                    <div className="text-center py-3 text-xs text-muted-foreground">
+                        Nenhum insight disponível no momento
                     </div>
-                </div>
+                ) : (
+                    <div className="space-y-2">
+                        {insights.map((insight, index) => (
+                            <div
+                                key={index}
+                                className={`${insight.type === 'pattern'
+                                    ? 'bg-primary/5 p-2.5 rounded-lg border border-primary/20'
+                                    : 'flex items-start gap-2 p-2 rounded-lg hover:bg-secondary/50 transition-colors'
+                                    }`}
+                            >
+                                {insight.type === 'pattern' ? (
+                                    <p className="text-xs text-foreground leading-snug">
+                                        <span className={`font-semibold ${insight.severity === 'warning' ? 'text-amber-600' : 'text-primary'}`}>
+                                            Padrão identificado:
+                                        </span>{' '}
+                                        {insight.message}
+                                    </p>
+                                ) : (
+                                    <>
+                                        <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${insight.severity === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
+                                            }`}></div>
+                                        <p className="text-xs text-muted-foreground leading-snug">
+                                            <span className="font-medium">Sugestão:</span> {insight.message}
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </Card>
     );
