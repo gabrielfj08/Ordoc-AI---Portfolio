@@ -15,9 +15,18 @@ import {
     Library,
     PenTool,
     BadgeCheck,
-    History
+    History,
+    AlertCircle,
+    Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { DocumentCard } from './document-card';
 import { CategoriesView } from './categories-view';
@@ -29,9 +38,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Types
 interface Directory {
-    id: number;
+    id: string | number;
     name: string;
+    healthStatus?: 'healthy' | 'needs_attention' | 'critical';
+    pendingActions?: number;
+    insights?: any[];
 }
+
+// Helper para formatação de data
+const formatDate = (dateString: string): string => {
+    try {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffMins < 60) return `Há ${diffMins} minuto${diffMins !== 1 ? 's' : ''}`;
+        if (diffHours < 24) return `Há ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+        if (diffDays < 7) return `Há ${diffDays} dia${diffDays !== 1 ? 's' : ''}`;
+        return date.toLocaleDateString('pt-BR');
+    } catch {
+        return dateString;
+    }
+};
 
 const DocumentsView = () => {
     const router = useRouter();
@@ -39,26 +70,45 @@ const DocumentsView = () => {
 
     // Derived state from URL
     const currentView = searchParams.get('docView') || 'files'; // files, categories, templates, sign_pending, sign_signed, sign_history
-    const currentDirId = searchParams.get('folder') ? Number(searchParams.get('folder')) : null;
+    const currentDirId = searchParams.get('folder');
     const currentFolderName = searchParams.get('folderName');
 
-    // --- Mock Data Logic ---
-    const fetchDirectories = async (parentId: number | null) => {
-        if (parentId === null) return [{ id: 1, name: 'Documentos Gerais' }, { id: 2, name: 'Contratos' }, { id: 3, name: 'Relatórios' }];
-        if (parentId === 1) return [{ id: 11, name: 'Políticas' }, { id: 12, name: 'Manuais' }];
-        if (parentId === 2) return [{ id: 21, name: 'Fornecedores' }, { id: 22, name: 'Clientes' }];
+    const fetchDirectories = async (parentId: string | null) => {
+        // TODO: Implement with real API when parentId support is added
+        // For now, return root directories with insights
+        if (parentId === null) {
+            const { default: dashboardService } = await import('@/services/dashboard');
+            const folders = await dashboardService.getFoldersWithInsights();
+            return folders.map((f: any) => ({
+                id: f.id,
+                name: f.name,
+                healthStatus: f.healthStatus || 'healthy',
+                pendingActions: f.pendingActions || 0,
+                insights: f.insights || []
+            }));
+        }
         return [];
     };
 
-    const fetchDocuments = async (dirId: number | null) => {
-        if (dirId === null) return [
-            { id: 1, title: 'Proposta Comercial 2025', filename: 'proposta.pdf', created_at: '2024-12-19', sharedBy: 'Maria Silva' },
-            { id: 2, title: 'Ata de Reunião', filename: 'ata_reuniao.docx', created_at: '2024-12-18' }
-        ];
-        if (dirId === 1) return [
-            { id: 11, title: 'Manual do Funcionário', filename: 'manual.pdf', created_at: '2024-11-01' },
-            { id: 12, title: 'Código de Ética', filename: 'etica.pdf', created_at: '2024-10-15', sharedBy: 'RH Corporativo' }
-        ];
+    const fetchDocuments = async (dirId: string | null) => {
+        const { default: dashboardService } = await import('@/services/dashboard');
+
+        if (dirId === null) {
+            // Root level: show recent intelligent documents
+            const docs = await dashboardService.getRecentDocumentsIntelligent();
+            return docs.map((d: any) => ({
+                id: d.id,
+                title: d.name,
+                filename: d.name,
+                created_at: d.uploadedAt,
+                suggested: d.suggested,
+                suggestionReason: d.suggestionReason,
+                relevanceScore: d.relevanceScore,
+            }));
+        }
+
+        // TODO: Fetch documents for specific directory
+        // For now returning empty if inside directory until folder logic is full
         return [];
     };
 
@@ -215,16 +265,64 @@ const DocumentsView = () => {
                             </CardHeader>
                             <CardContent className="p-2">
                                 <div className="flex flex-col gap-1">
-                                    {(directories || []).map(dir => (
-                                        <button
-                                            key={dir.id}
-                                            onClick={() => handleNavigate(dir)}
-                                            className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-secondary/80 text-left transition-colors group"
-                                        >
-                                            <Folder className="w-4 h-4 text-orange-400 fill-orange-50 group-hover:fill-orange-100" />
-                                            <span className="text-sm font-medium text-foreground">{dir.name}</span>
-                                        </button>
-                                    ))}
+                                    {(directories || []).map(dir => {
+                                        const isHealthy = !dir.healthStatus || dir.healthStatus === 'healthy';
+                                        const hasIssues = dir.healthStatus === 'needs_attention';
+                                        const isCritical = dir.healthStatus === 'critical';
+
+                                        const FolderContent = (
+                                            <button
+                                                onClick={() => handleNavigate(dir)}
+                                                className={`w-full flex items-center justify-between p-2.5 rounded-lg text-left transition-colors group ${isCritical ? 'hover:bg-red-50' : hasIssues ? 'hover:bg-yellow-50' : 'hover:bg-secondary/80'}`}
+                                            >
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="relative">
+                                                        <Folder className={`w-4 h-4 ${isCritical ? 'text-red-500 fill-red-50' : hasIssues ? 'text-yellow-600 fill-yellow-50' : 'text-orange-400 fill-orange-50 group-hover:fill-orange-100'}`} />
+                                                        {!isHealthy && (
+                                                            <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ring-1 ring-white ${isCritical ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                                                        )}
+                                                    </div>
+                                                    <span className={`text-sm font-medium truncate ${isCritical ? 'text-red-700' : hasIssues ? 'text-yellow-700' : 'text-foreground'}`}>
+                                                        {dir.name}
+                                                    </span>
+                                                </div>
+
+                                                {dir.pendingActions && dir.pendingActions > 0 && (
+                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-background shadow-sm border">
+                                                        {dir.pendingActions}
+                                                    </Badge>
+                                                )}
+                                            </button>
+                                        );
+
+                                        if (dir.insights && dir.insights.length > 0) {
+                                            return (
+                                                <TooltipProvider key={dir.id}>
+                                                    <Tooltip delayDuration={300}>
+                                                        <TooltipTrigger asChild>
+                                                            {FolderContent}
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="right" className="max-w-[200px]" align="start">
+                                                            <div className="flex flex-col gap-2">
+                                                                <p className="font-semibold text-xs flex items-center gap-1.5">
+                                                                    <Info className="w-3 h-3" /> Insights da Pasta
+                                                                </p>
+                                                                <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-3">
+                                                                    {dir.insights.map((insight: any, idx: number) => (
+                                                                        <li key={idx}>
+                                                                            {insight.description}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            </div>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            );
+                                        }
+
+                                        return <div key={dir.id}>{FolderContent}</div>;
+                                    })}
                                     {directories?.length === 0 && (
                                         <p className="text-xs text-muted-foreground p-2">Nenhuma subpasta</p>
                                     )}
@@ -240,25 +338,25 @@ const DocumentsView = () => {
                     {/* Files View */}
                     {currentView === 'files' && (
                         <>
-                            {/* Recentes */}
-                            {currentDirId === null && (
-                                <section>
+                            {/* Recentes com IA */}
+                            {currentDirId === null && documents && documents.length > 0 && (
+                                <section className="mb-8">
                                     <h2 className="flex items-center gap-2 text-lg font-semibold mb-3">
                                         <Clock className="w-5 h-5 text-green-600" /> Recentes
                                     </h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <DocumentCard
-                                            title="Contrato XPTO v2.pdf"
-                                            type="PDF"
-                                            updatedAt="Há 2 horas"
-                                            sharedBy="Financeiro"
-                                        />
-                                        <DocumentCard
-                                            title="Apresentação Q4.pptx"
-                                            type="PPTX"
-                                            size="15 MB"
-                                            updatedAt="Ontem"
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {documents.slice(0, 4).map((doc: any) => (
+                                            <DocumentCard
+                                                key={doc.id}
+                                                title={doc.title}
+                                                type={doc.filename?.split('.').pop()?.toUpperCase() || 'FILE'}
+                                                updatedAt={formatDate(doc.created_at)}
+                                                sharedBy={doc.sharedBy}
+                                                suggested={doc.suggested}
+                                                suggestionReason={doc.suggestionReason}
+                                                relevanceScore={doc.relevanceScore}
+                                            />
+                                        ))}
                                     </div>
                                 </section>
                             )}
@@ -266,23 +364,31 @@ const DocumentsView = () => {
                             {/* Files List */}
                             <section>
                                 <h2 className="flex items-center gap-2 text-lg font-semibold mb-3">
-                                    {currentFolderName || 'Arquivos'}
+                                    {currentFolderName || (documents && documents.length > 4 ? 'Outros Arquivos' : 'Arquivos')}
                                 </h2>
                                 <div className="flex flex-col gap-3">
-                                    {(documents || []).map(doc => (
-                                        <DocumentCard
-                                            key={doc.id}
-                                            title={doc.title}
-                                            type={doc.filename.split('.').pop()?.toUpperCase() || 'FILE'}
-                                            updatedAt={doc.created_at}
-                                            sharedBy={doc.sharedBy}
-                                        />
-                                    ))}
-                                    {documents?.length === 0 && (
+                                    {(documents || [])
+                                        .slice(currentDirId === null ? 4 : 0) // If root, skip first 4 (shown in Recents). If folder, show all.
+                                        .map((doc: any) => (
+                                            <DocumentCard
+                                                key={doc.id}
+                                                title={doc.title}
+                                                type={doc.filename?.split('.').pop()?.toUpperCase() || 'FILE'}
+                                                updatedAt={formatDate(doc.created_at)}
+                                                sharedBy={doc.sharedBy}
+                                                suggested={doc.suggested}
+                                                suggestionReason={doc.suggestionReason}
+                                                relevanceScore={doc.relevanceScore}
+                                            />
+                                        ))}
+                                    {(documents || []).length === 0 && (
                                         <div className="text-center py-12 text-muted-foreground bg-card/50 rounded-xl border border-dashed border-border">
                                             <Folder className="w-12 h-12 mx-auto mb-3 opacity-20" />
                                             <p>Esta pasta está vazia</p>
                                         </div>
+                                    )}
+                                    {currentDirId === null && documents && documents.length > 0 && documents.length <= 4 && (
+                                        <p className="text-sm text-muted-foreground italic">Todos os documentos recentes estão listados acima.</p>
                                     )}
                                 </div>
                             </section>
