@@ -1,0 +1,902 @@
+"""
+Intelligence Celery Tasks - Processamento assíncrono e agendado.
+
+Tasks simples e focadas em valor:
+1. Análise automática de documentos
+2. Aprendizado com ações de usuários
+3. Agregação de padrões (user → org → platform)
+4. Geração de alertas proativos
+
+Princípios:
+- Cada task faz UMA coisa
+- Falhas são logadas, não propagadas
+- Retry automático com backoff
+- Monitoramento simples com logs
+"""
+from celery import shared_task
+from django.utils import timezone
+from django.db.models import Count, Q
+import logging
+from datetime import timedelta
+from uuid import UUID
+
+logger = logging.getLogger('intelligence.tasks')
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def analyze_document_async(self, document_id: str, document_type: str = 'unknown', organization_id: str = None):
+    """
+    Analisa documento com IA de forma assíncrona.
+
+    Args:
+        document_id: UUID do documento
+        document_type: Tipo do documento
+        organization_id: UUID da organização
+    """
+    from ordoc_air.models import Document
+    from .services.intelligence_service import IntelligenceService
+    from .models import DocumentAnalysis, ProactiveAlert
+    import asyncio
+
+    try:
+        # Buscar documento
+        document = Document.objects.get(id=document_id)
+
+        # Extrair texto (suporta OCR se necessário)
+        document_content = _extract_document_text(document)
+
+        if not document_content:
+            logger.warning(f"Documento {document_id} sem conteúdo para análise")
+            return None
+
+        # Limitar análise a 10.000 caracteres (evita custos excessivos)
+        if len(document_content) > 10000:
+            document_content = document_content[:10000]
+            logger.info(f"Documento {document_id} truncado para análise (>10k chars)")
+
+        # Inicializar serviço e analisar
+        service = IntelligenceService()
+
+        # Executar análise (usa asyncio)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        result = loop.run_until_complete(
+            service.analyze_document(
+                document_id=UUID(document_id),
+                document_content=document_content,
+                document_type=document_type,
+                context={
+                    'organization_id': organization_id,
+                    'filename': document.name if hasattr(document, 'name') else 'unknown'
+                },
+                analysis_depth='standard'  # Standard = extraction + classification (não usa LLM Council por padrão)
+            )
+        )
+
+        loop.close()
+
+        # Salvar resultado
+        DocumentAnalysis.objects.update_or_create(
+            document_id=document_id,
+            defaults={
+                'document_type': document_type,
+                'extraction_result': result.get('extraction', {}),
+                'council_deliberation': result.get('deliberation', {}),
+                'analysis_depth': 'standard',
+                'processing_time_ms': result.get('processing_time_ms', 0),
+                'status': 'completed',
+                'completed_at': timezone.now(),
+                'organization_id': organization_id
+            }
+        )
+
+        # Criar alertas se houver
+        for alert_data in result.get('alerts', []):
+            ProactiveAlert.objects.create(
+                document_id=document_id,
+                document_type=document_type,
+                alert_type=alert_data.get('alert_type', 'suggestion'),
+                severity=alert_data.get('severity', 'info'),
+                title=alert_data.get('title', 'Alerta'),
+                message=alert_data.get('message', ''),
+                details=alert_data.get('details', {}),
+                suggested_actions=alert_data.get('suggested_actions', []),
+                organization_id=organization_id
+            )
+
+        logger.info(f"Documento {document_id} analisado com sucesso - {len(result.get('alerts', []))} alertas")
+        return result
+
+    except Document.DoesNotExist:
+        logger.error(f"Documento {document_id} não encontrado")
+        return None
+    except Exception as e:
+        logger.exception(f"Erro ao analisar documento {document_id}: {e}")
+        # Retry com backoff exponencial
+        raise self.retry(exc=e, countdown=2 ** self.request.retries * 60)
+
+
+@shared_task
+def learn_from_task_action(task_id: str, action_type: str, user_id: str = None, organization_id: str = None):
+    """
+    Aprende com aprovações/rejeições de tarefas.
+
+    Captura padrões: "Departamento X sempre rejeita tipo Y por motivo Z"
+    """
+    from ordoc_flow.models import Task
+    from .models import KnowledgeFeedback
+
+    try:
+        task = Task.objects.select_related('procedure').get(id=task_id)
+
+        # Capturar contexto da ação
+        context = {
+            'task_id': task_id,
+            'procedure_id': str(task.procedure_id) if hasattr(task, 'procedure') else None,
+            'procedure_type': task.procedure.template.name if hasattr(task, 'procedure') and hasattr(task.procedure, 'template') else 'unknown',
+            'department': task.department.name if hasattr(task, 'department') else None,
+            'rejection_reason': task.rejection_reason if hasattr(task, 'rejection_reason') else None
+        }
+
+        # Criar feedback
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type='workflow_task',
+            action_type=action_type,
+            original_value='',  # Não há valor original em tasks
+            corrected_value='',
+            context=context,
+            user_id=user_id,
+            organization_id=organization_id,
+            sector=task.procedure.sector if hasattr(task, 'procedure') and hasattr(task.procedure, 'sector') else ''
+        )
+
+        logger.info(f"Feedback registrado para task {task_id}: {action_type}")
+
+    except Task.DoesNotExist:
+        logger.warning(f"Task {task_id} não encontrada para aprendizado")
+    except Exception as e:
+        logger.error(f"Erro ao aprender com task {task_id}: {e}")
+
+
+@shared_task
+def analyze_signature_pattern(signature_id: str):
+    """
+    Analisa padrões de assinatura (tempo médio, rejeições, etc).
+    """
+    from ordoc_sign.models import SignatureRequest
+    from .models import KnowledgeFeedback
+
+    try:
+        signature = SignatureRequest.objects.get(id=signature_id)
+
+        # Calcular tempo de assinatura
+        if signature.created_at and signature.completed_at:
+            time_taken = (signature.completed_at - signature.created_at).total_seconds() / 3600  # horas
+
+            # Se demorou muito (>72h), registrar como padrão
+            if time_taken > 72:
+                KnowledgeFeedback.objects.create(
+                    layer='organization',
+                    document_type='signature_workflow',
+                    action_type='observation',
+                    original_value='',
+                    corrected_value='',
+                    context={
+                        'signature_id': signature_id,
+                        'time_taken_hours': time_taken,
+                        'alert': 'slow_signature'
+                    },
+                    organization_id=str(signature.workflow.organization_id) if hasattr(signature, 'workflow') else None
+                )
+
+        logger.debug(f"Padrão de assinatura analisado: {signature_id}")
+
+    except SignatureRequest.DoesNotExist:
+        logger.warning(f"Assinatura {signature_id} não encontrada")
+    except Exception as e:
+        logger.error(f"Erro ao analisar assinatura {signature_id}: {e}")
+
+
+@shared_task
+def track_document_edit(document_id: str, modified_by: str = None):
+    """
+    Rastreia edições de documentos como feedback implícito.
+
+    Edições frequentes indicam que algo está errado ou pode ser melhorado.
+    """
+    from ordoc_air.models import Document
+    from .models import KnowledgeFeedback
+
+    try:
+        document = Document.objects.get(id=document_id)
+
+        # Contar edições recentes (últimas 24h)
+        recent_edits = KnowledgeFeedback.objects.filter(
+            context__document_id=document_id,
+            action_type='correction',
+            created_at__gte=timezone.now() - timedelta(hours=24)
+        ).count()
+
+        # Se há muitas edições (>3), pode indicar problema
+        if recent_edits >= 3:
+            logger.info(f"Documento {document_id} com {recent_edits} edições em 24h - possível problema")
+
+        # Registrar edição
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type=document.document_type or 'unknown',
+            action_type='correction',
+            original_value='',
+            corrected_value='',
+            context={
+                'document_id': document_id,
+                'edit_count': recent_edits + 1
+            },
+            user_id=modified_by,
+            organization_id=str(document.organization_id) if document.organization_id else None
+        )
+
+    except Document.DoesNotExist:
+        logger.warning(f"Documento {document_id} não encontrado para rastreamento")
+    except Exception as e:
+        logger.error(f"Erro ao rastrear edição do documento {document_id}: {e}")
+
+
+@shared_task
+def aggregate_patterns_periodic():
+    """
+    Agrega padrões de user → organization → platform.
+
+    Executa periodicamente (ex: a cada hora) para identificar padrões recorrentes.
+
+    Lógica SIMPLES:
+    - Se 3+ usuários fizeram a mesma correção → vira padrão organizacional
+    - Se 3+ organizações têm o mesmo padrão → vira padrão de setor
+    - Se 3+ setores têm o mesmo padrão → vira padrão de plataforma
+    """
+    from .models import KnowledgeFeedback, LearnedPattern, PatternFeedbackLink
+    from django.db.models import Count
+
+    try:
+        # 1. Identificar correções recorrentes (mesma ação, mesmo tipo de doc)
+        recurrent_corrections = KnowledgeFeedback.objects.filter(
+            processed=False,
+            action_type='correction'
+        ).values(
+            'document_type',
+            'corrected_value',
+            'organization_id'
+        ).annotate(
+            count=Count('id')
+        ).filter(count__gte=3)  # 3+ ocorrências = padrão
+
+        patterns_created = 0
+
+        for correction in recurrent_corrections:
+            # Buscar feedbacks que compõem esse padrão
+            feedbacks = KnowledgeFeedback.objects.filter(
+                document_type=correction['document_type'],
+                corrected_value=correction['corrected_value'],
+                organization_id=correction['organization_id'],
+                processed=False
+            )
+
+            if not feedbacks.exists():
+                continue
+
+            # Criar padrão organizacional
+            pattern = LearnedPattern.objects.create(
+                layer='organization',
+                pattern_type='common_correction',
+                name=f"Correção recorrente em {correction['document_type']}",
+                description=f"Usuários frequentemente corrigem para: {correction['corrected_value'][:100]}",
+                condition={
+                    'document_type': correction['document_type'],
+                    'trigger': 'on_create'
+                },
+                action={
+                    'type': 'suggestion',
+                    'message': f"Considere usar: {correction['corrected_value'][:100]}",
+                    'auto_applicable': False
+                },
+                confidence=min(0.9, 0.5 + (feedbacks.count() * 0.1)),  # Mais ocorrências = mais confiança
+                occurrences=feedbacks.count(),
+                organization_id=correction['organization_id'],
+                document_type=correction['document_type']
+            )
+
+            # Vincular feedbacks ao padrão
+            for feedback in feedbacks:
+                PatternFeedbackLink.objects.create(
+                    pattern=pattern,
+                    feedback=feedback,
+                    contribution_weight=1.0 / feedbacks.count()
+                )
+
+            # Marcar como processados
+            feedbacks.update(processed=True, processed_at=timezone.now())
+            patterns_created += 1
+
+        logger.info(f"Agregação periódica concluída: {patterns_created} padrões criados")
+        return patterns_created
+
+    except Exception as e:
+        logger.exception(f"Erro na agregação periódica de padrões: {e}")
+        return 0
+
+
+@shared_task
+def generate_compliance_alerts():
+    """
+    Gera alertas de compliance automáticos.
+
+    Exemplos:
+    - Documentos sem assinatura há 7+ dias
+    - Workflows parados há 14+ dias
+    - Certificados próximos do vencimento
+    """
+    from ordoc_air.models import Document
+    from ordoc_flow.models import Procedure
+    from .models import ProactiveAlert
+
+    alerts_created = 0
+
+    try:
+        # 1. Documentos que precisam de assinatura mas não têm
+        pending_signature_docs = Document.objects.filter(
+            requires_signature=True,
+            created_at__lt=timezone.now() - timedelta(days=7)
+        ).exclude(
+            id__in=Document.objects.filter(
+                signatures__isnull=False
+            ).values_list('id', flat=True)
+        )
+
+        for doc in pending_signature_docs[:50]:  # Limitar a 50 por execução
+            alert, created = ProactiveAlert.objects.get_or_create(
+                document_id=doc.id,
+                alert_type='compliance',
+                severity='warning',
+                defaults={
+                    'title': 'Documento pendente de assinatura',
+                    'message': f'Documento "{doc.name}" aguarda assinatura há mais de 7 dias',
+                    'details': {'days_pending': (timezone.now() - doc.created_at).days},
+                    'suggested_actions': [
+                        {
+                            'action_type': 'review',
+                            'label': 'Enviar para assinatura',
+                            'auto_applicable': False
+                        }
+                    ],
+                    'organization_id': doc.organization_id
+                }
+            )
+            if created:
+                alerts_created += 1
+
+        # 2. Workflows parados há muito tempo
+        stalled_procedures = Procedure.objects.filter(
+            status='processing',
+            updated_at__lt=timezone.now() - timedelta(days=14)
+        )
+
+        for proc in stalled_procedures[:50]:
+            alert, created = ProactiveAlert.objects.get_or_create(
+                document_id=proc.id,  # Procedure ID como document_id
+                document_type='procedure',
+                alert_type='compliance',
+                severity='error',
+                defaults={
+                    'title': 'Procedimento parado',
+                    'message': f'Procedimento "{proc.title if hasattr(proc, "title") else "Sem título"}" sem atualização há 14+ dias',
+                    'details': {'days_stalled': (timezone.now() - proc.updated_at).days},
+                    'suggested_actions': [
+                        {
+                            'action_type': 'review',
+                            'label': 'Verificar procedimento',
+                            'auto_applicable': False
+                        }
+                    ],
+                    'organization_id': proc.organization_id
+                }
+            )
+            if created:
+                alerts_created += 1
+
+        logger.info(f"Alertas de compliance gerados: {alerts_created}")
+        return alerts_created
+
+    except Exception as e:
+        logger.exception(f"Erro ao gerar alertas de compliance: {e}")
+        return 0
+
+
+@shared_task
+def cleanup_expired_alerts():
+    """
+    Remove alertas expirados ou muito antigos.
+
+    Mantém apenas alertas dos últimos 30 dias.
+    """
+    from .models import ProactiveAlert
+
+    try:
+        cutoff_date = timezone.now() - timedelta(days=30)
+
+        deleted = ProactiveAlert.objects.filter(
+            Q(expires_at__lt=timezone.now()) |
+            Q(created_at__lt=cutoff_date, user_response__in=['accepted', 'rejected'])
+        ).delete()
+
+        logger.info(f"Alertas limpos: {deleted[0]} removidos")
+        return deleted[0]
+
+    except Exception as e:
+        logger.exception(f"Erro ao limpar alertas expirados: {e}")
+        return 0
+
+
+@shared_task
+def analyze_procedure_pattern(procedure_id: str, is_new: bool = False):
+    """
+    Analisa padrões de procedimentos/workflows.
+
+    Aprende:
+    - Tipos mais usados
+    - Tempo médio
+    - Taxa de aprovação
+    """
+    from ordoc_flow.models import Procedure
+    from .models import KnowledgeFeedback
+
+    try:
+        procedure = Procedure.objects.get(id=procedure_id)
+
+        # Registrar padrão de uso
+        KnowledgeFeedback.objects.create(
+            layer='organization',
+            document_type='procedure',
+            action_type='observation',
+            context={
+                'procedure_id': procedure_id,
+                'procedure_type': procedure.template.name if hasattr(procedure, 'template') else 'unknown',
+                'is_new': is_new,
+                'status': procedure.status
+            },
+            organization_id=procedure.organization_id if hasattr(procedure, 'organization_id') else None
+        )
+
+        logger.debug(f"Padrão de procedimento analisado: {procedure_id}")
+
+    except Procedure.DoesNotExist:
+        logger.warning(f"Procedimento {procedure_id} não encontrado")
+    except Exception as e:
+        logger.error(f"Erro ao analisar procedimento {procedure_id}: {e}")
+
+
+@shared_task
+def track_user_activity(user_id: str, activity_type: str, ip_address: str = None, user_agent: str = None):
+    """
+    Rastreia atividade de usuários (login, logout, etc).
+
+    Detecta:
+    - Horários incomuns
+    - Frequência de uso
+    - Padrões de acesso
+    """
+    from .models import KnowledgeFeedback
+    from django.utils import timezone
+
+    try:
+        hour = timezone.now().hour
+
+        # Detectar acesso fora do horário comercial (antes das 7h ou depois das 20h)
+        is_unusual_time = hour < 7 or hour > 20
+
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type='user_activity',
+            action_type='observation',
+            context={
+                'activity_type': activity_type,
+                'hour': hour,
+                'is_unusual_time': is_unusual_time,
+                'ip_address': ip_address,
+                'user_agent': user_agent
+            },
+            user_id=user_id
+        )
+
+        if is_unusual_time and activity_type == 'login':
+            logger.info(f"Acesso fora do horário detectado: usuário {user_id} às {hour}h")
+
+    except Exception as e:
+        logger.error(f"Erro ao rastrear atividade do usuário {user_id}: {e}")
+
+
+@shared_task
+def track_security_event(event_type: str, username: str = None, ip_address: str = None):
+    """
+    Rastreia eventos de segurança (login_failed, etc).
+
+    Detecta:
+    - Tentativas de ataque
+    - IPs suspeitos
+    """
+    from .models import KnowledgeFeedback, ProactiveAlert
+
+    try:
+        # Contar falhas recentes deste IP (últimas 24h)
+        if ip_address:
+            recent_failures = KnowledgeFeedback.objects.filter(
+                document_type='security_event',
+                context__event_type='login_failed',
+                context__ip_address=ip_address,
+                created_at__gte=timezone.now() - timedelta(hours=24)
+            ).count()
+
+            # Se 5+ falhas, gerar alerta
+            if recent_failures >= 5:
+                ProactiveAlert.objects.create(
+                    document_id=ip_address,  # Usar IP como identificador
+                    document_type='security',
+                    alert_type='error',
+                    severity='critical',
+                    title='Possível ataque de força bruta',
+                    message=f'IP {ip_address} teve {recent_failures} tentativas de login falhadas em 24h',
+                    details={
+                        'ip_address': ip_address,
+                        'failure_count': recent_failures,
+                        'username': username
+                    },
+                    suggested_actions=[
+                        {
+                            'action_type': 'block',
+                            'label': 'Bloquear IP',
+                            'auto_applicable': False
+                        }
+                    ]
+                )
+
+        # Registrar evento
+        KnowledgeFeedback.objects.create(
+            layer='platform',
+            document_type='security_event',
+            action_type='observation',
+            context={
+                'event_type': event_type,
+                'username': username,
+                'ip_address': ip_address
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao rastrear evento de segurança: {e}")
+
+
+@shared_task
+def analyze_organization_usage(organization_id: str):
+    """
+    Analisa padrões de uso de uma organização.
+
+    Gera insights sobre:
+    - Funcionalidades mais usadas
+    - Usuários mais ativos
+    - Horários de pico
+    """
+    from .models import KnowledgeFeedback
+
+    try:
+        # Análise simples: contar atividades por tipo
+        activities = KnowledgeFeedback.objects.filter(
+            organization_id=organization_id,
+            created_at__gte=timezone.now() - timedelta(days=7)
+        ).values('document_type').annotate(count=Count('id'))
+
+        logger.info(f"Uso da organização {organization_id}: {dict(activities)}")
+
+    except Exception as e:
+        logger.error(f"Erro ao analisar organização {organization_id}: {e}")
+
+
+@shared_task
+def track_deletion(entity_type: str, entity_id: str, quick_delete: bool = False, organization_id: str = None):
+    """
+    Rastreia exclusões (documentos, etc).
+
+    Detecta:
+    - Exclusões logo após criação (possível erro)
+    - Muitas exclusões (problema de UX)
+    """
+    from .models import KnowledgeFeedback, ProactiveAlert
+
+    try:
+        # Se foi exclusão rápida, gerar alerta
+        if quick_delete:
+            ProactiveAlert.objects.create(
+                document_id=entity_id,
+                document_type=entity_type,
+                alert_type='suggestion',
+                severity='info',
+                title='Exclusão rápida detectada',
+                message=f'{entity_type.capitalize()} foi deletado menos de 5 minutos após criação. Possível erro?',
+                details={
+                    'entity_type': entity_type,
+                    'entity_id': entity_id
+                },
+                organization_id=organization_id
+            )
+
+        # Registrar
+        KnowledgeFeedback.objects.create(
+            layer='organization' if organization_id else 'platform',
+            document_type=f'{entity_type}_deletion',
+            action_type='observation',
+            context={
+                'entity_id': entity_id,
+                'quick_delete': quick_delete
+            },
+            organization_id=organization_id
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao rastrear exclusão: {e}")
+
+
+@shared_task
+def track_document_access(document_id: str, user_id: str):
+    """
+    Rastreia acessos a documentos.
+
+    Detecta:
+    - Documentos mais acessados
+    - Acesso a docs sensíveis
+    - Padrões de uso
+    """
+    from ordoc_air.models import Document
+    from .models import KnowledgeFeedback
+
+    try:
+        document = Document.objects.get(id=document_id)
+
+        # Verificar se é documento sensível (nome contém palavras-chave)
+        sensitive_keywords = ['confidencial', 'secreto', 'restrito', 'sigiloso']
+        is_sensitive = any(kw in document.name.lower() for kw in sensitive_keywords) if hasattr(document, 'name') else False
+
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type='document_access',
+            action_type='observation',
+            context={
+                'document_id': document_id,
+                'is_sensitive': is_sensitive
+            },
+            user_id=user_id,
+            organization_id=str(document.organization_id) if document.organization_id else None
+        )
+
+    except Document.DoesNotExist:
+        logger.warning(f"Documento {document_id} não encontrado")
+    except Exception as e:
+        logger.error(f"Erro ao rastrear acesso: {e}")
+
+
+@shared_task
+def track_document_download(document_id: str, user_id: str):
+    """
+    Rastreia downloads de documentos.
+
+    Detecta:
+    - Múltiplos downloads do mesmo doc
+    - Downloads em massa (possível vazamento)
+    """
+    from .models import KnowledgeFeedback
+
+    try:
+        # Contar downloads recentes deste usuário (última hora)
+        recent_downloads = KnowledgeFeedback.objects.filter(
+            document_type='document_download',
+            user_id=user_id,
+            created_at__gte=timezone.now() - timedelta(hours=1)
+        ).count()
+
+        # Se 10+ downloads em 1h, alertar
+        if recent_downloads >= 10:
+            logger.warning(f"Usuário {user_id} baixou {recent_downloads} documentos em 1h - possível vazamento")
+
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type='document_download',
+            action_type='observation',
+            context={
+                'document_id': document_id,
+                'recent_download_count': recent_downloads
+            },
+            user_id=user_id
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao rastrear download: {e}")
+
+
+@shared_task
+def learn_tagging_pattern(document_id: str, action: str):
+    """
+    Aprende padrões de categorização com tags.
+
+    Detecta:
+    - Tags mais usadas por tipo de doc
+    - Padrões de organização
+    """
+    from ordoc_air.models import Document
+    from .models import KnowledgeFeedback
+
+    try:
+        document = Document.objects.prefetch_related('tags').get(id=document_id)
+
+        tags_list = [tag.name for tag in document.tags.all()] if hasattr(document, 'tags') else []
+
+        KnowledgeFeedback.objects.create(
+            layer='organization',
+            document_type=document.document_type or 'unknown',
+            action_type='observation',
+            context={
+                'document_id': document_id,
+                'tags': tags_list,
+                'action': action
+            },
+            organization_id=str(document.organization_id) if document.organization_id else None
+        )
+
+    except Document.DoesNotExist:
+        logger.warning(f"Documento {document_id} não encontrado")
+    except Exception as e:
+        logger.error(f"Erro ao aprender padrão de tags: {e}")
+
+
+# ========================================
+# ANÁLISE PROATIVA PERIÓDICA
+# ========================================
+
+@shared_task
+def proactive_document_analysis():
+    """
+    Analisa documentos EXISTENTES periodicamente.
+
+    Não espera upload - vai atrás dos documentos!
+
+    Analisa:
+    - Docs sem categoria
+    - Docs sem tags
+    - Docs duplicados
+    - Docs sem metadados
+    """
+    from ordoc_air.models import Document
+    from .models import ProactiveAlert
+
+    try:
+        # 1. Documentos sem tipo (categoria)
+        uncategorized = Document.objects.filter(
+            Q(document_type__isnull=True) | Q(document_type='')
+        )[:20]  # Limitar a 20 por execução
+
+        for doc in uncategorized:
+            ProactiveAlert.objects.get_or_create(
+                document_id=doc.id,
+                alert_type='suggestion',
+                defaults={
+                    'severity': 'info',
+                    'title': 'Documento sem categoria',
+                    'message': f'Documento "{doc.name}" não tem categoria definida',
+                    'details': {'document_id': str(doc.id)},
+                    'suggested_actions': [
+                        {
+                            'action_type': 'categorize',
+                            'label': 'Categorizar',
+                            'auto_applicable': False
+                        }
+                    ],
+                    'organization_id': doc.organization_id
+                }
+            )
+
+        # 2. Documentos sem tags
+        untagged = Document.objects.annotate(
+            tag_count=Count('tags')
+        ).filter(tag_count=0)[:20]
+
+        for doc in untagged:
+            ProactiveAlert.objects.get_or_create(
+                document_id=doc.id,
+                alert_type='suggestion',
+                defaults={
+                    'severity': 'info',
+                    'title': 'Documento sem tags',
+                    'message': f'Documento "{doc.name}" não possui tags para facilitar busca',
+                    'suggested_actions': [
+                        {
+                            'action_type': 'add_tags',
+                            'label': 'Adicionar tags',
+                            'auto_applicable': False
+                        }
+                    ],
+                    'organization_id': doc.organization_id
+                }
+            )
+
+        logger.info(f"Análise proativa: {uncategorized.count()} sem categoria, {untagged.count()} sem tags")
+
+    except Exception as e:
+        logger.exception(f"Erro na análise proativa de documentos: {e}")
+
+
+@shared_task
+def generate_insights_report():
+    """
+    Gera relatório de insights automaticamente.
+
+    Analisa últimos 7 dias e gera insights sobre:
+    - Padrões de uso
+    - Gargalos
+    - Oportunidades de melhoria
+    """
+    from .models import KnowledgeFeedback, ProactiveAlert
+    from django.db.models import Count
+
+    try:
+        cutoff = timezone.now() - timedelta(days=7)
+
+        # Top 5 atividades mais comuns
+        top_activities = KnowledgeFeedback.objects.filter(
+            created_at__gte=cutoff
+        ).values('document_type').annotate(
+            count=Count('id')
+        ).order_by('-count')[:5]
+
+        # Gerar alerta com insights
+        insights_text = "Insights dos últimos 7 dias:\n"
+        for activity in top_activities:
+            insights_text += f"- {activity['document_type']}: {activity['count']} ocorrências\n"
+
+        ProactiveAlert.objects.create(
+            document_id='insights-report',
+            document_type='analytics',
+            alert_type='suggestion',
+            severity='info',
+            title='Relatório Semanal de Insights',
+            message=insights_text,
+            details={'period': '7_days', 'activities': list(top_activities)}
+        )
+
+        logger.info(f"Relatório de insights gerado: {len(top_activities)} atividades")
+
+    except Exception as e:
+        logger.exception(f"Erro ao gerar relatório de insights: {e}")
+
+
+# Helper functions
+def _extract_document_text(document) -> str:
+    """
+    Extrai texto de um documento.
+
+    Suporta:
+    - Texto direto (se já extraído por OCR)
+    - Campos de metadados
+    """
+    # Se tem campo 'content' ou 'extracted_text'
+    if hasattr(document, 'extracted_text') and document.extracted_text:
+        return document.extracted_text
+
+    if hasattr(document, 'content') and document.content:
+        return document.content
+
+    # Fallback: usar nome + descrição
+    parts = []
+    if hasattr(document, 'name'):
+        parts.append(f"Arquivo: {document.name}")
+    if hasattr(document, 'description') and document.description:
+        parts.append(f"Descrição: {document.description}")
+
+    return '\n'.join(parts) if parts else ''
