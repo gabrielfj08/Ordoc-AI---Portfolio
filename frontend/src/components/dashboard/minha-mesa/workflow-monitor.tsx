@@ -4,6 +4,7 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export const WorkflowMonitor = () => {
     return (
@@ -15,7 +16,9 @@ export const WorkflowMonitor = () => {
                         Processos com maior volume de documentos circulando.
                     </p>
                 </div>
-                <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground font-medium">Ver todos <ArrowRight className="ml-1.5 w-3.5 h-3.5" /></Button>
+                <Link href="/dashboard?view=workflows">
+                    <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground font-medium">Ver todos <ArrowRight className="ml-1.5 w-3.5 h-3.5" /></Button>
+                </Link>
             </div>
             <div className="space-y-3">
                 <div className="rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors p-3.5 flex items-start justify-between gap-3 cursor-pointer">

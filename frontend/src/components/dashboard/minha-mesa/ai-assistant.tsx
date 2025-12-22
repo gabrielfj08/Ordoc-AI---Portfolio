@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Sparkles, Bot, Zap, Bell, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import intelligenceService, { ProactiveAlert } from '@/services/intelligence';
 
 import { AgendaWidget } from './agenda-widget';
@@ -97,12 +98,12 @@ export const AIAssistant = () => {
                             <p className="text-muted-foreground leading-relaxed text-sm">
                                 {alerts.length} alerta{alerts.length > 1 ? 's' : ''} aguardando sua ação.
                             </p>
-                            <button
-                                onClick={() => window.location.href = '/dashboard/analytics'}
-                                className="mt-2 text-xs font-medium text-primary hover:underline flex items-center gap-1"
+                            <Link
+                                href="/dashboard/ordoc-intelligence"
+                                className="mt-2 text-xs font-medium text-primary hover:underline flex items-center gap-1 inline-flex"
                             >
                                 Ver todos →
-                            </button>
+                            </Link>
                         </div>
                     )}
 

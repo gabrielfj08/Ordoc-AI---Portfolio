@@ -29,7 +29,8 @@ import {
   LogOut,
   Command,
   ChevronsUpDown,
-  Plus
+  Plus,
+  Brain
 } from 'lucide-react'
 
 import {
@@ -88,6 +89,11 @@ const navMain = [
         title: 'Dashboard',
         url: '/dashboard',
         icon: LayoutDashboard,
+      },
+      {
+        title: 'Intelligence',
+        url: '/dashboard/ordoc-intelligence',
+        icon: Brain,
       },
       {
         title: 'OrdocAir',
