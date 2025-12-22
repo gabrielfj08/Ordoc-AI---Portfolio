@@ -95,6 +95,44 @@ export interface AgendaInsight {
     message: string;
 }
 
+// ==================== DOCUMENTS TYPES ====================
+
+export interface IntelligentDocument extends RecentDocument {
+    suggested: boolean; // IA recomenda
+    suggestionReason?: string; // Motivo da sugestão
+    relevanceScore: number; // 0-100
+    lastAccessed?: string;
+    relatedTo?: string[]; // IDs de processos/workflows relacionados
+}
+
+export interface FolderInsight {
+    type: 'warning' | 'info' | 'success';
+    message: string;
+    count?: number;
+}
+
+export interface IntelligentFolder {
+    id: string;
+    name: string;
+    documentCount: number;
+    lastAccessed?: string;
+    healthStatus: 'healthy' | 'needs_attention' | 'critical';
+    insights: FolderInsight[];
+    pendingActions: number;
+}
+
+export interface PrioritySignature {
+    id: string;
+    title: string;
+    received_at: string;
+    deadline?: string;
+    priority_score: number; // 1-10
+    impact: 'low' | 'medium' | 'high' | 'critical';
+    blocks_processes?: string[];
+    estimated_time?: number; // minutos
+    can_sign: boolean;
+}
+
 // ==================== API FUNCTIONS ====================
 
 export const dashboardService = {
@@ -431,6 +469,253 @@ export const dashboardService = {
             return insights;
         } catch (error) {
             console.error('Failed to load agenda insights:', error);
+            return [];
+        }
+    },
+
+    // ==================== DOCUMENTS INTELLIGENCE ====================
+
+    /**
+     * Feature 1.1: Documentos Recentes com Intelligence
+     * IA analisa relevância e sugere documentos importantes
+     */
+    async getRecentDocumentsIntelligent(): Promise<IntelligentDocument[]> {
+        try {
+            // 1. Buscar documentos recentes do OrdocAir
+            const response = await api.get('/ordoc-air/documents/', {
+                params: {
+                    ordering: '-created_at',
+                    limit: 20,
+                },
+            });
+
+            const docs = Array.isArray(response.data) ? response.data : response.data.results || [];
+
+            // 2. IA analisa relevância de cada documento
+            const intelligentDocs: IntelligentDocument[] = docs.map((doc: any) => {
+                // Calcular score de relevância baseado em:
+                // - Recência (quanto mais recente, maior o score)
+                // - Tipo de documento (contratos têm prioridade)
+                // - Status (pendentes têm prioridade)
+
+                const daysSinceCreation = (Date.now() - new Date(doc.created_at).getTime()) / (1000 * 60 * 60 * 24);
+                let relevanceScore = 100 - (daysSinceCreation * 10); // Decai 10 pontos por dia
+
+                // Boost para documentos importantes
+                if (doc.name?.toLowerCase().includes('contrato')) relevanceScore += 20;
+                if (doc.name?.toLowerCase().includes('urgente')) relevanceScore += 30;
+                if (doc.status === 'pending') relevanceScore += 15;
+
+                relevanceScore = Math.max(0, Math.min(100, relevanceScore)); // Clamp 0-100
+
+                // IA decide se sugere (score > 70)
+                const suggested = relevanceScore > 70;
+                let suggestionReason: string | undefined;
+
+                if (suggested) {
+                    if (doc.name?.toLowerCase().includes('contrato')) {
+                        suggestionReason = 'Contrato recente que pode precisar de atenção';
+                    } else if (doc.name?.toLowerCase().includes('urgente')) {
+                        suggestionReason = 'Marcado como urgente';
+                    } else if (daysSinceCreation < 1) {
+                        suggestionReason = 'Adicionado hoje';
+                    } else {
+                        suggestionReason = 'Documento relevante baseado em padrões de uso';
+                    }
+                }
+
+                return {
+                    id: doc.id,
+                    name: doc.name,
+                    type: this.getDocType(doc.name || ''),
+                    uploadedAt: doc.created_at,
+                    suggested,
+                    suggestionReason,
+                    relevanceScore: Math.round(relevanceScore),
+                    lastAccessed: doc.last_accessed,
+                };
+            });
+
+            // Ordenar por relevância (mais relevantes primeiro)
+            return intelligentDocs.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 10);
+        } catch (error) {
+            console.error('Failed to load intelligent documents:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Feature 1.2: Pastas com Insights
+     * IA analisa saúde das pastas e gera insights
+     */
+    async getFoldersWithInsights(): Promise<IntelligentFolder[]> {
+        try {
+            // 1. Buscar pastas do OrdocAir
+            const response = await api.get('/ordoc-air/directories/');
+            const folders = Array.isArray(response.data) ? response.data : response.data.results || [];
+
+            // 2. Para cada pasta, buscar documentos e gerar insights
+            const intelligentFolders: IntelligentFolder[] = await Promise.all(
+                folders.map(async (folder: any) => {
+                    // Buscar docs da pasta
+                    const docsResponse = await api.get('/ordoc-air/documents/', {
+                        params: { directory: folder.id },
+                    });
+                    const docs = Array.isArray(docsResponse.data) ? docsResponse.data : docsResponse.data.results || [];
+
+                    // IA analisa saúde da pasta
+                    const insights: FolderInsight[] = [];
+                    let healthStatus: 'healthy' | 'needs_attention' | 'critical' = 'healthy';
+                    let pendingActions = 0;
+
+                    // Detectar documentos sem categoria
+                    const uncategorized = docs.filter((d: any) => !d.category).length;
+                    if (uncategorized > 0) {
+                        insights.push({
+                            type: 'warning',
+                            message: `${uncategorized} documento${uncategorized > 1 ? 's' : ''} sem categoria`,
+                            count: uncategorized,
+                        });
+                        healthStatus = 'needs_attention';
+                        pendingActions += uncategorized;
+                    }
+
+                    // Detectar documentos muito antigos
+                    const now = Date.now();
+                    const oldDocs = docs.filter((d: any) => {
+                        const age = (now - new Date(d.created_at).getTime()) / (1000 * 60 * 60 * 24);
+                        return age > 365; // Mais de 1 ano
+                    }).length;
+                    if (oldDocs > 5) {
+                        insights.push({
+                            type: 'info',
+                            message: `${oldDocs} documentos com mais de 1 ano`,
+                            count: oldDocs,
+                        });
+                    }
+
+                    // Detectar pasta vazia ou muito cheia
+                    if (docs.length === 0) {
+                        insights.push({
+                            type: 'info',
+                            message: 'Pasta vazia',
+                        });
+                    } else if (docs.length > 100) {
+                        insights.push({
+                            type: 'warning',
+                            message: 'Pasta com muitos documentos - considere organizar em subpastas',
+                            count: docs.length,
+                        });
+                        healthStatus = 'needs_attention';
+                    }
+
+                    // Status crítico se muitas ações pendentes
+                    if (pendingActions > 20) {
+                        healthStatus = 'critical';
+                    }
+
+                    // Se não há problemas, mensagem positiva
+                    if (insights.length === 0) {
+                        insights.push({
+                            type: 'success',
+                            message: 'Pasta organizada',
+                        });
+                    }
+
+                    return {
+                        id: folder.id,
+                        name: folder.name,
+                        documentCount: docs.length,
+                        lastAccessed: folder.last_accessed,
+                        healthStatus,
+                        insights,
+                        pendingActions,
+                    };
+                })
+            );
+
+            return intelligentFolders;
+        } catch (error) {
+            console.error('Failed to load folders with insights:', error);
+            return [];
+        }
+    },
+
+    /**
+     * Feature 4.1: Assinaturas Priorizadas
+     * IA prioriza assinaturas urgentes
+     */
+    async getPrioritizedSignatures(): Promise<PrioritySignature[]> {
+        try {
+            // 1. Buscar assinaturas pendentes do OrdocSign
+            const response = await api.get('/ordoc-sign/api/requests/', {
+                params: { status: 'pending' },
+            });
+
+            const signatures = Array.isArray(response.data) ? response.data : response.data.results || [];
+
+            // 2. IA calcula prioridade de cada assinatura
+            const prioritizedSignatures: PrioritySignature[] = signatures.map((sig: any) => {
+                let priorityScore = 5; // Score padrão médio
+                let impact: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+                let estimatedTime = 5; // minutos padrão
+
+                // Analisar deadline
+                if (sig.deadline) {
+                    const deadline = new Date(sig.deadline);
+                    const now = new Date();
+                    const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+                    if (diffHours < 0) {
+                        // Atrasado
+                        priorityScore = 10;
+                        impact = 'critical';
+                    } else if (diffHours < 2) {
+                        // Menos de 2 horas
+                        priorityScore = 9;
+                        impact = 'critical';
+                    } else if (diffHours < 24) {
+                        // Menos de 24 horas
+                        priorityScore = 8;
+                        impact = 'high';
+                    } else if (diffHours < 72) {
+                        // Menos de 3 dias
+                        priorityScore = 7;
+                        impact = 'high';
+                    } else {
+                        priorityScore = 5;
+                        impact = 'medium';
+                    }
+                }
+
+                // Boost para contratos e valores altos
+                if (sig.title?.toLowerCase().includes('contrato')) {
+                    priorityScore = Math.min(10, priorityScore + 1);
+                    impact = impact === 'low' ? 'medium' : impact;
+                    estimatedTime = 10; // Contratos demoram mais
+                }
+
+                // Reduzir prioridade para documentos simples
+                if (sig.title?.toLowerCase().includes('termo') || sig.title?.toLowerCase().includes('declaração')) {
+                    estimatedTime = 2; // Documentos simples são rápidos
+                }
+
+                return {
+                    id: sig.id,
+                    title: sig.title || 'Documento sem título',
+                    received_at: sig.created_at,
+                    deadline: sig.deadline,
+                    priority_score: priorityScore,
+                    impact,
+                    estimated_time: estimatedTime,
+                    can_sign: true, // Assume que pode assinar
+                };
+            });
+
+            // Ordenar por prioridade (maior score primeiro)
+            return prioritizedSignatures.sort((a, b) => b.priority_score - a.priority_score);
+        } catch (error) {
+            console.error('Failed to load prioritized signatures:', error);
             return [];
         }
     },

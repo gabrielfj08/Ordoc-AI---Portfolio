@@ -1,12 +1,19 @@
 import React from 'react';
-import { FileText, MoreVertical, Share2 } from 'lucide-react';
+import { FileText, MoreVertical, Share2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface DocumentCardProps {
     title: string;
@@ -14,6 +21,8 @@ interface DocumentCardProps {
     size?: string;
     updatedAt: string;
     sharedBy?: string; // If present, displays shared tag
+    suggested?: boolean; // IA sugere este documento
+    suggestionReason?: string; // Motivo da sugestão
     onClick?: () => void;
 }
 
@@ -23,23 +32,46 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     size = '2 MB',
     updatedAt,
     sharedBy,
+    suggested = false,
+    suggestionReason,
     onClick
 }) => {
+    const SuggestedBadge = () => {
+        if (!suggested) return null;
+
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Badge variant="secondary" className="text-xs font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20">
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            Sugerido
+                        </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p className="text-xs">{suggestionReason || 'Documento relevante'}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    };
+
     return (
         <div
-            className="group relative flex items-center justify-between p-3 bg-card hover:bg-accent/50 cursor-pointer border border-border hover:border-primary/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            className={`group relative flex items-center justify-between p-3 bg-card hover:bg-accent/50 cursor-pointer border ${suggested ? 'border-primary/40 bg-primary/5' : 'border-border'} hover:border-primary/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
             onClick={onClick}
         >
             <div className="flex items-center gap-3">
                 {/* Icon - Minimalist (no background) */}
                 <div className="w-10 h-10 flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-orange-600 dark:text-orange-400/90" />
+                    <FileText className={`w-6 h-6 ${suggested ? 'text-primary' : 'text-orange-600 dark:text-orange-400/90'}`} />
                 </div>
 
                 {/* Info */}
                 <div className="flex flex-col">
                     <span className="font-semibold text-foreground text-sm flex items-center gap-2">
                         {title}
+                        <SuggestedBadge />
                         {sharedBy && (
                             <span className="text-muted-foreground" title={`Compartilhado por ${sharedBy}`}>
                                 <Share2 className="w-3.5 h-3.5 text-blue-500" />
