@@ -82,7 +82,7 @@ export const AIAssistant = () => {
             <Card className="p-4 border-border/60 shadow-sm animate-in fade-in slide-in-from-right-4 duration-700 delay-300">
                 <h2 className="text-base font-semibold text-foreground mb-1 flex items-center gap-2">
                     <Bot className="w-5 h-5 text-primary" />
-                    OrdocAI Assistant
+                    Assistente
                     {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
                 </h2>
                 <p className="text-sm text-muted-foreground mb-3">
@@ -130,7 +130,7 @@ export const AIAssistant = () => {
             <Card className="p-4 border-border/60 shadow-sm animate-in fade-in slide-in-from-right-4 duration-700 delay-500">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-amber-500" /> Ações rápidas (IA)
+                        <Zap className="w-4 h-4 text-amber-500" /> Ações rápidas
                     </h2>
                     <span className="text-xs text-muted-foreground">
                         {loading ? 'Carregando...' : 'Atualizado agora'}
