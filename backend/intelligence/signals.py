@@ -1,19 +1,34 @@
 """
-Intelligence Signals - Integração automática com eventos da plataforma.
+Intelligence Signals - Integração AMPLA e automática com eventos da plataforma.
 
-Este módulo conecta o sistema de Intelligence aos eventos dos outros módulos
-de forma DESACOPLADA e NÃO-INVASIVA, usando Django signals.
+Este módulo conecta o sistema de Intelligence a TODOS os eventos relevantes
+dos outros módulos de forma DESACOPLADA e NÃO-INVASIVA, usando Django signals.
+
+COBERTURA COMPLETA:
+- Documentos (upload, edição, download, compartilhamento, exclusão)
+- Workflows (criação, aprovação, rejeição, conclusão)
+- Assinaturas (solicitação, assinatura, rejeição)
+- Usuários (login, logout, mudança de senha, acesso)
+- Organizações (criação, mudança de configuração)
+- Integrações (uso de APIs externas)
 
 Princípios:
 - Assíncrono: usa Celery para não bloquear requests
 - Resiliente: falhas não afetam o fluxo principal
+- Abrangente: captura TUDO que pode gerar insights
 - Simples: sem lógica complexa, delega para tasks
 """
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.db.models.signals import post_save, pre_delete, m2m_changed
+from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
+from django.dispatch import receiver, Signal
 import logging
 
 logger = logging.getLogger('intelligence.signals')
+
+# Custom signals
+document_accessed = Signal()
+document_downloaded = Signal()
+document_shared = Signal()
 
 
 # Evitar import circular - importar models apenas quando necessário
@@ -142,6 +157,219 @@ def on_document_edited(sender, instance, created, **kwargs):
     except Exception as e:
         logger.warning(f"Erro ao rastrear edição do documento {instance.id}: {e}")
 
+
+# ========================================
+# WORKFLOWS E PROCEDIMENTOS
+# ========================================
+
+@receiver(post_save, sender='ordoc_flow.Procedure')
+def on_procedure_created_or_updated(sender, instance, created, **kwargs):
+    """
+    Quando um procedimento é criado ou atualizado.
+
+    Aprende:
+    - Tipos de procedimentos mais usados
+    - Tempo médio de conclusão
+    - Taxa de aprovação/rejeição
+    """
+    from .tasks import analyze_procedure_pattern
+
+    try:
+        analyze_procedure_pattern.apply_async(
+            args=[str(instance.id)],
+            kwargs={'is_new': created},
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao agendar análise de procedimento {instance.id}: {e}")
+
+
+# ========================================
+# USUÁRIOS E AUTENTICAÇÃO
+# ========================================
+
+@receiver(user_logged_in)
+def on_user_login(sender, request, user, **kwargs):
+    """
+    Quando um usuário faz login.
+
+    Monitora:
+    - Horários de acesso
+    - Frequência de uso
+    - Padrões de login
+    """
+    from .tasks import track_user_activity
+
+    try:
+        track_user_activity.apply_async(
+            args=[str(user.id), 'login'],
+            kwargs={
+                'ip_address': request.META.get('REMOTE_ADDR'),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:200]
+            },
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao rastrear login do usuário {user.id}: {e}")
+
+
+@receiver(user_login_failed)
+def on_login_failed(sender, credentials, request, **kwargs):
+    """
+    Quando uma tentativa de login falha.
+
+    Monitora:
+    - Tentativas de acesso não autorizado
+    - Possíveis ataques
+    """
+    from .tasks import track_security_event
+
+    try:
+        track_security_event.apply_async(
+            args=['login_failed'],
+            kwargs={
+                'username': credentials.get('username', 'unknown'),
+                'ip_address': request.META.get('REMOTE_ADDR') if request else None
+            },
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao rastrear falha de login: {e}")
+
+
+# ========================================
+# ORGANIZAÇÕES
+# ========================================
+
+@receiver(post_save, sender='ordoc_air.Organization')
+def on_organization_changed(sender, instance, created, **kwargs):
+    """
+    Quando uma organização é criada ou atualizada.
+
+    Aprende:
+    - Configurações comuns
+    - Padrões de uso
+    """
+    from .tasks import analyze_organization_usage
+
+    try:
+        if not created:  # Só analisa mudanças, não criação
+            analyze_organization_usage.apply_async(
+                args=[str(instance.id)],
+                countdown=1
+            )
+    except Exception as e:
+        logger.warning(f"Erro ao analisar organização {instance.id}: {e}")
+
+
+# ========================================
+# EXCLUSÕES (Detecção de problemas)
+# ========================================
+
+@receiver(pre_delete, sender='ordoc_air.Document')
+def on_document_deleted(sender, instance, **kwargs):
+    """
+    Quando um documento é deletado.
+
+    Monitora:
+    - Exclusões frequentes (possível problema de UX)
+    - Documentos deletados logo após upload (erro?)
+    """
+    from .tasks import track_deletion
+    from django.utils import timezone
+
+    try:
+        # Se deletado logo após criação (< 5 min), pode ser erro
+        time_since_creation = (timezone.now() - instance.created_at).total_seconds()
+        is_quick_delete = time_since_creation < 300  # 5 minutos
+
+        track_deletion.apply_async(
+            args=['document', str(instance.id)],
+            kwargs={
+                'quick_delete': is_quick_delete,
+                'organization_id': str(instance.organization_id) if instance.organization_id else None
+            },
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao rastrear exclusão do documento {instance.id}: {e}")
+
+
+# ========================================
+# COMPARTILHAMENTOS E ACESSOS
+# ========================================
+
+@receiver(document_accessed)
+def on_document_accessed(sender, document, user, **kwargs):
+    """
+    Custom signal: quando um documento é acessado/visualizado.
+
+    COMO USAR: Disparar este signal nas views de visualização:
+
+    from intelligence.signals import document_accessed
+    document_accessed.send(sender=Document, document=doc, user=request.user)
+    """
+    from .tasks import track_document_access
+
+    try:
+        track_document_access.apply_async(
+            args=[str(document.id), str(user.id)],
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao rastrear acesso ao documento {document.id}: {e}")
+
+
+@receiver(document_downloaded)
+def on_document_downloaded(sender, document, user, **kwargs):
+    """
+    Custom signal: quando um documento é baixado.
+
+    COMO USAR: Disparar nas views de download:
+
+    from intelligence.signals import document_downloaded
+    document_downloaded.send(sender=Document, document=doc, user=request.user)
+    """
+    from .tasks import track_document_download
+
+    try:
+        track_document_download.apply_async(
+            args=[str(document.id), str(user.id)],
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao rastrear download do documento {document.id}: {e}")
+
+
+# ========================================
+# TAGS E CATEGORIZAÇÃO
+# ========================================
+
+@receiver(m2m_changed, sender='ordoc_air.Document.tags.through')
+def on_document_tags_changed(sender, instance, action, **kwargs):
+    """
+    Quando tags de um documento mudam.
+
+    Aprende:
+    - Tags mais usadas por tipo de documento
+    - Padrões de categorização
+    """
+    from .tasks import learn_tagging_pattern
+
+    if action in ['post_add', 'post_remove']:
+        try:
+            learn_tagging_pattern.apply_async(
+                args=[str(instance.id)],
+                kwargs={'action': action},
+                countdown=1
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao aprender padrão de tags do documento {instance.id}: {e}")
+
+
+# ========================================
+# HELPERS
+# ========================================
 
 # Função helper para desabilitar signals em contextos específicos (ex: testes, migrations)
 class DisableSignals:

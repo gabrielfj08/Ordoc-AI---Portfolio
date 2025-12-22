@@ -18,14 +18,33 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks()
 
 
-# Celery Beat Schedule - Tarefas periódicas
+# Celery Beat Schedule - Tarefas periódicas de INTELIGÊNCIA AMPLA
 app.conf.beat_schedule = {
+    # ========================================
+    # APRENDIZADO E AGREGAÇÃO
+    # ========================================
+
     # Intelligence: Agregação de padrões (a cada hora)
     'intelligence-aggregate-patterns-hourly': {
         'task': 'intelligence.tasks.aggregate_patterns_periodic',
         'schedule': crontab(minute=0),  # A cada hora cheia (00:00, 01:00, etc)
         'options': {'expires': 3600}  # Expira em 1h se não executar
     },
+
+    # ========================================
+    # ANÁLISE PROATIVA
+    # ========================================
+
+    # Intelligence: Análise proativa de documentos (a cada 6 horas)
+    'intelligence-proactive-analysis': {
+        'task': 'intelligence.tasks.proactive_document_analysis',
+        'schedule': crontab(minute=0, hour='*/6'),  # 00:00, 06:00, 12:00, 18:00
+        'options': {'expires': 21600}  # Expira em 6h
+    },
+
+    # ========================================
+    # COMPLIANCE E SEGURANÇA
+    # ========================================
 
     # Intelligence: Alertas de compliance (diariamente às 8h)
     'intelligence-compliance-alerts-daily': {
@@ -38,6 +57,17 @@ app.conf.beat_schedule = {
     'intelligence-cleanup-alerts-daily': {
         'task': 'intelligence.tasks.cleanup_expired_alerts',
         'schedule': crontab(hour=0, minute=0),  # 00:00 todos os dias
+        'options': {'expires': 86400}
+    },
+
+    # ========================================
+    # INSIGHTS E RELATÓRIOS
+    # ========================================
+
+    # Intelligence: Relatório de insights (semanalmente às segundas 9h)
+    'intelligence-weekly-insights': {
+        'task': 'intelligence.tasks.generate_insights_report',
+        'schedule': crontab(hour=9, minute=0, day_of_week=1),  # Segunda-feira 9h
         'options': {'expires': 86400}
     },
 }
