@@ -105,9 +105,9 @@ export const dashboardService = {
         try {
             // Buscar dados do backend
             const [docsResponse, approvalsResponse, userResponse] = await Promise.all([
-                api.get('/ordoc-sign/documents/?status=pending_signature'),
-                api.get('/ordoc-flow/tasks/?status=pending_approval'),
-                api.get('/ordoc-cloud/profile/'),
+                api.get('/ordoc-sign/api/requests/pending/'),
+                api.get('/ordoc-flow/api/tasks/?status=running'),
+                api.get('/../auth/me/'),
             ]);
 
             const docs = Array.isArray(docsResponse.data) ? docsResponse.data : docsResponse.data.results || [];
@@ -159,7 +159,7 @@ export const dashboardService = {
      */
     async getProcessStatus(): Promise<ProcessStatus> {
         try {
-            const response = await api.get('/ordoc-flow/tasks/');
+            const response = await api.get('/ordoc-flow/api/tasks/');
             const tasks = Array.isArray(response.data) ? response.data : response.data.results || [];
 
             const urgent = tasks.filter((t: any) => t.priority === 'high' || t.priority === 'urgent').length;
@@ -190,7 +190,7 @@ export const dashboardService = {
     async getImpactEstimate(): Promise<ImpactEstimate> {
         try {
             // Buscar tarefas pendentes
-            const response = await api.get('/ordoc-flow/tasks/?status=pending');
+            const response = await api.get('/ordoc-flow/api/tasks/?status=running');
             const tasks = Array.isArray(response.data) ? response.data : response.data.results || [];
 
             // Buscar alertas da IA para insights
@@ -228,8 +228,8 @@ export const dashboardService = {
     async getPriorityTasks(type?: 'all' | 'urgent' | 'signature' | 'approval'): Promise<PriorityTask[]> {
         try {
             const [tasksResponse, docsResponse] = await Promise.all([
-                api.get('/ordoc-flow/tasks/?status=pending'),
-                api.get('/ordoc-sign/documents/?status=pending_signature'),
+                api.get('/ordoc-flow/api/tasks/?status=running'),
+                api.get('/ordoc-sign/api/requests/pending/'),
             ]);
 
             const tasks = Array.isArray(tasksResponse.data) ? tasksResponse.data : tasksResponse.data.results || [];
@@ -340,7 +340,7 @@ export const dashboardService = {
      */
     async getActiveWorkflows(): Promise<Workflow[]> {
         try {
-            const response = await api.get('/ordoc-flow/procedures/');
+            const response = await api.get('/ordoc-flow/api/procedures/');
             const procedures = Array.isArray(response.data) ? response.data : response.data.results || [];
 
             // IA analisa atividade de cada workflow
@@ -368,7 +368,10 @@ export const dashboardService = {
      */
     async getRecentDocuments(): Promise<RecentDocument[]> {
         try {
-            const response = await api.get('/ordoc-air/documents/?ordering=-created_at&limit=5');
+            // OrdocAir urls usually don't have intermediate /api/ because configuration varies, 
+            // but let's assume standard pattern. Checking if it fails.
+            // Actually, based on patterns, let's try /ordoc-air/api/documents/
+            const response = await api.get('/ordoc-air/api/documents/?ordering=-created_at&limit=5');
             const docs = Array.isArray(response.data) ? response.data : response.data.results || [];
 
             return docs.map((doc: any) => ({
@@ -389,7 +392,7 @@ export const dashboardService = {
     async getAgendaEvents(): Promise<AgendaEvent[]> {
         try {
             // Buscar deadlines e eventos
-            const response = await api.get('/ordoc-flow/tasks/?has_deadline=true');
+            const response = await api.get('/ordoc-flow/api/tasks/?has_deadline=true');
             const tasks = Array.isArray(response.data) ? response.data : response.data.results || [];
 
             const events: AgendaEvent[] = tasks
