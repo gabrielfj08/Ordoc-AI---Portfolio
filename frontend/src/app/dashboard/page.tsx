@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, use } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DaySummaryWidget } from '@/components/dashboard/minha-mesa/day-summary';
 import { ImpactWidget } from '@/components/dashboard/minha-mesa/impact-widget';
@@ -84,10 +85,23 @@ function DashboardContent({ searchParams }: DashboardProps) {
   );
 }
 
+// Create a client instance for this dashboard
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export default function Dashboard(props: DashboardProps) {
   return (
     <ProtectedRoute>
-      <DashboardContent {...props} />
+      <QueryClientProvider client={queryClient}>
+        <DashboardContent {...props} />
+      </QueryClientProvider>
     </ProtectedRoute>
   );
 }
