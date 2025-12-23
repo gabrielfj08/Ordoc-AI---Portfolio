@@ -62,6 +62,7 @@ import { SignHistoryView } from './signatures/sign-history-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SmartUploadDialog } from './smart-upload-dialog';
 import FolderCard from './folder-card';
+import { CreateFolderDialog } from './dialogs/create-folder-dialog';
 
 // Types
 interface Directory {
@@ -105,6 +106,11 @@ const DocumentsView = () => {
     const [previewDocument, setPreviewDocument] = useState<any | null>(null);
     const [csvData, setCsvData] = useState<string[][] | null>(null);
     const [isLoadingCsv, setIsLoadingCsv] = useState(false);
+    
+    // Dialog states
+    const [createFolderOpen, setCreateFolderOpen] = useState(false);
+    const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
+    const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
 
     const handleCardClick = (doc: any) => {
         setPreviewDocument(doc);
@@ -269,18 +275,31 @@ const DocumentsView = () => {
                                     <Upload className="w-4 h-4" /> Upload
                                 </Button>
                             </SmartUploadDialog>
-                            <Button size="sm" variant="outline" className="gap-2">
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="gap-2"
+                                onClick={() => setCreateFolderOpen(true)}
+                            >
                                 <Plus className="w-4 h-4" /> Pasta
                             </Button>
                         </>
                     )}
                     {currentView === 'categories' && (
-                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                        <Button 
+                            size="sm" 
+                            className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
+                            onClick={() => setCreateCategoryOpen(true)}
+                        >
                             <Plus className="w-4 h-4" /> Nova Categoria
                         </Button>
                     )}
                     {currentView === 'templates' && (
-                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                        <Button 
+                            size="sm" 
+                            className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
+                            onClick={() => setCreateTemplateOpen(true)}
+                        >
                             <Plus className="w-4 h-4" /> Novo Template
                         </Button>
                     )}
@@ -666,6 +685,16 @@ const DocumentsView = () => {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Create Folder Dialog */}
+            <CreateFolderDialog 
+                open={createFolderOpen} 
+                onOpenChange={setCreateFolderOpen}
+                parentDirId={currentDirId}
+            />
+
+            {/* TODO: Add CreateCategoryDialog */}
+            {/* TODO: Add CreateTemplateDialog */}
 
         </div>
     )
