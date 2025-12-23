@@ -206,7 +206,7 @@ class TaskSerializer(serializers.ModelSerializer):
             'task_comments', 'task_fields', 'is_closed', 'procedure_info',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'prn', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'prn', 'created_by', 'created_at', 'updated_at']
     
 
     def validate(self, data):

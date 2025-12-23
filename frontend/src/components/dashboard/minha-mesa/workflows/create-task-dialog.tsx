@@ -89,7 +89,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
                 status: defaultStatus === 'in_progress' ? 'running' : 'draft',
                 deadline: values.deadline || null,
                 assignee: values.assignee_id || null,
-                created_by: user?.id,
+                // Note: created_by is set automatically by the backend from the authenticated user
             };
 
             // Remove helper keys
@@ -98,15 +98,12 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
 
             console.log('Sending Task Payload:', payload);
 
-            if (!payload.created_by) {
-                console.error('MISSING USER ID in payload! User object:', user);
-                throw new Error('Usuário não identificado. Recarregue a página.');
-            }
-
             return flowService.createTask(payload);
         },
         onSuccess: () => {
+            // Invalida todas as queries de tasks para atualizar tanto o workflow quanto o kanban
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['procedures'] });
             toast.success("Tarefa criada com sucesso!");
             form.reset();
             onOpenChange(false);
