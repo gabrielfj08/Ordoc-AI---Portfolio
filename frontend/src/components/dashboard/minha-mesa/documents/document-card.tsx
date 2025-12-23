@@ -25,6 +25,7 @@ interface DocumentCardProps {
     suggestionReason?: string; // Motivo da sugestão
     relevanceScore?: number;
     onClick?: () => void;
+    onAction?: (action: 'download' | 'share' | 'delete') => void;
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -36,7 +37,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     suggested = false,
     suggestionReason,
     relevanceScore,
-    onClick
+    onClick,
+    onAction
 }) => {
     // Format date logic reuse or simplified
     const formatDate = (dateString: string) => {
@@ -108,7 +110,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             </div>
 
             {/* Actions - Menu Only */}
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background/80">
@@ -116,9 +118,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Baixar</DropdownMenuItem>
-                        <DropdownMenuItem>Compartilhar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onAction?.('download')}>Baixar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onAction?.('share')}>Compartilhar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => onAction?.('delete')}>Excluir</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

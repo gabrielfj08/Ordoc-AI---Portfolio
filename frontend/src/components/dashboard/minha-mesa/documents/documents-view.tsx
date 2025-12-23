@@ -1,7 +1,9 @@
 'use client';
 
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+
+
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Folder,
@@ -17,8 +19,31 @@ import {
     BadgeCheck,
     History,
     AlertCircle,
-    Info
+    Info,
+    FileText,
+    Download,
+    Share2,
+    Trash2,
+    X,
+    Maximize2,
+    Loader2
 } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from '@/components/ui/dialog';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -35,6 +60,7 @@ import { SignPendingView } from './signatures/sign-pending-view';
 import { SignSignedView } from './signatures/sign-signed-view';
 import { SignHistoryView } from './signatures/sign-history-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SmartUploadDialog } from './smart-upload-dialog';
 
 // Types
 interface Directory {
@@ -67,11 +93,68 @@ const formatDate = (dateString: string): string => {
 const DocumentsView = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
 
     // Derived state from URL
     const currentView = searchParams.get('docView') || 'files'; // files, categories, templates, sign_pending, sign_signed, sign_history
     const currentDirId = searchParams.get('folder');
     const currentFolderName = searchParams.get('folderName');
+
+    const [previewDocument, setPreviewDocument] = useState<any | null>(null);
+    const [csvData, setCsvData] = useState<string[][] | null>(null);
+    const [isLoadingCsv, setIsLoadingCsv] = useState(false);
+
+    const handleCardClick = (doc: any) => {
+        setPreviewDocument(doc);
+        setCsvData(null); // Reset CSV data
+    };
+
+    // Effect to parse CSV if applicable
+    useEffect(() => {
+        if (previewDocument?.previewUrl && (previewDocument.type === 'CSV' || previewDocument.filename?.toLowerCase().endsWith('.csv'))) {
+            setIsLoadingCsv(true);
+            fetch(previewDocument.previewUrl)
+                .then(res => res.text())
+                .then(text => {
+                    // Simple CSV Parser
+                    const rows = text.split('\n').filter(r => r.trim() !== '');
+                    const data = rows.map(r => {
+                        // Handle simple comma or semicolon
+                        if (r.indexOf(';') > -1) return r.split(';');
+                        return r.split(',');
+                    });
+                    setCsvData(data);
+                })
+                .catch(err => console.error("Failed to parse CSV", err))
+                .finally(() => setIsLoadingCsv(false));
+        } else {
+            setCsvData(null);
+        }
+    }, [previewDocument]);
+
+    // Helper para verificar tipos
+    const isImage = (filename?: string) => filename?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i);
+    const isPDF = (filename?: string) => filename?.match(/\.pdf$/i);
+
+    const handleAction = (action: 'download' | 'share' | 'delete', doc: any) => {
+        console.log(`Action ${action} on doc ${doc.id}`);
+        if (action === 'download') {
+            const link = document.createElement('a');
+            link.href = doc.previewUrl || '#';
+            link.download = doc.filename || 'documento';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else if (action === 'share') {
+            alert(`Compartilhar link de: ${doc.title}`);
+        } else if (action === 'delete') {
+            if (confirm(`Tem certeza que deseja excluir ${doc.title}?`)) {
+                alert('Documento excluído (simulação).');
+                queryClient.invalidateQueries({ queryKey: ['documents'] });
+                setPreviewDocument(null);
+            }
+        }
+    };
 
     const fetchDirectories = async (parentId: string | null) => {
         // TODO: Implement with real API when parentId support is added
@@ -104,6 +187,7 @@ const DocumentsView = () => {
                 suggested: d.suggested,
                 suggestionReason: d.suggestionReason,
                 relevanceScore: d.relevanceScore,
+                previewUrl: d.previewUrl,
             }));
         }
 
@@ -149,6 +233,12 @@ const DocumentsView = () => {
         router.push(`?${params.toString()}`);
     };
 
+    const handleUploadComplete = () => {
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+        queryClient.invalidateQueries({ queryKey: ['directories'] });
+        // Optional: Show toast success
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -171,9 +261,11 @@ const DocumentsView = () => {
 
                     {currentView === 'files' && (
                         <>
-                            <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
-                                <Upload className="w-4 h-4" /> Upload
-                            </Button>
+                            <SmartUploadDialog onUploadComplete={handleUploadComplete}>
+                                <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                                    <Upload className="w-4 h-4" /> Upload
+                                </Button>
+                            </SmartUploadDialog>
                             <Button size="sm" variant="outline" className="gap-2">
                                 <Plus className="w-4 h-4" /> Pasta
                             </Button>
@@ -355,6 +447,8 @@ const DocumentsView = () => {
                                                 suggested={doc.suggested}
                                                 suggestionReason={doc.suggestionReason}
                                                 relevanceScore={doc.relevanceScore}
+                                                onClick={() => handleCardClick(doc)}
+                                                onAction={(action) => handleAction(action, doc)}
                                             />
                                         ))}
                                     </div>
@@ -379,6 +473,8 @@ const DocumentsView = () => {
                                                 suggested={doc.suggested}
                                                 suggestionReason={doc.suggestionReason}
                                                 relevanceScore={doc.relevanceScore}
+                                                onClick={() => handleCardClick(doc)}
+                                                onAction={(action) => handleAction(action, doc)}
                                             />
                                         ))}
                                     {(documents || []).length === 0 && (
@@ -447,6 +543,107 @@ const DocumentsView = () => {
 
                 </div>
             </div>
+            {/* Document Preview Modal */}
+            <Dialog open={!!previewDocument} onOpenChange={(open) => !open && setPreviewDocument(null)}>
+                <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden rounded-xl">
+
+
+                    // ...
+
+                    <div className="flex items-center justify-between p-4 border-b bg-background z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
+                                <FileText className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-base font-semibold truncate max-w-[400px]">
+                                    {previewDocument?.title || 'Documento'}
+                                </DialogTitle>
+                                <DialogDescription className="text-xs">
+                                    {previewDocument?.type} • {previewDocument?.updatedAt}
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 bg-secondary/20 flex flex-col items-center justify-center p-0 relative overflow-hidden">
+                        {isLoadingCsv ? (
+                            <div className="flex flex-col items-center justify-center h-full w-full text-muted-foreground">
+                                <Loader2 className="h-8 w-8 animate-spin mb-3" />
+                                <p>Carregando CSV...</p>
+                            </div>
+                        ) : csvData ? (
+                            <div className="w-full h-full overflow-auto bg-white p-4">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            {csvData[0]?.map((header, i) => (
+                                                <TableHead key={i} className="whitespace-nowrap font-bold bg-muted/50">{header}</TableHead>
+                                            ))}
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {csvData.slice(1).map((row, i) => (
+                                            <TableRow key={i}>
+                                                {row.map((cell, j) => (
+                                                    <TableCell key={j} className="whitespace-nowrap">{cell}</TableCell>
+                                                ))}
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        ) : previewDocument?.previewUrl && isImage(previewDocument.filename) ? (
+                            <div className="w-full h-full flex items-center justify-center bg-black/5">
+                                <img
+                                    src={previewDocument.previewUrl}
+                                    className="max-w-full max-h-full object-contain shadow-lg"
+                                    alt="Preview"
+                                />
+                            </div>
+                        ) : previewDocument?.previewUrl && isPDF(previewDocument.filename) ? (
+                            <iframe
+                                src={previewDocument.previewUrl}
+                                className="w-full h-full border-none bg-white"
+                                title="Document Preview"
+                            />
+                        ) : (
+                            /* Placeholder for unsupported types or when no previewUrl */
+                            <div className="bg-white shadow-sm border rounded-xl w-[400px] h-[500px] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-300 m-8">
+                                <FileText className="w-24 h-24 text-gray-200 mb-6" />
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">{previewDocument?.title}</h3>
+                                <p className="text-sm text-gray-500 mb-6 max-w-[200px]">
+                                    Visualização não disponível para este formato.
+                                </p>
+                                {previewDocument?.previewUrl && (
+                                    <Button
+                                        className="gap-2 bg-orange-600 hover:bg-orange-700"
+                                        onClick={() => handleAction('download', previewDocument)}
+                                    >
+                                        <Download className="w-4 h-4" /> Baixar para Visualizar
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-4 border-t bg-background flex justify-between items-center">
+                        <div className="text-xs text-muted-foreground flex gap-4">
+                            <span>Tamanho: {previewDocument?.size || '2 MB'}</span>
+                            <span>Criado em: {previewDocument?.updatedAt}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" className="gap-2" onClick={() => handleAction('share', previewDocument)}>
+                                <Share2 className="w-4 h-4" /> Compartilhar
+                            </Button>
+                            <Button variant="default" onClick={() => setPreviewDocument(null)}>
+                                Fechar
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
         </div>
     )
 }

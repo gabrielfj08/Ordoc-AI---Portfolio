@@ -6,6 +6,7 @@ import { PriorityList } from '@/components/dashboard/minha-mesa/priority-list';
 import { WorkflowMonitor } from '@/components/dashboard/minha-mesa/workflow-monitor';
 import { DocumentsView } from '@/components/dashboard/minha-mesa/documents/documents-view';
 import { WorkflowsView } from '@/components/dashboard/minha-mesa/workflows/workflows-view';
+import { SignaturesView } from '@/components/dashboard/minha-mesa/signatures/signatures-view';
 import { AnalyticsView } from '@/components/dashboard/minha-mesa/analytics/analytics-view';
 import { SettingsView } from '@/components/dashboard/minha-mesa/settings/settings-view';
 import { AIAssistant } from '@/components/dashboard/minha-mesa/ai-assistant';
@@ -61,23 +62,10 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
           )}
 
           {activeTab === 'signatures' && (
-            <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Assinaturas</h1>
-                <Button>Solicitar Assinatura</Button>
-              </div>
-              <div className="bg-card rounded-xl border border-border p-12 text-center">
-                <div className="mx-auto w-12 h-12 bg-secondary rounded-full flex items-center justify-center mb-4">
-                  <Settings className="text-muted-foreground w-6 h-6" />
-                </div>
-                <h2 className="text-lg font-semibold mb-1">Central de Assinaturas</h2>
-                <p className="text-muted-foreground">Funcionalidade migrada para a aba "Documentos".</p>
-                <Button variant="link" className="mt-2 text-primary">Ir para Documentos</Button>
-              </div>
-            </div>
+            <SignaturesView />
           )}
 
-          {activeTab === 'analytics' && (
+          {activeTab === 'analises' && (
             <AnalyticsView />
           )}
 

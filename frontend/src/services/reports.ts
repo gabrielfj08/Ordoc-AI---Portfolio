@@ -1,240 +1,88 @@
-import {
-  ReportTemplate,
-  Report,
-  ReportSchedule,
-  ReportShare,
-  ReportMetric,
-  DashboardMetrics,
-  GenerateReportData,
-  CreateReportScheduleData,
-  CreateReportShareData,
-  FilterReportTemplatesParams,
-  FilterReportsParams,
-  FilterReportSchedulesParams,
-  FilterReportSharesParams,
-  ApiResponse
-} from '@/types/ordoc-reports';
+/**
+ * Reports Service - API client for Ordoc Reports
+ */
 
-import api from './auth';
+import axios from 'axios';
 
-class ReportsService {
-  private base = '/api/v1/ordoc-reports';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  async getTemplates(params?: FilterReportTemplatesParams): Promise<ReportTemplate[]> {
-    const response = await api.get(`${this.base}/templates/`, { params });
-    return response.data.results || [];
+const api = axios.create({
+  baseURL: `${API_BASE_URL}/api/v1/ordoc-reports/api`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add auth token interceptor
+api.interceptors.request.use((config) => {
+  config.headers['X-Subdomain'] = 'demo';
+  const token = localStorage.getItem('ordoc_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
+  return config;
+});
 
-  async getTemplate(id: string): Promise<ReportTemplate> {
-    const response = await api.get(`${this.base}/templates/${id}/`);
-    return response.data;
-  }
-
-  async generateReport(data: GenerateReportData): Promise<any> {
-    const response = await api.post(`${this.base}/reports/generate/`, data);
-    return response.data;
-  }
-
-  async getReports(params?: FilterReportsParams): Promise<Report[]> {
-    const response = await api.get(`${this.base}/reports/`, { params });
-    return response.data.results || [];
-  }
-
-  async getReport(id: string): Promise<Report> {
-    const response = await api.get(`${this.base}/reports/${id}/`);
-    return response.data;
-  }
-
-  async getReportStats(): Promise<any> {
-    const response = await api.get(`${this.base}/reports/stats/`);
-    return response.data;
-  }
-
-  async getDashboardMetrics(): Promise<DashboardMetrics> {
-    const response = await api.get(`${this.base}/metrics/dashboard/`);
-    return response.data;
-  }
-
-  async getStats(timeRange?: string): Promise<any> {
-    const response = await api.get(`${this.base}/stats/`, { params: { timeRange } });
-    return response.data;
-  }
-
-  async getRecentReports(limit: number = 10): Promise<Report[]> {
-    const response = await api.get(`${this.base}/reports/recent/`, { params: { limit } });
-    return response.data.results || [];
-  }
-
-  /* Schedules */
-  async getSchedules(params?: FilterReportSchedulesParams): Promise<ReportSchedule[]> {
-    const response = await api.get(`${this.base}/schedules/`, { params });
-    return response.data.results || [];
-  }
-
-  async createSchedule(data: CreateReportScheduleData): Promise<ReportSchedule> {
-    const response = await api.post(`${this.base}/schedules/`, data);
-    return response.data;
-  }
-
-  async getSchedule(id: string): Promise<any> {
-    const response = await api.get(`${this.base}/schedules/${id}/`);
-    return response.data;
-  }
-
-  async updateSchedule(id: string, data: any): Promise<any> {
-    const response = await api.put(`${this.base}/schedules/${id}/`, data);
-    return response.data;
-  }
-
-  async deleteSchedule(id: string): Promise<any> {
-    const response = await api.delete(`${this.base}/schedules/${id}/`);
-    return response.data;
-  }
-
-  async toggleScheduleStatus(id: string, status: 'active' | 'paused' | 'inactive'): Promise<any> {
-    const response = await api.patch(`${this.base}/schedules/${id}/`, { status });
-    return response.data;
-  }
-
-  async bulkUpdateSchedules(ids: string[], data: any): Promise<any> {
-    const response = await api.post(`${this.base}/schedules/bulk_update/`, { ids, data });
-    return response.data;
-  }
-
-  /* Shares */
-  async getShares(params?: FilterReportSharesParams): Promise<ApiResponse<ReportShare>> {
-    const response = await api.get(`${this.base}/shares/`, { params });
-    return response.data;
-  }
-
-  async createShare(data: CreateReportShareData): Promise<ReportShare> {
-    const response = await api.post(`${this.base}/shares/`, data);
-    return response.data;
-  }
-
-  async updateShare(id: string, data: Record<string, any>): Promise<ReportShare> {
-    const response = await api.put(`${this.base}/shares/${id}/`, data);
-    return response.data;
-  }
-
-  async deleteShare(id: string): Promise<any> {
-    const response = await api.delete(`${this.base}/shares/${id}/`);
-    return response.data;
-  }
-
-  async revokeShare(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/shares/${id}/revoke/`);
-    return response.data;
-  }
-
-  async publicShareAccess(token: string, password?: string): Promise<any> {
-    const response = await api.get(`${this.base}/shares/public_access`, { params: { token, password } });
-    return response.data;
-  }
-
-  /* Metrics */
-  async getMetrics(params?: Record<string, any>): Promise<ApiResponse<ReportMetric>> {
-    const response = await api.get(`${this.base}/metrics/`, { params });
-    return response.data;
-  }
-
-  async deleteReport(id: string): Promise<any> {
-    const response = await api.delete(`${this.base}/reports/${id}/`);
-    return response.data;
-  }
-
-  async exportReports(reportIds: string[], format: string = 'zip'): Promise<any> {
-    const response = await api.post(`${this.base}/reports/export/`, {
-      report_ids: reportIds,
-      export_format: format,
-      include_metadata: true
-    });
-    return response.data;
-  }
-
-  async regenerateReport(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/reports/${id}/regenerate/`);
-    return response.data;
-  }
-
-  async activateTemplate(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/templates/${id}/activate/`);
-    return response.data;
-  }
-
-  async deactivateTemplate(id: string): Promise<any> {
-    const response = await api.post(`${this.base}/templates/${id}/deactivate/`);
-    return response.data;
-  }
-
-  async duplicateTemplate(id: string): Promise<ReportTemplate> {
-    const response = await api.post(`${this.base}/templates/${id}/duplicate/`);
-    return response.data;
-  }
-
-  async previewTemplate(id: string, params?: Record<string, any>): Promise<any> {
-    const response = await api.get(`${this.base}/templates/${id}/preview/`, { params });
-    return response.data;
-  }
-
-  async createTemplate(data: any): Promise<ReportTemplate> {
-    const response = await api.post(`${this.base}/templates/`, data);
-    return response.data;
-  }
-
-  async updateTemplate(id: string, data: any): Promise<ReportTemplate> {
-    const response = await api.put(`${this.base}/templates/${id}/`, data);
-    return response.data;
-  }
-
-  async deleteTemplate(id: string): Promise<any> {
-    const response = await api.delete(`${this.base}/templates/${id}/`);
-    return response.data;
-  }
-
-  async exportReport(id: string, format: string, options?: any): Promise<string> {
-    const response = await api.post(`${this.base}/reports/${id}/export/`, {
-      format,
-      ...options
-    }, {
-      responseType: 'blob'
-    });
-
-    // Create download URL from blob
-    const blob = new Blob([response.data]);
-    return URL.createObjectURL(blob);
-  }
-
-  async exportReportData(data: any, format: string, options?: any): Promise<string> {
-    const response = await api.post(`${this.base}/reports/export_data/`, {
-      data,
-      format,
-      ...options
-    }, {
-      responseType: 'blob'
-    });
-
-    // Create download URL from blob
-    const blob = new Blob([response.data]);
-    return URL.createObjectURL(blob);
-  }
+// Types
+export interface Report {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'generating' | 'completed' | 'failed' | 'scheduled';
+  format: 'html' | 'pdf' | 'excel' | 'csv' | 'json';
+  created_at: string;
+  file_size?: number;
+  file_path?: string;
 }
 
-export const reportsService = new ReportsService();
-export default reportsService;
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  category: string;
+  type: string;
+}
 
-export type {
-  ReportTemplate,
-  Report,
-  ReportSchedule,
-  ReportShare,
-  ReportMetric,
-  DashboardMetrics,
-  GenerateReportData,
-  CreateReportScheduleData,
-  CreateReportShareData,
-  FilterReportTemplatesParams,
-  FilterReportsParams,
-  FilterReportSchedulesParams,
-  FilterReportSharesParams
-} from '@/types/ordoc-reports';
+export const reportsService = {
+  /**
+   * Get list of reports
+   */
+  async getReports(params?: { status?: string; search?: string }): Promise<Report[]> {
+    const response = await api.get('/reports/', { params });
+    return Array.isArray(response.data) ? response.data : response.data.results || [];
+  },
+
+  /**
+   * Get list of report templates
+   */
+  async getTemplates(): Promise<ReportTemplate[]> {
+    const response = await api.get('/templates/');
+    return Array.isArray(response.data) ? response.data : response.data.results || [];
+  },
+
+  /**
+   * Create a new report
+   */
+  async createReport(templateId: string, parameters: Record<string, unknown>): Promise<Report> {
+    const response = await api.post('/reports/', {
+      template_id: templateId,
+      parameters
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete a report
+   */
+  async deleteReport(reportId: string): Promise<void> {
+    await api.delete(`/reports/${reportId}/`);
+  },
+
+  /**
+   * Get report download URL
+   */
+  getDownloadUrl(reportId: string): string {
+    return `${API_BASE_URL}/ordoc-reports/api/reports/${reportId}/download/`;
+  }
+};
+
+export default reportsService;

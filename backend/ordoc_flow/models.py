@@ -271,7 +271,7 @@ class GroupRequester(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.name} ({self.organization.name})"
+        return f"{self.name} ({self.organization.corporate_name})"
     
     @property
     def is_active(self):
@@ -422,7 +422,7 @@ class ProcedureTemplate(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.name} ({self.organization.name})"
+        return f"{self.name} ({self.organization.corporate_name})"
     
     def save(self, *args, **kwargs):
         if not self.prn:
@@ -840,7 +840,7 @@ class TaskTemplate(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.name} ({self.organization.name})"
+        return f"{self.name} ({self.organization.corporate_name})"
     
     def save(self, *args, **kwargs):
         if not self.prn:

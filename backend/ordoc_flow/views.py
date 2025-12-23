@@ -285,6 +285,45 @@ class ProcedureViewSet(BaseViewSet):
             )
         ).filter(organization=self.get_current_organization())
     
+    def perform_create(self, serializer):
+        user = self.get_current_user()
+        ordoc_user = self.get_current_ordoc_user()
+        organization = self.get_current_organization()
+        
+        # 1. Obter template para definir grupo responsável
+        template = serializer.validated_data.get('procedure_template')
+        responsible_group = None
+        if template:
+            responsible_group = template.group_requester
+            
+        # 2. Definir Solicitante (Requester)
+        requester = None
+        if hasattr(user, 'external_requester'):
+            requester = user.external_requester
+        else:
+            # Usuário interno criando procedimento
+            # Como o campo requester é obrigatório e aponta para ExternalRequester,
+            # usamos um placeholder para procedimentos internos
+            requester = ExternalRequester.objects.filter(
+                email='internal@system.local',
+                organization=organization
+            ).first()
+            
+            if not requester and organization:
+                requester = ExternalRequester.objects.create(
+                    name='Sistema Interno',
+                    email='internal@system.local',
+                    organization=organization,
+                    status='active'
+                )
+
+        serializer.save(
+            organization=organization,
+            created_by=ordoc_user,
+            responsible_group=responsible_group,
+            requester=requester
+        )
+    
     @procedure_stats_schema
     @action(detail=False, methods=['get'])
     def stats(self, request):

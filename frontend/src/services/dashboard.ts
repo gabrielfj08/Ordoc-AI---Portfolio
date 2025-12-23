@@ -16,6 +16,9 @@ const api = axios.create({
     },
 });
 
+// Storage temporário para documentos mockados (simula persistência durante a sessão)
+let localMockDocuments: IntelligentDocument[] = [];
+
 // Add auth token interceptor
 api.interceptors.request.use((config) => {
     config.headers['X-Subdomain'] = 'demo';
@@ -103,7 +106,15 @@ export interface IntelligentDocument extends RecentDocument {
     relevanceScore: number; // 0-100
     lastAccessed?: string;
     relatedTo?: string[]; // IDs de processos/workflows relacionados
+    previewUrl?: string; // URL para preview local (Blob)
 }
+
+// ... existing code ...
+
+/**
+ * Simula upload de documento para a sessão atual
+ */
+
 
 export interface FolderInsight {
     type: 'warning' | 'info' | 'success';
@@ -121,16 +132,73 @@ export interface IntelligentFolder {
     pendingActions: number;
 }
 
+export interface SmartCategory {
+    id: string | number;
+    name: string;
+    description: string;
+    docCount: number;
+    status: 'active' | 'archived';
+    lastUpdate: string;
+    isAiSuggested?: boolean;
+    confidence?: number;
+    suggestionReason?: string;
+    tags?: string[];
+}
+
 export interface PrioritySignature {
     id: string;
     title: string;
+    status: 'pending';
     received_at: string;
     deadline?: string;
-    priority_score: number; // 1-10
+    priority_score: number;
+    estimated_time?: number; // minutes
     impact: 'low' | 'medium' | 'high' | 'critical';
-    blocks_processes?: string[];
-    estimated_time?: number; // minutos
     can_sign: boolean;
+}
+
+export interface SmartTemplate {
+    id: string | number;
+    name: string;
+    category: string;
+    version: string;
+    status: 'active' | 'draft' | 'archived';
+    lastUpdate: string;
+    description?: string;
+    usageCount?: number;
+    isAiSuggested?: boolean;
+    confidence?: number;
+    suggestionReason?: string;
+}
+
+export interface AnalyticsOverview {
+    documents: {
+        total: number;
+        change: string;
+    };
+    users: {
+        active: number;
+        change: string;
+    };
+    reports: {
+        total: number;
+        change: string;
+    };
+    storage: {
+        used_bytes: number;
+        display: string;
+        usage_percent: number;
+    };
+    weekly_activity: {
+        day: string;
+        label: string;
+        count: number;
+    }[];
+    system_status: {
+        api: 'operational' | 'degraded' | 'down';
+        database: 'operational' | 'degraded' | 'down';
+        storage: 'operational' | 'warning' | 'critical';
+    };
 }
 
 // ==================== API FUNCTIONS ====================
@@ -479,14 +547,19 @@ export const dashboardService = {
     async getRecentDocumentsIntelligent(): Promise<IntelligentDocument[]> {
         try {
             // 1. Buscar documentos recentes do OrdocAir
-            const response = await api.get('/ordoc-air/documents/', {
-                params: {
-                    ordering: '-created_at',
-                    limit: 20,
-                },
-            });
-
-            const docs = Array.isArray(response.data) ? response.data : response.data.results || [];
+            let docs = [];
+            try {
+                const response = await api.get('/ordoc-air/documents/', {
+                    params: {
+                        ordering: '-created_at',
+                        limit: 20,
+                    },
+                });
+                docs = Array.isArray(response.data) ? response.data : response.data.results || [];
+            } catch (err) {
+                console.warn('API error fetching documents, using empty list', err);
+                docs = [];
+            }
 
             // 2. IA analisa relevância de cada documento
             const intelligentDocs: IntelligentDocument[] = docs.map((doc: any) => {
@@ -533,13 +606,47 @@ export const dashboardService = {
                 };
             });
 
-            // Ordenar por relevância (mais relevantes primeiro)
-            return intelligentDocs.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 10);
+            // Combinar com documentos locais mockados
+            const allDocs = [...localMockDocuments, ...intelligentDocs];
+
+            // Ordenar por relevância (mais relevantes primeiro) e depois por data
+            return allDocs.sort((a, b) => {
+                if (a.relevanceScore !== b.relevanceScore) return b.relevanceScore - a.relevanceScore;
+                return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+            }).slice(0, 15);
         } catch (error) {
             console.error('Failed to load intelligent documents:', error);
-            return [];
+            return localMockDocuments;
         }
     },
+
+    /**
+     * Simula upload de documento para a sessão atual
+     */
+    async uploadDocumentMock(file: File, folderName: string): Promise<boolean> {
+        // Simular delay de rede
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Create object URL for preview
+        const previewUrl = URL.createObjectURL(file);
+
+        const newDoc: IntelligentDocument = {
+            id: `mock_upload_${Date.now()}`,
+            name: file.name,
+            type: this.getDocType(file.name),
+            uploadedAt: new Date().toISOString(),
+            suggested: true,
+            suggestionReason: `Upload recente para ${folderName}`,
+            relevanceScore: 100, // Alto score para aparecer no topo
+            lastAccessed: new Date().toISOString(),
+            previewUrl: previewUrl
+        };
+
+        localMockDocuments = [newDoc, ...localMockDocuments];
+        return true;
+    },
+
+    // ... (removed duplicate getDocType)
 
     /**
      * Feature 1.2: Pastas com Insights
@@ -633,8 +740,117 @@ export const dashboardService = {
 
             return intelligentFolders;
         } catch (error) {
-            console.error('Failed to load folders with insights:', error);
             return [];
+        }
+    },
+
+    async getSmartCategories(): Promise<SmartCategory[]> {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        const baseCategories: SmartCategory[] = [
+            { id: 1, name: 'Financeiro', description: 'Documentos fiscais, faturas e comprovantes', docCount: 154, status: 'active', lastUpdate: '2024-12-12', tags: ['faturas', 'recibos', 'impostos'] },
+            { id: 2, name: 'Recursos Humanos', description: 'Contratos, holerites e feedback', docCount: 89, status: 'active', lastUpdate: '2024-12-10', tags: ['contratos', 'holerites'] },
+            { id: 3, name: 'Jurídico', description: 'Contratos legais, termos e NDAs', docCount: 234, status: 'active', lastUpdate: '2024-12-15', tags: ['contratos', 'termos', 'legal'] },
+            { id: 4, name: 'Marketing', description: 'Assets de marca, campanhas e briefings', docCount: 45, status: 'active', lastUpdate: '2024-12-01', tags: ['brand', 'assets'] },
+            { id: 5, name: 'Operacional', description: 'Manuais, procedimentos e relatórios diários', docCount: 312, status: 'active', lastUpdate: '2024-12-18', tags: ['manuais', 'pops'] },
+            { id: 6, name: 'Projetos', description: 'Documentação técnica de projetos', docCount: 67, status: 'archived', lastUpdate: '2024-11-20', tags: ['specs', 'técnico'] },
+        ];
+
+        // AI Suggestions based on analysis of "uncategorized" documents
+        const aiSuggestions: SmartCategory[] = [
+            {
+                id: 'suggested_1',
+                name: 'Protocolos 2024',
+                description: 'Agrupamento automático de protocolos detectados',
+                docCount: 15,
+                status: 'active',
+                lastUpdate: new Date().toISOString().split('T')[0],
+                isAiSuggested: true,
+                confidence: 0.92,
+                suggestionReason: "Detectados 15 arquivos com padrão 'PROT-2024-XXX' dispersos.",
+                tags: ['protocolos', 'automático']
+            },
+            {
+                id: 'suggested_2',
+                name: 'Fornecedores Externos',
+                description: 'Contratos de terceiros identificados recentemente',
+                docCount: 8,
+                status: 'active',
+                lastUpdate: new Date().toISOString().split('T')[0],
+                isAiSuggested: true,
+                confidence: 0.85,
+                suggestionReason: "Múltiplos contratos de CNPJs externos sem classificação.",
+                tags: ['fornecedores', 'contratos']
+            }
+        ];
+
+        return [...aiSuggestions, ...baseCategories];
+    },
+
+    async getSmartTemplates(): Promise<SmartTemplate[]> {
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        const baseTemplates: SmartTemplate[] = [
+            { id: 1, name: 'Contrato de Prestação de Serviços', category: 'Jurídico', version: '1.2', status: 'active', lastUpdate: '2024-12-10', usageCount: 45 },
+            { id: 2, name: 'Proposta Comercial Padrão', category: 'Comercial', version: '2.0', status: 'active', lastUpdate: '2024-12-15', usageCount: 128 },
+            { id: 3, name: 'Termo de Confidencialidade (NDA)', category: 'Jurídico', version: '1.0', status: 'active', lastUpdate: '2024-11-05', usageCount: 67 },
+            { id: 4, name: 'Briefing Inicial de Projeto', category: 'Projetos', version: '3.1', status: 'draft', lastUpdate: '2024-12-18', usageCount: 12 },
+            { id: 5, name: 'Solicitação de Férias', category: 'RH', version: '1.0', status: 'active', lastUpdate: '2024-10-20', usageCount: 89 },
+        ];
+
+        const aiSuggestions: SmartTemplate[] = [
+            {
+                id: 'suggested_tpl_1',
+                name: 'Aditivo de Prazo Contratual',
+                category: 'Jurídico',
+                version: '1.0',
+                status: 'draft',
+                lastUpdate: new Date().toISOString().split('T')[0],
+                isAiSuggested: true,
+                confidence: 0.88,
+                suggestionReason: "Identificado padrão repetitivo em 5 aditivos recentes. Converter em template economizaria ~30min/doc.",
+                usageCount: 0
+            }
+        ];
+
+        return [...aiSuggestions, ...baseTemplates];
+    },
+
+    // ==================== ANALYTICS ====================
+
+
+
+    /**
+     * Analytics: Visão Geral
+     */
+    async getAnalyticsOverview(): Promise<AnalyticsOverview> {
+        try {
+            const response = await api.get('/ordoc-reports/api/analytics/overview/');
+            return response.data;
+        } catch (error) {
+            console.error('Failed to load analytics overview:', error);
+            // Fallback para mock se falhar
+            return {
+                documents: { total: 1248, change: '+12%' },
+                users: { active: 86, change: '+4%' },
+                reports: { total: 342, change: '+24%' },
+                storage: { used_bytes: 48318382080, display: '45 GB', usage_percent: 65 },
+                weekly_activity: [
+                    { day: '2024-12-16', label: 'Seg', count: 65 },
+                    { day: '2024-12-17', label: 'Ter', count: 40 },
+                    { day: '2024-12-18', label: 'Qua', count: 75 },
+                    { day: '2024-12-19', label: 'Qui', count: 55 },
+                    { day: '2024-12-20', label: 'Sex', count: 80 },
+                    { day: '2024-12-21', label: 'Sáb', count: 95 },
+                    { day: '2024-12-22', label: 'Dom', count: 60 }
+                ],
+                system_status: {
+                    api: 'operational',
+                    database: 'operational',
+                    storage: 'warning'
+                }
+            };
         }
     },
 
@@ -644,21 +860,25 @@ export const dashboardService = {
      */
     async getPrioritizedSignatures(): Promise<PrioritySignature[]> {
         try {
-            // 1. Buscar assinaturas pendentes do OrdocSign
-            // Usando endpoint dedicado para evitar erro 400
-            const response = await api.get('/ordoc-sign/api/requests/pending/');
+            // 1. Buscar minhas atribuições de assinatura (otimizado com detalhes da requisição)
+            const response = await api.get('/ordoc-sign/api/signers/my_assignments/');
 
-            const signatures = Array.isArray(response.data) ? response.data : response.data.results || [];
+            const assignments = Array.isArray(response.data) ? response.data : response.data.results || [];
 
             // 2. IA calcula prioridade de cada assinatura
-            const prioritizedSignatures: PrioritySignature[] = signatures.map((sig: any) => {
+            const prioritizedSignatures: PrioritySignature[] = assignments.map((assignment: any) => {
                 let priorityScore = 5; // Score padrão médio
                 let impact: 'low' | 'medium' | 'high' | 'critical' = 'medium';
                 let estimatedTime = 5; // minutos padrão
 
+                // Dados agora vêm direto do serializar enriquecido do assignment
+                const deadlineStr = assignment.deadline;
+                const title = assignment.signature_request_title || assignment.document_name || 'Documento sem título';
+                const created_at = assignment.created_at;
+
                 // Analisar deadline
-                if (sig.deadline) {
-                    const deadline = new Date(sig.deadline);
+                if (deadlineStr) {
+                    const deadline = new Date(deadlineStr);
                     const now = new Date();
                     const diffHours = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
 
@@ -684,26 +904,27 @@ export const dashboardService = {
                     }
                 }
 
-                if (sig.title?.toLowerCase().includes('contrato')) {
+                if (title.toLowerCase().includes('contrato')) {
                     priorityScore = Math.min(10, priorityScore + 1);
                     if (impact === 'medium') impact = 'high';
                     estimatedTime = 10; // Contratos demoram mais
                 }
 
                 // Reduzir prioridade para documentos simples
-                if (sig.title?.toLowerCase().includes('termo') || sig.title?.toLowerCase().includes('declaração')) {
+                if (title.toLowerCase().includes('termo') || title.toLowerCase().includes('declaração')) {
                     estimatedTime = 2; // Documentos simples são rápidos
                 }
 
                 return {
-                    id: sig.id,
-                    title: sig.title || 'Documento sem título',
-                    received_at: sig.created_at,
-                    deadline: sig.deadline,
+                    id: assignment.id, // ID do Assignment (SignatureRequestSigner), pronto para assinar
+                    title: title,
+                    status: 'pending',
+                    received_at: created_at,
+                    deadline: deadlineStr,
                     priority_score: priorityScore,
                     impact,
                     estimated_time: estimatedTime,
-                    can_sign: true, // Assume que pode assinar
+                    can_sign: assignment.can_sign,
                 };
             });
 

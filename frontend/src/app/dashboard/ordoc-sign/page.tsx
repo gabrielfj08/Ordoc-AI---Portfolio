@@ -7,7 +7,8 @@ import {
   CheckBadgeIcon,
   ClockIcon,
   ArrowLeftIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  ShieldCheckIcon as Shield
 } from '@heroicons/react/24/outline';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -40,6 +41,15 @@ export default function OrdocSignSelectionPage() {
       color: 'text-gray-600',
       bgColor: 'bg-gray-100',
       borderColor: 'hover:border-gray-600',
+    },
+    {
+      title: 'Certificados Digitais',
+      description: 'Gerencie seus certificados A1',
+      icon: Shield,
+      href: '/dashboard/ordoc-sign/certificates',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100',
+      borderColor: 'hover:border-blue-600',
     }
   ];
 

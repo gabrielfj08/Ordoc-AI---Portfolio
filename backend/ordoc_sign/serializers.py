@@ -131,6 +131,10 @@ class SignatureRequestSignerSerializer(serializers.ModelSerializer):
     )
     can_sign = serializers.SerializerMethodField()
     signing_url = serializers.SerializerMethodField()
+    signature_request_title = serializers.SerializerMethodField()
+    document_name = serializers.SerializerMethodField()
+    deadline = serializers.SerializerMethodField()
+    priority = serializers.SerializerMethodField()
     
     class Meta:
         model = SignatureRequestSigner
@@ -140,12 +144,26 @@ class SignatureRequestSignerSerializer(serializers.ModelSerializer):
             'signing_order', 'status', 'require_certificate',
             'access_token', 'access_expires_at', 'created_at',
             'updated_at', 'notified_at', 'viewed_at', 'signed_at',
-            'can_sign', 'signing_url'
+            'can_sign', 'signing_url', 'signature_request',
+            'signature_request_title', 'document_name', 'deadline', 'priority'
         ]
         read_only_fields = [
             'id', 'access_token', 'access_expires_at', 'created_at',
-            'updated_at', 'notified_at', 'viewed_at', 'signed_at'
+            'updated_at', 'notified_at', 'viewed_at', 'signed_at',
+            'signature_request_title', 'document_name', 'deadline', 'priority'
         ]
+
+    def get_signature_request_title(self, obj):
+        return obj.signature_request.title
+
+    def get_document_name(self, obj):
+        return obj.signature_request.document.name
+    
+    def get_deadline(self, obj):
+        return obj.signature_request.expires_at
+
+    def get_priority(self, obj):
+        return obj.signature_request.priority
     
     def get_can_sign(self, obj):
         """Verifica se o assinante pode assinar"""
@@ -473,7 +491,11 @@ class SignDocumentSerializer(serializers.Serializer):
     """Serializer para assinar documento"""
     
     certificate_id = serializers.UUIDField()
-    signature_data = serializers.CharField(help_text="Dados da assinatura em base64")
+    signature_data = serializers.CharField(
+        help_text="Dados da assinatura em base64 (opcional para assinatura via backend)",
+        required=False, 
+        allow_blank=True
+    )
     signing_reason = serializers.CharField(required=False, allow_blank=True)
     signing_location = serializers.CharField(required=False, allow_blank=True)
     contact_info = serializers.CharField(required=False, allow_blank=True)

@@ -21,6 +21,7 @@ from .models import (
     Permission,
     Tag,
     ActivityLog,
+    CategorizationRule,
 )
 from .serializers import (
     OrganizationSerializer,
@@ -35,6 +36,7 @@ from .serializers import (
     PermissionSerializer,
     TagSerializer,
     ActivityLogSerializer,
+    CategorizationRuleSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
 import uuid
@@ -716,3 +718,51 @@ class PermissionViewSet(BaseViewSet):
         user_or_group = instance.user or instance.group
         remove_perm(instance.permission, user_or_group, target)
         instance.delete()
+
+
+class CategorizationRuleViewSet(BaseViewSet):
+    """ViewSet for CategorizationRule management"""
+    queryset = CategorizationRule.objects.all()
+    serializer_class = CategorizationRuleSerializer
+    filterset_fields = ['is_active', 'match_type']
+    search_fields = ['name', 'description', 'pattern']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+
+    def get_queryset(self):
+        """Filter by current organization"""
+        queryset = super().get_queryset()
+        org = self.get_current_organization()
+        if org:
+            return queryset.filter(organization=org)
+        return queryset.none()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['current_organization'] = self.get_current_organization()
+        return context
+
+    @action(detail=False, methods=['post'])
+    def test_rule(self, request):
+        """Test a rule against a sample text"""
+        pattern = request.data.get('pattern')
+        match_type = request.data.get('match_type', 'contains')
+        text = request.data.get('text', '')
+        
+        if not pattern or not text:
+            return Response({'error': 'Pattern and text are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        matched = False
+        import re
+        
+        try:
+            if match_type == 'exact':
+                matched = pattern.lower() == text.lower()
+            elif match_type == 'contains':
+                matched = pattern.lower() in text.lower()
+            elif match_type == 'regex':
+                matched = bool(re.search(pattern, text, re.IGNORECASE))
+        except re.error as e:
+            return Response({'error': f'Invalid regex: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({'matched': matched})

@@ -220,7 +220,7 @@ export interface CreateSignatureBatchData {
 
 export interface SignDocumentPayload {
   certificate_id: string;
-  signature_data: string;
+  signature_data?: string;
   signing_reason?: string;
   signing_location?: string;
   contact_info?: string;

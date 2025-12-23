@@ -145,6 +145,45 @@ class Tag(models.Model):
         super().save(*args, **kwargs)
 
 
+class CategorizationRule(models.Model):
+    """Modelo para regras de auto-categorização"""
+    
+    MATCH_TYPE_CHOICES = [
+        ('exact', 'Correspondência Exata'),
+        ('contains', 'Contém'),
+        ('regex', 'Expressão Regular'),
+        ('similarity', 'Similaridade (IA)'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name="Nome da Regra")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+    
+    # Matching logic
+    match_type = models.CharField(max_length=20, choices=MATCH_TYPE_CHOICES, default='contains', verbose_name="Tipo de Correspondência")
+    pattern = models.CharField(max_length=500, verbose_name="Padrão de Busca")
+    is_active = models.BooleanField(default=True, verbose_name="Ativa")
+    
+    # Actions
+    target_tag = models.ForeignKey(Tag, on_delete=models.SET_NULL, null=True, blank=True, related_name='rules', verbose_name="Aplicar Tag")
+    target_directory = models.ForeignKey(Directory, on_delete=models.SET_NULL, null=True, blank=True, related_name='rules', verbose_name="Mover para Diretório")
+    
+    # Organization context
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='categorization_rules')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Regra de Categorização"
+        verbose_name_plural = "Regras de Categorização"
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_match_type_display()})"
+
+
 class Document(models.Model):
     """Modelo principal para documentos - equivalente ao Document do Rails"""
     

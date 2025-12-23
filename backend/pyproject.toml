@@ -33,6 +33,7 @@ pyotp = "^2.9.0"
 # Intelligence module dependencies
 gliner2 = "^1.2.0"           # Entity extraction (CPU-friendly)
 ollama = "^0.4.0"            # Local LLM client for Council
+pyhanko = {extras = ["crypto"], version = "^0.32.0"}
 
 
 [tool.poetry.group.dev.dependencies]

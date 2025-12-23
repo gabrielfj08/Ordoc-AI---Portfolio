@@ -4,6 +4,7 @@ URLs for OrdocReports - Reports and Analytics Module
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from . import views_analytics
 
 # Router para as APIs REST
 router = DefaultRouter()
@@ -14,6 +15,7 @@ router.register(r'reports', views.ReportViewSet, basename='report')
 router.register(r'schedules', views.ReportScheduleViewSet, basename='reportschedule')
 router.register(r'shares', views.ReportShareViewSet, basename='reportshare')
 router.register(r'metrics', views.ReportMetricViewSet, basename='reportmetric')
+router.register(r'analytics', views_analytics.AnalyticsSummaryViewSet, basename='analytics')
 
 app_name = 'ordoc_reports'
 
