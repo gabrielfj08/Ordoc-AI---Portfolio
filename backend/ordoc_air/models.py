@@ -590,3 +590,61 @@ class Permission(models.Model):
         target = self.directory or self.document
         subject = self.user or self.group
         return f"{subject} -> {self.permission} on {target}"
+
+
+class DocumentTemplate(models.Model):
+    """Modelo para templates de documentos"""
+    
+    STATUS_CHOICES = [
+        ('draft', 'Rascunho'),
+        ('active', 'Ativo'),
+        ('archived', 'Arquivado'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, verbose_name="Nome")
+    description = models.TextField(blank=True, null=True, verbose_name="Descrição")
+    category = models.CharField(max_length=100, verbose_name="Categoria")
+    version = models.CharField(max_length=20, default='1.0', verbose_name="Versão")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name="Status")
+    
+    # Template file
+    file = models.FileField(
+        upload_to='templates/',
+        validators=[FileExtensionValidator(allowed_extensions=['pdf', 'doc', 'docx', 'txt', 'odt'])],
+        verbose_name="Arquivo Template"
+    )
+    
+    # Usage tracking
+    usage_count = models.PositiveIntegerField(default=0, verbose_name="Contador de Uso")
+    
+    # Relations
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='document_templates',
+        verbose_name="Organização"
+    )
+    tags = models.ManyToManyField(Tag, blank=True, related_name='templates', verbose_name="Tags")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # User tracking
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_templates')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_templates')
+    
+    class Meta:
+        verbose_name = "Template de Documento"
+        verbose_name_plural = "Templates de Documentos"
+        ordering = ['-usage_count', 'name']
+        unique_together = ['organization', 'name', 'version']
+    
+    def __str__(self):
+        return f"{self.name} v{self.version}"
+    
+    def increment_usage(self):
+        """Incrementa o contador de uso"""
+        self.usage_count += 1
+        self.save(update_fields=['usage_count', 'updated_at'])

@@ -22,6 +22,7 @@ from .models import (
     Tag,
     ActivityLog,
     CategorizationRule,
+    DocumentTemplate,
 )
 from .serializers import (
     OrganizationSerializer,
@@ -37,6 +38,7 @@ from .serializers import (
     TagSerializer,
     ActivityLogSerializer,
     CategorizationRuleSerializer,
+    DocumentTemplateSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
 import uuid
@@ -934,6 +936,126 @@ class TagViewSet(BaseViewSet):
                 'confidence': 0.85,
                 'suggestion_reason': f'Múltiplos contratos de CNPJs externos sem classificação.',
                 'tags': ['fornecedores', 'contratos']
+            })
+        
+        return Response(suggestions)
+
+
+class DocumentTemplateViewSet(BaseViewSet):
+    """ViewSet for DocumentTemplate management with AI suggestions"""
+    queryset = DocumentTemplate.objects.all()
+    serializer_class = DocumentTemplateSerializer
+    parser_classes = [MultiPartParser, FormParser]
+    search_fields = ['name', 'description', 'category']
+    ordering_fields = ['name', 'usage_count', 'created_at']
+    ordering = ['-usage_count', 'name']
+    
+    def get_queryset(self):
+        """Filter by current organization"""
+        queryset = super().get_queryset()
+        org = self.get_current_organization()
+        if org:
+            # Filter by status if provided
+            status_filter = self.request.query_params.get('status')
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+            return queryset.filter(organization=org)
+        return queryset.none()
+    
+    def perform_create(self, serializer):
+        """Set organization and created_by on creation"""
+        serializer.save(
+            organization=self.get_current_organization(),
+            created_by=self.request.user
+        )
+    
+    def perform_update(self, serializer):
+        """Set updated_by on update"""
+        serializer.save(updated_by=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def use(self, request, pk=None):
+        """Increment usage count when template is used"""
+        template = self.get_object()
+        template.increment_usage()
+        serializer = self.get_serializer(template)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def suggestions(self, request):
+        """IA sugere templates baseado em padrões de documentos repetitivos"""
+        import re
+        from collections import Counter
+        org = self.get_current_organization()
+        
+        if not org:
+            return Response({'error': 'Organization not found'}, status=404)
+        
+        # Buscar documentos recentes da organização
+        from datetime import timedelta
+        from django.utils import timezone
+        recent_cutoff = timezone.now() - timedelta(days=90)  # Últimos 90 dias
+        
+        recent_docs = Document.objects.filter(
+            department__organization=org,
+            deleted_at__isnull=True,
+            created_at__gte=recent_cutoff
+        ).values_list('name', 'description', flat=False)
+        
+        suggestions = []
+        
+        # Detectar padrão: Aditivos contratuais
+        aditivo_pattern = r'(?i)(aditivo|adendo|termo\s+aditivo)'
+        aditivo_docs = [doc for doc in recent_docs if re.search(aditivo_pattern, doc[0] or '')]
+        if len(aditivo_docs) >= 5:
+            suggestions.append({
+                'id': f'suggested_template_{uuid.uuid4()}',
+                'name': 'Aditivo de Prazo Contratual',
+                'description': 'Template para aditivos de prorrogação de prazo contratual',
+                'category': 'Jurídico',
+                'version': '1.0',
+                'status': 'draft',
+                'usage_count': 0,
+                'last_update': None,
+                'is_ai_suggested': True,
+                'confidence': 0.88,
+                'suggestion_reason': f'Identificado padrão repetitivo em {len(aditivo_docs)} aditivos recentes. Converter em template economizaria ~30min/doc.',
+            })
+        
+        # Detectar padrão: Propostas comerciais
+        proposta_pattern = r'(?i)(proposta|orçamento|cotação)'
+        proposta_docs = [doc for doc in recent_docs if re.search(proposta_pattern, doc[0] or '')]
+        if len(proposta_docs) >= 8:
+            suggestions.append({
+                'id': f'suggested_template_{uuid.uuid4()}',
+                'name': 'Proposta Comercial Padrão',
+                'description': 'Template para propostas comerciais de produtos/serviços',
+                'category': 'Comercial',
+                'version': '1.0',
+                'status': 'draft',
+                'usage_count': 0,
+                'last_update': None,
+                'is_ai_suggested': True,
+                'confidence': 0.85,
+                'suggestion_reason': f'{len(proposta_docs)} propostas criadas recentemente com estrutura similar.',
+            })
+        
+        # Detectar padrão: Solicitações de RH
+        rh_pattern = r'(?i)(solicitação|requisição|pedido).*(férias|licença|atestado)'
+        rh_docs = [doc for doc in recent_docs if re.search(rh_pattern, doc[0] or '')]
+        if len(rh_docs) >= 10:
+            suggestions.append({
+                'id': f'suggested_template_{uuid.uuid4()}',
+                'name': 'Solicitação de Férias',
+                'description': 'Formulário padrão para solicitação de férias',
+                'category': 'RH',
+                'version': '1.0',
+                'status': 'draft',
+                'usage_count': 0,
+                'last_update': None,
+                'is_ai_suggested': True,
+                'confidence': 0.90,
+                'suggestion_reason': 'Alto volume de solicitações manuais detectadas. Template facilitaria processo.',
             })
         
         return Response(suggestions)

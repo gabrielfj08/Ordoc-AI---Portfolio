@@ -17,6 +17,7 @@ from .models import (
     Tag,
     ActivityLog,
     CategorizationRule,
+    DocumentTemplate,
 )
 from ordoc_cloud.models import OrdocUser
 
@@ -464,3 +465,44 @@ class PermissionSerializer(serializers.ModelSerializer):
         if directory and document:
             raise serializers.ValidationError('Provide either directory or document, not both.')
         return attrs
+
+
+class DocumentTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for DocumentTemplate model"""
+    
+    created_by_name = serializers.SerializerMethodField()
+    category_display = serializers.CharField(source='category', read_only=True)
+    last_update = serializers.DateTimeField(source='updated_at', read_only=True, format='%Y-%m-%d')
+    
+    class Meta:
+        model = DocumentTemplate
+        fields = [
+            'id', 'name', 'description', 'category', 'category_display', 'version', 
+            'status', 'file', 'usage_count', 'organization', 'tags', 
+            'created_by', 'created_by_name', 'last_update', 
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'usage_count', 'organization', 'created_by', 'created_by_name', 
+            'last_update', 'created_at', 'updated_at', 'category_display'
+        ]
+    
+    def get_created_by_name(self, obj):
+        """Get creator name"""
+        if obj.created_by:
+            try:
+                return obj.created_by.get_full_name() or obj.created_by.username
+            except Exception:
+                return obj.created_by.username
+        return 'Sistema'
+    
+    def create(self, validated_data):
+        """Set organization and created_by from context"""
+        validated_data['organization'] = self.context.get('current_organization')
+        validated_data['created_by'] = self.context.get('current_user')
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """Set updated_by from context"""
+        validated_data['updated_by'] = self.context.get('current_user')
+        return super().update(instance, validated_data)

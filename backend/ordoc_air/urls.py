@@ -15,6 +15,7 @@ from .views import (
     TagViewSet,
     ActivityLogViewSet,
     CategorizationRuleViewSet,
+    DocumentTemplateViewSet,
 )
 
 # Create router for OrdocAir API endpoints
@@ -31,6 +32,7 @@ router.register(r'permissions', PermissionViewSet, basename='permission')
 router.register(r'tags', TagViewSet, basename='tag')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activitylog')
 router.register(r'categorization-rules', CategorizationRuleViewSet, basename='categorizationrule')
+router.register(r'document-templates', DocumentTemplateViewSet, basename='documenttemplate')
 
 app_name = 'ordoc_air'
 

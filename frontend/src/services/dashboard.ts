@@ -790,32 +790,47 @@ export const dashboardService = {
     },
 
     async getSmartTemplates(): Promise<SmartTemplate[]> {
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        const baseTemplates: SmartTemplate[] = [
-            { id: 1, name: 'Contrato de Prestação de Serviços', category: 'Jurídico', version: '1.2', status: 'active', lastUpdate: '2024-12-10', usageCount: 45 },
-            { id: 2, name: 'Proposta Comercial Padrão', category: 'Comercial', version: '2.0', status: 'active', lastUpdate: '2024-12-15', usageCount: 128 },
-            { id: 3, name: 'Termo de Confidencialidade (NDA)', category: 'Jurídico', version: '1.0', status: 'active', lastUpdate: '2024-11-05', usageCount: 67 },
-            { id: 4, name: 'Briefing Inicial de Projeto', category: 'Projetos', version: '3.1', status: 'draft', lastUpdate: '2024-12-18', usageCount: 12 },
-            { id: 5, name: 'Solicitação de Férias', category: 'RH', version: '1.0', status: 'active', lastUpdate: '2024-10-20', usageCount: 89 },
-        ];
-
-        const aiSuggestions: SmartTemplate[] = [
-            {
-                id: 'suggested_tpl_1',
-                name: 'Aditivo de Prazo Contratual',
-                category: 'Jurídico',
-                version: '1.0',
-                status: 'draft',
-                lastUpdate: new Date().toISOString().split('T')[0],
-                isAiSuggested: true,
-                confidence: 0.88,
-                suggestionReason: "Identificado padrão repetitivo em 5 aditivos recentes. Converter em template economizaria ~30min/doc.",
-                usageCount: 0
-            }
-        ];
-
-        return [...aiSuggestions, ...baseTemplates];
+        try {
+            // 1. Buscar templates existentes do backend
+            const templatesResponse = await api.get('/ordoc-air/api/document-templates/');
+            const templates = Array.isArray(templatesResponse.data) ? templatesResponse.data : templatesResponse.data.results || [];
+            
+            // 2. Buscar sugestões de IA do backend
+            const suggestionsResponse = await api.get('/ordoc-air/api/document-templates/suggestions/');
+            const aiSuggestions = Array.isArray(suggestionsResponse.data) ? suggestionsResponse.data : suggestionsResponse.data.results || [];
+            
+            // 3. Converter templates existentes para formato SmartTemplate
+            const baseTemplates: SmartTemplate[] = templates.map((template: any) => ({
+                id: template.id,
+                name: template.name,
+                category: template.category,
+                version: template.version,
+                status: template.status,
+                lastUpdate: template.last_update || new Date().toISOString().split('T')[0],
+                usageCount: template.usage_count || 0
+            }));
+            
+            // 4. Converter sugestões de IA para formato SmartTemplate
+            const smartSuggestions: SmartTemplate[] = aiSuggestions.map((suggestion: any) => ({
+                id: suggestion.id,
+                name: suggestion.name,
+                category: suggestion.category,
+                version: suggestion.version,
+                status: suggestion.status,
+                lastUpdate: suggestion.last_update || new Date().toISOString().split('T')[0],
+                usageCount: suggestion.usage_count || 0,
+                isAiSuggested: suggestion.is_ai_suggested || true,
+                confidence: suggestion.confidence || 0.85,
+                suggestionReason: suggestion.suggestion_reason || ''
+            }));
+            
+            // Retornar sugestões primeiro, depois templates existentes
+            return [...smartSuggestions, ...baseTemplates];
+        } catch (error) {
+            console.error('Failed to load smart templates:', error);
+            // Fallback para mock se falhar
+            return [];
+        }
     },
 
     // ==================== ANALYTICS ====================
