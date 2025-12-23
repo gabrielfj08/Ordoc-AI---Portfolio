@@ -78,14 +78,10 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
             // Clean payload
             const payload = {
                 ...values,
-                status: defaultStatus === 'pending' ? 'draft' : 'draft', // Backend status choices: draft, running, started... Task usually starts as draft? 
-                // Wait, Task status choices: draft, running, started, finished, refused.
                 // Kanban columns: 'pending' (map to draft?), 'in_progress' (running), 'completed' (finished)
-                // Let's map strict backend choices
                 status: defaultStatus === 'in_progress' ? 'running' : 'draft',
                 deadline: values.deadline || null,
-                assignee: values.assignee_id || null, // Backend field name is 'assignee' for the ID creation? Check serializer.
-                // Serializer: assignee is keys to Model, expects ID.
+                assignee: values.assignee_id || null,
             };
 
             // Remove helper keys

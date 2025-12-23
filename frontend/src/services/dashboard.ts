@@ -155,6 +155,7 @@ export interface PrioritySignature {
     estimated_time?: number; // minutes
     impact: 'low' | 'medium' | 'high' | 'critical';
     can_sign: boolean;
+    blocks_processes?: string[];
 }
 
 export interface SmartTemplate {
