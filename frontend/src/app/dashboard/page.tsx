@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DaySummaryWidget } from '@/components/dashboard/minha-mesa/day-summary';
 import { ImpactWidget } from '@/components/dashboard/minha-mesa/impact-widget';
@@ -17,67 +17,79 @@ interface DashboardProps {
   searchParams: Promise<{ view?: string }>;
 }
 
-export default async function Dashboard({ searchParams }: DashboardProps) {
+async function DashboardContent({ searchParams }: DashboardProps) {
   const { view } = await searchParams;
   const activeTab = view || 'home';
 
   return (
-    <ProtectedRoute>
-      <div className="flex flex-col min-h-screen bg-transparent">
+    <div className="flex flex-col min-h-screen bg-transparent">
 
-        <main className="flex-1 w-full px-4 py-6 space-y-6">
+      <main className="flex-1 w-full px-4 py-6 space-y-6">
 
-          {activeTab === 'home' && (
-            <>
-              {/* Seção Superior: Resumos */}
-              <DaySummaryWidget />
+        {activeTab === 'home' && (
+          <>
+            {/* Seção Superior: Resumos */}
+            <DaySummaryWidget />
 
-              {/* Grid Principal */}
-              <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Grid Principal */}
+            <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-                {/* Coluna Principal: Tarefas e Workflows */}
-                <div className="xl:col-span-2 flex flex-col gap-6 h-full">
-                  <ImpactWidget />
-                  <PriorityList />
+              {/* Coluna Principal: Tarefas e Workflows */}
+              <div className="xl:col-span-2 flex flex-col gap-6 h-full">
+                <ImpactWidget />
+                <PriorityList />
 
-                  {/* Monitor de Workflows */}
-                  <WorkflowMonitor />
-                </div>
+                {/* Monitor de Workflows */}
+                <WorkflowMonitor />
+              </div>
 
-                {/* Coluna Lateral: Assistente IA e Notificações */}
-                <aside className="xl:col-span-1">
-                  <AIAssistant />
-                </aside>
+              {/* Coluna Lateral: Assistente IA e Notificações */}
+              <aside className="xl:col-span-1">
+                <AIAssistant />
+              </aside>
 
-              </section>
-            </>
-          )}
+            </section>
+          </>
+        )}
 
-          {activeTab === 'documents' && (
+        {activeTab === 'documents' && (
+          <Suspense fallback={<div>Carregando documentos...</div>}>
             <DocumentsView />
-          )}
+          </Suspense>
+        )}
 
-          {activeTab === 'workflows' && (
+        {activeTab === 'workflows' && (
+          <Suspense fallback={<div>Carregando workflows...</div>}>
             <WorkflowsView />
-          )}
+          </Suspense>
+        )}
 
-          {activeTab === 'signatures' && (
-            <SignaturesView />
-          )}
+        {activeTab === 'signatures' && (
+          <SignaturesView />
+        )}
 
-          {activeTab === 'analises' && (
-            <AnalyticsView />
-          )}
+        {activeTab === 'analises' && (
+          <AnalyticsView />
+        )}
 
-          {['settings', 'profile', 'users', 'groups', 'organizations', 'policies'].includes(activeTab) && (
-            <SettingsView
-              key={activeTab} // Força remount ao trocar entre tabs
-              initialView={(activeTab === 'settings' ? 'users' : activeTab) as any}
-            />
-          )}
+        {['settings', 'profile', 'users', 'groups', 'organizations', 'policies'].includes(activeTab) && (
+          <SettingsView
+            key={activeTab} // Força remount ao trocar entre tabs
+            initialView={(activeTab === 'settings' ? 'users' : activeTab) as any}
+          />
+        )}
 
-        </main>
-      </div>
+      </main>
+    </div>
+  );
+}
+
+export default function Dashboard(props: DashboardProps) {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<div>Carregando...</div>}>
+        <DashboardContent {...props} />
+      </Suspense>
     </ProtectedRoute>
   );
 }
