@@ -23,22 +23,37 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import flowService, { Procedure } from '@/services/flow';
 import { toast } from 'react-hot-toast';
+import { ProcedureDetailsDialog } from './procedure-details-dialog';
 
 export const ProceduresList = () => {
     const queryClient = useQueryClient();
+    const [selectedProcedure, setSelectedProcedure] = React.useState<Procedure | null>(null);
 
     const { data: procedures, isLoading } = useQuery({
         queryKey: ['procedures'],
         queryFn: () => flowService.getProcedures(),
     });
 
-    const pauseMutation = useMutation({
-        mutationFn: (id: string) => flowService.pauseProcedure(id),
+    const startMutation = useMutation({
+        mutationFn: (id: string) => flowService.updateProcedure(id, { status: 'running' }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['procedures'] });
-            toast.success('Procedimento pausado com sucesso');
+            toast.success('Procedimento iniciado com sucesso');
         },
-        onError: () => toast.error('Erro ao pausar procedimento')
+        onError: (error: any) => {
+            console.error('Erro ao iniciar:', error);
+            const msg = error?.response?.data?.detail || error?.response?.data?.error || 'Erro ao iniciar procedimento.';
+            toast.error(msg);
+        }
+    });
+
+    const pauseMutation = useMutation({
+        mutationFn: (id: string) => flowService.updateProcedure(id, { status: 'archived' }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['procedures'] });
+            toast.success('Procedimento arquivado com sucesso');
+        },
+        onError: () => toast.error('Erro ao arquivar procedimento')
     });
 
     const cancelMutation = useMutation({
@@ -87,15 +102,15 @@ export const ProceduresList = () => {
                 return (
                     <div
                         key={proc.id}
-                        className="group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card hover:bg-accent/50 border border-border hover:border-primary/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer gap-4"
+                        className="group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card border border-border rounded-xl gap-4"
                     >
                         {/* Left: Icon & Info */}
                         <div className="flex items-start gap-4 flex-1">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${proc.status === 'finished' ? 'bg-green-50' : 'bg-blue-50'}`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${proc.status === 'finished' ? 'bg-green-50' : 'bg-orange-50'}`}>
                                 {proc.status === 'finished' ? (
                                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                                 ) : (
-                                    <PlayCircle className="w-5 h-5 text-blue-600" />
+                                    <PlayCircle className="w-5 h-5 text-orange-600" />
                                 )}
                             </div>
 
@@ -103,7 +118,7 @@ export const ProceduresList = () => {
                                 <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
                                     {proc.procedure_template_name}
                                     <span className="text-muted-foreground font-normal text-xs">#{proc.process_number}</span>
-                                    {proc.status === 'running' && <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200 bg-blue-50">Em Andamento</Badge>}
+                                    {proc.status === 'running' && <Badge variant="outline" className="text-[10px] text-orange-700 border-orange-200 bg-orange-50">Em Andamento</Badge>}
                                     {proc.status === 'finished' && <Badge variant="outline" className="text-[10px] text-green-600 border-green-200 bg-green-50">Concluído</Badge>}
                                     {proc.status === 'draft' && <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-200 bg-yellow-50">Rascunho</Badge>}
                                     {proc.status === 'archived' && <Badge variant="outline" className="text-[10px] text-gray-600 border-gray-200 bg-gray-50">Arquivado</Badge>}
@@ -127,7 +142,7 @@ export const ProceduresList = () => {
                                 <span className="text-muted-foreground">Progresso</span>
                                 <span className="font-medium">{progress}%</span>
                             </div>
-                            <Progress value={progress} className="h-2" indicatorClassName={proc.status === 'finished' ? 'bg-green-500' : 'bg-blue-600'} />
+                            <Progress value={progress} className="h-2" indicatorClassName={proc.status === 'finished' ? 'bg-green-500' : 'bg-orange-600'} />
                         </div>
 
                         {/* Right: Actions */}
@@ -142,17 +157,39 @@ export const ProceduresList = () => {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => toast('Detalhes em breve')}>Ver Detalhes</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => pauseMutation.mutate(proc.id)}>
-                                        {(proc.status === 'running' || proc.status === 'started') ? 'Arquivar/Pausar' : 'Status'}
+                                    <DropdownMenuItem onClick={() => setSelectedProcedure(proc)}>
+                                        Ver Detalhes
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-destructive" onClick={() => cancelMutation.mutate(proc.id)}>Cancelar</DropdownMenuItem>
+
+                                    {(proc.status === 'draft') && (
+                                        <DropdownMenuItem onClick={() => startMutation.mutate(proc.id)}>
+                                            Iniciar Execução
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    {/* Show Archive/Pause only for running items */}
+                                    {(proc.status === 'running' || proc.status === 'started') && (
+                                        <DropdownMenuItem onClick={() => pauseMutation.mutate(proc.id)}>
+                                            Arquivar
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    {/* If archived, maybe show Restore or nothing for now? keeping it simple */}
+
+                                    <DropdownMenuItem className="text-destructive" onClick={() => cancelMutation.mutate(proc.id)}>
+                                        Cancelar
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
                     </div>
                 );
             })}
+            <ProcedureDetailsDialog
+                open={!!selectedProcedure}
+                onOpenChange={(open) => !open && setSelectedProcedure(null)}
+                procedure={selectedProcedure}
+            />
         </div>
     );
 };

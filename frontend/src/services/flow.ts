@@ -53,20 +53,25 @@ const flowService = {
         return response.data;
     },
 
+    async updateProcedure(id: string, data: any): Promise<Procedure> {
+        const response = await api.patch(`/api/v1/ordoc-flow/api/procedures/${id}/`, data);
+        return response.data;
+    },
+
     async startProcedure(id: string): Promise<void> {
-        await api.post(`/api/v1/ordoc-flow/api/procedures/${id}/start/`);
+        await api.post(`/api/v1/ordoc-flow/api/procedures/${id}/start/`, {});
     },
 
     async pauseProcedure(id: string): Promise<void> {
-        // Backend currently doesn't have an explicit pause transition, assuming archive or stop
-        // Check models: only draft, running, started, finished, archived.
-        // Pausing might mean moving to draft or a custom status.
-        // For now, let's implement archive as pause/stop
         await api.post(`/api/v1/ordoc-flow/api/procedures/${id}/archive/`);
     },
 
     async cancelProcedure(id: string): Promise<void> {
-        await api.post(`/api/v1/ordoc-flow/api/procedures/${id}/archive/`);
+        await api.delete(`/api/v1/ordoc-flow/api/procedures/${id}/`);
+    },
+
+    async deleteProcedure(id: string): Promise<void> {
+        await api.delete(`/api/v1/ordoc-flow/api/procedures/${id}/`);
     },
 
     // Tasks

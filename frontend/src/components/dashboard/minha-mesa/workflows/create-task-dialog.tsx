@@ -34,6 +34,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import flowService from '@/services/flow';
 import { toast } from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
     name: z.string().min(3, "O título deve ter pelo menos 3 caracteres"),
@@ -52,12 +53,18 @@ interface CreateTaskDialogProps {
 
 export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending' }: CreateTaskDialogProps) => {
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     // Fetch running procedures to populate selection
     const { data: procedures, isLoading: isLoadingProcedures } = useQuery({
         queryKey: ['procedures'],
         queryFn: () => flowService.getProcedures(),
     });
+
+    // DEBUG: Check user
+    React.useEffect(() => {
+        console.log('CreatesTaskDialog - Current User:', user);
+    }, [user]);
 
     const activeProcedures = procedures?.filter((p: any) => p.status === 'running' || p.status === 'started' || p.status === 'draft') || [];
 
@@ -82,11 +89,19 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
                 status: defaultStatus === 'in_progress' ? 'running' : 'draft',
                 deadline: values.deadline || null,
                 assignee: values.assignee_id || null,
+                created_by: user?.id,
             };
 
             // Remove helper keys
             // @ts-ignore
             delete payload.assignee_id;
+
+            console.log('Sending Task Payload:', payload);
+
+            if (!payload.created_by) {
+                console.error('MISSING USER ID in payload! User object:', user);
+                throw new Error('Usuário não identificado. Recarregue a página.');
+            }
 
             return flowService.createTask(payload);
         },
@@ -97,8 +112,9 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
             onOpenChange(false);
         },
         onError: (err: any) => {
-            console.error(err);
-            toast.error("Erro ao criar tarefa. Verifique os dados.");
+            console.error('SERVER ERROR DATA:', JSON.stringify(err.response?.data, null, 2));
+            const msg = err?.response?.data ? `${JSON.stringify(err.response.data)}` : 'Erro ao criar tarefa. Verifique os dados.';
+            toast.error(msg, { duration: 5000 });
         }
     });
 

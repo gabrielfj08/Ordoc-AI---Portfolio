@@ -440,8 +440,7 @@ class TaskViewSet(BaseViewSet):
             'procedure__organization', 'procedure__procedure_template',
             'assignee', 'group_assignee', 'created_by', 'task_template'
         ).prefetch_related(
-            'task_comments__created_by',
-            'task_fields'
+            'task_comments__created_by'
         ).filter(procedure__organization=self.get_current_organization())
     
     @action(detail=False, methods=['get'])

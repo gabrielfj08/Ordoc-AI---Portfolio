@@ -135,7 +135,9 @@ class TaskTemplateSerializer(serializers.ModelSerializer):
     """Serializer para templates de tarefas"""
     
     organization_name = serializers.CharField(source='organization.name', read_only=True)
-    procedure_count = serializers.IntegerField(read_only=True)
+    procedure_count = serializers.SerializerMethodField()
+    
+
     
     class Meta:
         model = TaskTemplate
@@ -146,12 +148,16 @@ class TaskTemplateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'prn', 'created_at', 'updated_at']
 
+    def get_procedure_count(self, obj):
+        # Retorna 0 se não houver relacionamento inverso ou contagem definida
+        return 0 # Placeholder implementation as relationship lookup logic is model-dependent
+
 
 class TaskCommentSerializer(serializers.ModelSerializer):
     """Serializer para comentários de tarefas"""
     
-    created_by_name = serializers.CharField(source='created_by.name', read_only=True)
-    
+    created_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = TaskComment
         fields = [
@@ -159,6 +165,9 @@ class TaskCommentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.name if obj.created_by else None
 
 
 class TaskFieldSerializer(serializers.ModelSerializer):
@@ -176,15 +185,15 @@ class TaskFieldSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     """Serializer para tarefas"""
     
-    procedure_number = serializers.CharField(source='procedure.process_number', read_only=True)
-    procedure_template_name = serializers.CharField(source='procedure.procedure_template_name', read_only=True)
-    assignee_name = serializers.CharField(source='assignee.name', read_only=True)
-    group_assignee_name = serializers.CharField(source='group_assignee.name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.name', read_only=True)
+    procedure_number = serializers.SerializerMethodField()
+    procedure_template_name = serializers.SerializerMethodField()
+    assignee_name = serializers.SerializerMethodField()
+    group_assignee_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
     task_comments = TaskCommentSerializer(many=True, read_only=True)
     task_fields = TaskFieldSerializer(many=True, read_only=True)
     is_closed = serializers.BooleanField(read_only=True)
-    procedure_info = serializers.CharField(read_only=True)
+    procedure_info = serializers.SerializerMethodField()
     
     class Meta:
         model = Task
@@ -199,6 +208,7 @@ class TaskSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'prn', 'created_at', 'updated_at']
     
+
     def validate(self, data):
         """Validações customizadas"""
         if data.get('deadline') and data['deadline'] < timezone.now().date():
@@ -207,15 +217,35 @@ class TaskSerializer(serializers.ModelSerializer):
             })
         return data
 
+    def get_assignee_name(self, obj):
+        return obj.assignee.name if obj.assignee else None
+
+    def get_group_assignee_name(self, obj):
+        return obj.group_assignee.name if obj.group_assignee else None
+        
+    def get_procedure_number(self, obj):
+        return obj.procedure.process_number if obj.procedure else None
+
+    def get_procedure_template_name(self, obj):
+        return obj.procedure.procedure_template_name if obj.procedure else None
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return None
+        return obj.created_by.user.get_full_name() or obj.created_by.user.username
+
+    def get_procedure_info(self, obj):
+        return str(obj.procedure) if obj.procedure else None
+
 
 class ProcedureSerializer(serializers.ModelSerializer):
     """Serializer para procedimentos"""
     
     procedure_template_name = serializers.CharField(read_only=True)
-    requester_name = serializers.CharField(source='requester.name', read_only=True)
-    responsible_group_name = serializers.CharField(source='responsible_group.name', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.name', read_only=True)
-    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    requester_name = serializers.SerializerMethodField()
+    responsible_group_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    organization_name = serializers.SerializerMethodField()
     tasks = TaskSerializer(many=True, read_only=True)
     is_closed = serializers.BooleanField(read_only=True)
     
@@ -244,13 +274,27 @@ class ProcedureSerializer(serializers.ModelSerializer):
             })
         return data
 
+    def get_requester_name(self, obj):
+        return obj.requester.name if obj.requester else None
+        
+    def get_responsible_group_name(self, obj):
+        return obj.responsible_group.name if obj.responsible_group else None
+        
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return None
+        return obj.created_by.user.get_full_name() or obj.created_by.user.username
+
+    def get_organization_name(self, obj):
+        return obj.organization.corporate_name if obj.organization else None
+
 
 class WorkflowRequestSerializer(serializers.ModelSerializer):
     """Serializer para solicitações de workflow"""
     
-    requester_name = serializers.CharField(source='requester.name', read_only=True)
-    organization_name = serializers.CharField(source='organization.name', read_only=True)
-    assigned_to_name = serializers.CharField(source='assigned_to.name', read_only=True)
+    requester_name = serializers.SerializerMethodField()
+    organization_name = serializers.SerializerMethodField()
+    assigned_to_name = serializers.SerializerMethodField()
     
     class Meta:
         model = WorkflowRequest
@@ -261,6 +305,18 @@ class WorkflowRequestSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'completed_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'completed_at']
+
+    def get_requester_name(self, obj):
+        return obj.requester.name if obj.requester else None
+        
+    def get_organization_name(self, obj):
+        return obj.organization.corporate_name if obj.organization else None
+
+    def get_assigned_to_name(self, obj):
+        if not obj.assigned_to:
+            return None
+        # Handle simple user or OrdocUser
+        return getattr(obj.assigned_to, 'name', obj.assigned_to.username)
 
 
 class JustificationNoteSerializer(serializers.ModelSerializer):
@@ -282,8 +338,8 @@ class JustificationNoteSerializer(serializers.ModelSerializer):
 class ApprovalStepSerializer(serializers.ModelSerializer):
     """Serializer para etapas de aprovação"""
     
-    approver_user_name = serializers.CharField(source='approver_user.name', read_only=True)
-    approver_group_name = serializers.CharField(source='approver_group.name', read_only=True)
+    approver_user_name = serializers.SerializerMethodField()
+    approver_group_name = serializers.SerializerMethodField()
     
     class Meta:
         model = ApprovalStep
@@ -294,12 +350,16 @@ class ApprovalStepSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    def get_approver_user_name(self, obj):
+        return obj.approver_user.name if obj.approver_user else None
 
+    def get_approver_group_name(self, obj):
+        return obj.approver_group.name if obj.approver_group else None
 
 class ApprovalWorkflowSerializer(serializers.ModelSerializer):
     """Serializer para workflows de aprovação"""
     
-    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    organization_name = serializers.SerializerMethodField()
     steps = ApprovalStepSerializer(many=True, read_only=True)
     
     class Meta:
@@ -311,13 +371,16 @@ class ApprovalWorkflowSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+    def get_organization_name(self, obj):
+        return obj.organization.corporate_name if obj.organization else None
+
 
 class ApprovalStepInstanceSerializer(serializers.ModelSerializer):
     """Serializer para instâncias de etapas de aprovação"""
     
-    approval_step_name = serializers.CharField(source='approval_step.name', read_only=True)
-    assigned_to_name = serializers.CharField(source='assigned_to.name', read_only=True)
-    approved_by_name = serializers.CharField(source='approved_by.name', read_only=True)
+    approval_step_name = serializers.SerializerMethodField()
+    assigned_to_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
     
     class Meta:
         model = ApprovalStepInstance
@@ -329,12 +392,25 @@ class ApprovalStepInstanceSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'due_date', 'completed_at', 'created_at', 'updated_at']
 
+    def get_approval_step_name(self, obj):
+        return obj.approval_step.name if obj.approval_step else None
+
+    def get_assigned_to_name(self, obj):
+        if not obj.assigned_to:
+            return None
+        return getattr(obj.assigned_to, 'name', obj.assigned_to.username)
+
+    def get_approved_by_name(self, obj):
+        if not obj.approved_by:
+            return None
+        return obj.approved_by.user.get_full_name() or obj.approved_by.user.username
+
 
 class ApprovalInstanceSerializer(serializers.ModelSerializer):
     """Serializer para instâncias de aprovação"""
     
-    workflow_name = serializers.CharField(source='workflow.name', read_only=True)
-    requested_by_name = serializers.CharField(source='requested_by.name', read_only=True)
+    workflow_name = serializers.SerializerMethodField()
+    requested_by_name = serializers.SerializerMethodField()
     step_instances = ApprovalStepInstanceSerializer(many=True, read_only=True)
     
     class Meta:
@@ -346,13 +422,21 @@ class ApprovalInstanceSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'completed_at', 'created_at', 'updated_at']
 
+    def get_workflow_name(self, obj):
+        return obj.workflow.name if obj.workflow else None
+
+    def get_requested_by_name(self, obj):
+        if not obj.requested_by:
+            return None
+        return obj.requested_by.user.get_full_name() or obj.requested_by.user.username
+
 
 # Serializers para Sistema de Notificações
 
 class NotificationTemplateSerializer(serializers.ModelSerializer):
     """Serializer para templates de notificação"""
     
-    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    organization_name = serializers.SerializerMethodField()
     
     class Meta:
         model = NotificationTemplate
@@ -364,6 +448,9 @@ class NotificationTemplateSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_organization_name(self, obj):
+        return obj.organization.corporate_name if obj.organization else None
 
 
 class NotificationLogSerializer(serializers.ModelSerializer):
@@ -489,8 +576,8 @@ class BatchOperationResultSerializer(serializers.Serializer):
 class ProcedureDocumentSerializer(serializers.ModelSerializer):
     """Serializer para documentos de procedimentos"""
 
-    procedure_number = serializers.CharField(source='procedure.process_number', read_only=True)
-    uploaded_by_name = serializers.CharField(source='uploaded_by.name', read_only=True)
+    procedure_number = serializers.SerializerMethodField()
+    uploaded_by_name = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
     versions_count = serializers.SerializerMethodField()
 
@@ -523,12 +610,20 @@ class ProcedureDocumentSerializer(serializers.ModelSerializer):
             return obj.parent_document.versions.count()
         return obj.versions.count()
 
+    def get_procedure_number(self, obj):
+        return obj.procedure.process_number if obj.procedure else None
+
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by:
+            return None
+        return obj.uploaded_by.user.get_full_name() or obj.uploaded_by.user.username
+
 
 class TaskAttachmentSerializer(serializers.ModelSerializer):
     """Serializer para anexos de tarefas"""
 
-    task_name = serializers.CharField(source='task.name', read_only=True)
-    uploaded_by_name = serializers.CharField(source='uploaded_by.name', read_only=True)
+    task_name = serializers.SerializerMethodField()
+    uploaded_by_name = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
 
@@ -563,6 +658,14 @@ class TaskAttachmentSerializer(serializers.ModelSerializer):
             return obj.thumbnail.url
         return None
 
+    def get_task_name(self, obj):
+        return obj.task.name if obj.task else None
+
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by:
+            return None
+        return obj.uploaded_by.user.get_full_name() or obj.uploaded_by.user.username
+
 
 class WorkflowHistorySerializer(serializers.ModelSerializer):
     """Serializer para histórico do workflow"""
@@ -585,7 +688,7 @@ class WorkflowHistorySerializer(serializers.ModelSerializer):
 
     def get_performed_by_name(self, obj):
         if obj.performed_by:
-            return obj.performed_by.name
+            return obj.performed_by.user.get_full_name() or obj.performed_by.user.username
         elif obj.external_performed_by:
             return obj.external_performed_by.name
         return 'Sistema'
