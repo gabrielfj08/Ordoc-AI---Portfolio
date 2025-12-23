@@ -231,3 +231,25 @@ export type RestoreDirectoryActions =
   | 'restore_and_keep'
   | 'restore_and_merge'
   | 'restore_and_replace';
+
+// Directory Stats - Feature 1.2
+export interface DirectoryInsight {
+  type: 'success' | 'info' | 'warning' | 'error';
+  message: string;
+  count?: number;
+  action?: 'categorize' | 'review' | 'organize';
+}
+
+export interface DirectoryStats {
+  id: string | number;
+  name: string;
+  total_documents: number;
+  total_size: number;
+  uncategorized: number;
+  old_documents: number;
+  recent_documents: number;
+  status_breakdown: Record<string, number>;
+  health_status: 'healthy' | 'needs_attention' | 'critical';
+  insights: DirectoryInsight[];
+  pending_actions: number;
+}

@@ -1,4 +1,5 @@
 import api from '@/services/auth';
+import type { DirectoryStats } from '@/types/ordoc-air/directory';
 
 export const directoriesService = {
   async list(params?: Record<string, any>): Promise<any> {
@@ -37,6 +38,11 @@ export const directoriesService = {
 
   async tree(params?: Record<string, any>): Promise<any> {
     const response = await api.get('/api/v1/ordoc-air/directories/tree/', { params });
+    return response.data;
+  },
+
+  async getStats(id: string | number): Promise<DirectoryStats> {
+    const response = await api.get(`/api/v1/ordoc-air/directories/${id}/stats/`);
     return response.data;
   },
 };
