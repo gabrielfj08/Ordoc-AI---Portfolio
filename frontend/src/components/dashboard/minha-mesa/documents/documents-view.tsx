@@ -23,6 +23,7 @@ import { DocumentCard } from './document-card';
 import { CategoriesView } from './categories-view';
 import { TemplatesView } from './templates-view';
 import { FoldersView } from './folders-view';
+import { SearchView } from './search-view';
 import { SignPendingView } from './signatures/sign-pending-view';
 import { SignSignedView } from './signatures/sign-signed-view';
 import { SignHistoryView } from './signatures/sign-history-view';
@@ -58,7 +59,7 @@ const DocumentsView = () => {
     const searchParams = useSearchParams();
 
     // Derived state from URL
-    const currentView = searchParams.get('docView') || 'files'; // files, folders, categories, templates, sign_pending, sign_signed, sign_history
+    const currentView = searchParams.get('docView') || 'files'; // files, folders, categories, templates, search, sign_pending, sign_signed, sign_history
     const currentDirId = searchParams.get('folder') ? Number(searchParams.get('folder')) : null;
     const currentFolderName = searchParams.get('folderName');
 
@@ -212,6 +213,13 @@ const DocumentsView = () => {
                                 <FileCode className={`w-5 h-5 ${currentView === 'templates' ? 'text-orange-600' : 'text-muted-foreground'}`} />
                                 <span className="text-sm">Templates</span>
                             </button>
+                            <button
+                                onClick={() => handleViewChange('search')}
+                                className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-colors ${currentView === 'search' ? 'bg-orange-50 text-orange-700 font-medium' : 'hover:bg-secondary/80 text-foreground'}`}
+                            >
+                                <Search className={`w-5 h-5 ${currentView === 'search' ? 'text-orange-600' : 'text-muted-foreground'}`} />
+                                <span className="text-sm">Busca Semântica</span>
+                            </button>
                         </CardContent>
                     </Card>
 
@@ -353,6 +361,11 @@ const DocumentsView = () => {
                             </h2>
                             <TemplatesView />
                         </section>
+                    )}
+
+                    {/* Search View */}
+                    {currentView === 'search' && (
+                        <SearchView />
                     )}
 
                     {/* Signatures: Pending */}
