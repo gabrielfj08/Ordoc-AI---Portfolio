@@ -245,6 +245,102 @@ class DirectoryViewSet(BaseViewSet):
         
         tree_data = build_tree(root_directories)
         return Response(tree_data)
+    
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """Get directory statistics and insights"""
+        from django.db.models import Sum
+        from django.utils import timezone
+        
+        directory = self.get_object()
+        
+        # Buscar documentos da pasta
+        documents = directory.documents.filter(deleted_at__isnull=True)
+        
+        # Estatísticas básicas
+        total_documents = documents.count()
+        total_size = documents.aggregate(total=Sum('file_size'))['total'] or 0
+        
+        # Análise de categorização
+        uncategorized = documents.filter(tags__isnull=True).count()
+        
+        # Análise de idade
+        now = timezone.now()
+        old_docs = documents.filter(
+            created_at__lt=now - timezone.timedelta(days=365)
+        ).count()
+        
+        recent_docs = documents.filter(
+            created_at__gte=now - timezone.timedelta(days=7)
+        ).count()
+        
+        # Status dos documentos
+        status_breakdown = {}
+        for status_choice in Document.STATUS_CHOICES:
+            status_code = status_choice[0]
+            count = documents.filter(status=status_code).count()
+            if count > 0:
+                status_breakdown[status_code] = count
+        
+        # IA analisa saúde da pasta
+        health_status = 'healthy'
+        insights = []
+        pending_actions = 0
+        
+        if uncategorized > 0:
+            insights.append({
+                'type': 'warning',
+                'message': f'{uncategorized} documento{"s" if uncategorized > 1 else ""} sem tags',
+                'count': uncategorized,
+                'action': 'categorize'
+            })
+            health_status = 'needs_attention'
+            pending_actions += uncategorized
+        
+        if old_docs > 5:
+            insights.append({
+                'type': 'info',
+                'message': f'{old_docs} documentos com mais de 1 ano',
+                'count': old_docs,
+                'action': 'review'
+            })
+        
+        if total_documents == 0:
+            insights.append({
+                'type': 'info',
+                'message': 'Pasta vazia',
+            })
+        elif total_documents > 100:
+            insights.append({
+                'type': 'warning',
+                'message': 'Pasta com muitos documentos - considere organizar em subpastas',
+                'count': total_documents,
+                'action': 'organize'
+            })
+            health_status = 'needs_attention'
+        
+        if pending_actions > 20:
+            health_status = 'critical'
+        
+        if not insights:
+            insights.append({
+                'type': 'success',
+                'message': 'Pasta organizada',
+            })
+        
+        return Response({
+            'id': directory.id,
+            'name': directory.name,
+            'total_documents': total_documents,
+            'total_size': total_size,
+            'uncategorized': uncategorized,
+            'old_documents': old_docs,
+            'recent_documents': recent_docs,
+            'status_breakdown': status_breakdown,
+            'health_status': health_status,
+            'insights': insights,
+            'pending_actions': pending_actions,
+        })
 
 
 class DocumentViewSet(BaseViewSet):
