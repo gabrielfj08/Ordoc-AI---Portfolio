@@ -1,4 +1,6 @@
-import React, { Suspense } from 'react';
+'use client';
+
+import React, { Suspense, use } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { DaySummaryWidget } from '@/components/dashboard/minha-mesa/day-summary';
 import { ImpactWidget } from '@/components/dashboard/minha-mesa/impact-widget';
@@ -17,8 +19,8 @@ interface DashboardProps {
   searchParams: Promise<{ view?: string }>;
 }
 
-async function DashboardContent({ searchParams }: DashboardProps) {
-  const { view } = await searchParams;
+function DashboardContent({ searchParams }: DashboardProps) {
+  const { view } = use(searchParams);
   const activeTab = view || 'home';
 
   return (
@@ -85,9 +87,7 @@ async function DashboardContent({ searchParams }: DashboardProps) {
 export default function Dashboard(props: DashboardProps) {
   return (
     <ProtectedRoute>
-      <Suspense fallback={<div>Carregando...</div>}>
-        <DashboardContent {...props} />
-      </Suspense>
+      <DashboardContent {...props} />
     </ProtectedRoute>
   );
 }
