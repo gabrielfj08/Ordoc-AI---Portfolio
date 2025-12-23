@@ -25,12 +25,14 @@ export const DashboardHeader = () => {
     const folderName = searchParams.get('folderName');
 
     const tabs = [
-        { id: 'workflows', label: 'Processos' },
-        { id: 'home', label: 'Minha Mesa' },
+        { id: 'home', label: 'Meu Dia' },
         { id: 'documents', label: 'Documentos' },
+        { id: 'workflows', label: 'Processos' },
         { id: 'signatures', label: 'Assinaturas' },
         { id: 'analises', label: 'Análises' },
     ];
+
+    const currentTabLabel = tabs.find(t => t.id === activeTab)?.label || 'Meu Dia';
 
     const handleTabChange = (tabId: string) => {
         const params = new URLSearchParams(searchParams);
@@ -68,9 +70,9 @@ export const DashboardHeader = () => {
                             O
                         </div>
                         <div className="flex flex-col leading-none hidden lg:flex">
-                            <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">ORDOC AI</span>
+                            <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">ORDOC</span>
                             <div className="flex items-center gap-1">
-                                <span className="text-sm font-bold text-foreground">Minha Mesa</span>
+                                <span className="text-sm font-bold text-foreground">{currentTabLabel}</span>
                                 {folderName && (
                                     <>
                                         <span className="text-muted-foreground/50">|</span>
@@ -81,7 +83,7 @@ export const DashboardHeader = () => {
                         </div>
                         {/* Mobile Logo Text */}
                         <div className="flex flex-col leading-none lg:hidden">
-                            <span className="text-sm font-bold text-foreground">Minha Mesa</span>
+                            <span className="text-sm font-bold text-foreground">{currentTabLabel}</span>
                         </div>
                     </div>
                 </div>

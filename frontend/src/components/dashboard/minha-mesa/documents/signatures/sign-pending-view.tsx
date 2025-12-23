@@ -70,7 +70,7 @@ export const SignPendingView = () => {
                 return (
                     <div
                         key={doc.id}
-                        className={`group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card hover:bg-accent/50 border rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer gap-4 ${doc.impact === 'critical' ? 'border-red-200 bg-red-50/10' : 'border-border hover:border-primary/30'}`}
+                        className={`group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card border rounded-xl gap-4 ${doc.impact === 'critical' ? 'border-red-200 bg-red-50/10' : 'border-border'}`}
                     >
                         {/* Left: Icon & Info */}
                         <div className="flex items-start gap-4 flex-1">
@@ -83,9 +83,22 @@ export const SignPendingView = () => {
                                     <h3 className="font-semibold text-foreground text-sm">
                                         {doc.title}
                                     </h3>
-                                    <Badge variant="secondary" className={impactInfo.className}>
-                                        {impactInfo.label} Prioridade
-                                    </Badge>
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge variant="secondary" className={`${impactInfo.className}`}>
+                                                    {impactInfo.label} Prioridade
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p className="text-xs">
+                                                    {doc.impact === 'critical' ? 'Vencido! Ação imediata necessária' :
+                                                        doc.impact === 'high' ? 'Pendente há mais de 2 dias' :
+                                                            'Aguardando assinaturas'}
+                                                </p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                     {doc.priority_score >= 8 && (
                                         <TooltipProvider>
                                             <Tooltip>

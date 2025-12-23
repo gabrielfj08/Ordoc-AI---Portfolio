@@ -45,11 +45,11 @@ export const TemplatesView = () => {
             {suggestedTemplates.length > 0 && (
                 <section>
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="p-1.5 bg-purple-100 rounded-lg">
-                            <Brain className="w-4 h-4 text-purple-600" />
+                        <div className="p-1.5 bg-orange-100 rounded-lg">
+                            <Brain className="w-4 h-4 text-orange-600" />
                         </div>
                         <h2 className="text-lg font-semibold text-foreground">Sugeridos para Automação</h2>
-                        <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-200 ml-2">
+                        <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 ml-2">
                             Alta Economia de Tempo
                         </Badge>
                     </div>
@@ -58,14 +58,14 @@ export const TemplatesView = () => {
                         {suggestedTemplates.map((tmpl) => (
                             <div
                                 key={tmpl.id}
-                                className="group relative flex flex-col justify-between p-4 bg-purple-50/40 hover:bg-purple-50/70 border border-purple-200/60 hover:border-purple-300 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                                className="group relative flex flex-col justify-between p-4 bg-orange-50/40 border border-orange-200/60 rounded-xl"
                             >
                                 <div className="absolute top-3 right-3">
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger>
-                                                <Badge className="bg-white hover:bg-white text-purple-600 border-purple-200 shadow-sm gap-1 pl-1 cursor-help">
-                                                    <Zap className="w-3 h-3 fill-purple-100" /> {(tmpl.confidence! * 100).toFixed(0)}% Utilidade
+                                                <Badge className="bg-white hover:bg-white text-orange-600 border-orange-200 shadow-sm gap-1 pl-1 cursor-help">
+                                                    <Zap className="w-3 h-3 fill-orange-100" /> {(tmpl.confidence! * 100).toFixed(0)}% Utilidade
                                                 </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent className="max-w-[250px]">
@@ -77,23 +77,23 @@ export const TemplatesView = () => {
                                 </div>
 
                                 <div className="flex items-start justify-between mb-3 mt-1">
-                                    <div className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg bg-purple-100">
-                                        <FileCode className="w-5 h-5 text-purple-600" />
+                                    <div className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg bg-orange-100">
+                                        <FileCode className="w-5 h-5 text-orange-600" />
                                     </div>
                                 </div>
 
                                 <div>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-white/80 border border-purple-200 text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
+                                        <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-white/80 border border-orange-200 text-[10px] font-semibold text-orange-700 uppercase tracking-wide">
                                             {tmpl.category}
                                         </div>
-                                        <span className="text-[10px] text-purple-600/70 bg-purple-100/50 px-1.5 py-0.5 rounded">Rascunho</span>
+                                        <span className="text-[10px] text-muted-foreground bg-orange-100/50 px-1.5 py-0.5 rounded">Rascunho</span>
                                     </div>
-                                    <h3 className="font-semibold text-purple-950 text-base mb-1">{tmpl.name}</h3>
-                                    <p className="text-xs text-purple-700/80 mb-3 line-clamp-2">{tmpl.suggestionReason}</p>
+                                    <h3 className="font-semibold text-foreground text-base mb-1">{tmpl.name}</h3>
+                                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{tmpl.suggestionReason}</p>
                                 </div>
 
-                                <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-white gap-2 mt-auto shadow-sm">
+                                <Button size="sm" className="w-full bg-orange-600 hover:bg-orange-700 text-white gap-2 mt-auto shadow-sm">
                                     <Pencil className="w-4 h-4" /> Criar Template
                                 </Button>
                             </div>
@@ -111,7 +111,7 @@ export const TemplatesView = () => {
                     {regularTemplates.map((tmpl) => (
                         <div
                             key={tmpl.id}
-                            className="group relative flex flex-col justify-between p-4 bg-card hover:bg-accent/50 border border-border hover:border-primary/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                            className="group relative flex flex-col justify-between p-4 bg-card border border-border rounded-xl"
                         >
                             <div className="flex items-start justify-between mb-2">
                                 <div className="w-10 h-10 flex items-center justify-center -ml-2">

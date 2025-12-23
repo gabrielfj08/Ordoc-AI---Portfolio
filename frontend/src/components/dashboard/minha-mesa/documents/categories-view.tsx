@@ -44,11 +44,11 @@ export const CategoriesView = () => {
             {suggestedCategories.length > 0 && (
                 <section>
                     <div className="flex items-center gap-2 mb-4">
-                        <div className="p-1.5 bg-indigo-100 rounded-lg">
-                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                        <div className="p-1.5 bg-orange-100 rounded-lg">
+                            <Sparkles className="w-4 h-4 text-orange-600" />
                         </div>
                         <h2 className="text-lg font-semibold text-foreground">Sugestões Inteligentes</h2>
-                        <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-200 ml-2">
+                        <Badge variant="secondary" className="bg-orange-50 text-orange-700 border-orange-200 ml-2">
                             Novos Padrões Detectados
                         </Badge>
                     </div>
@@ -57,13 +57,13 @@ export const CategoriesView = () => {
                         {suggestedCategories.map((cat: SmartCategory) => (
                             <div
                                 key={cat.id}
-                                className="group relative flex flex-col justify-between p-4 bg-indigo-50/30 hover:bg-indigo-50/60 border border-indigo-200/60 hover:border-indigo-300 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                                className="group relative flex flex-col justify-between p-4 bg-orange-50/30 border border-orange-200/60 rounded-xl"
                             >
                                 <div className="absolute top-3 right-3">
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger>
-                                                <Badge className="bg-white hover:bg-white text-indigo-600 border-indigo-200 shadow-sm gap-1 pl-1 cursor-help">
+                                                <Badge className="bg-white hover:bg-white text-orange-600 border-orange-200 shadow-sm gap-1 pl-1 cursor-help">
                                                     <Brain className="w-3 h-3" /> {(cat.confidence! * 100).toFixed(0)}%
                                                 </Badge>
                                             </TooltipTrigger>
@@ -76,25 +76,25 @@ export const CategoriesView = () => {
                                 </div>
 
                                 <div className="flex items-start justify-between mb-3 mt-1">
-                                    <div className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg bg-indigo-100">
-                                        <Tag className="w-5 h-5 text-indigo-600" />
+                                    <div className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg bg-orange-100">
+                                        <Tag className="w-5 h-5 text-orange-600" />
                                     </div>
                                 </div>
 
                                 <div>
-                                    <h3 className="font-semibold text-indigo-950 text-base mb-1">{cat.name}</h3>
-                                    <p className="text-xs text-indigo-700/80 mb-3">{cat.description}</p>
+                                    <h3 className="font-semibold text-foreground text-base mb-1">{cat.name}</h3>
+                                    <p className="text-xs text-muted-foreground mb-3">{cat.description}</p>
 
                                     <div className="flex flex-wrap gap-1 mb-4">
                                         {cat.tags?.map((tag: string) => (
-                                            <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-white border border-indigo-200 rounded text-indigo-600">
+                                            <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-white border border-orange-200 rounded text-muted-foreground">
                                                 #{tag}
                                             </span>
                                         ))}
                                     </div>
                                 </div>
 
-                                <Button size="sm" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-2 mt-auto shadow-sm">
+                                <Button size="sm" className="w-full bg-orange-600 hover:bg-orange-700 text-white gap-2 mt-auto shadow-sm">
                                     <Plus className="w-4 h-4" /> Criar Categoria
                                 </Button>
                             </div>
@@ -112,7 +112,7 @@ export const CategoriesView = () => {
                     {regularCategories.map((cat: SmartCategory) => (
                         <div
                             key={cat.id}
-                            className="group relative flex flex-col justify-between p-4 bg-card hover:bg-accent/50 border border-border hover:border-primary/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                            className="group relative flex flex-col justify-between p-4 bg-card border border-border rounded-xl"
                         >
                             <div className="flex items-start justify-between mb-2">
                                 <div className="w-10 h-10 flex items-center justify-center -ml-2">

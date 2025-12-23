@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useClientOnly } from '../hooks/useClientOnly';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Import modern components
@@ -16,7 +15,6 @@ import { FeaturesSection } from '@/components/sections/FeaturesSection';
 import { StatsSection } from '@/components/sections/StatsSection';
 
 export default function Home() {
-  const isClient = useClientOnly();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const [showWarning, setShowWarning] = useState(true);
@@ -24,15 +22,16 @@ export default function Home() {
 
   // Check if user was redirected from protected route
   useEffect(() => {
-    if (!isClient) return;
+    // Only access window on client
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const openLogin = urlParams.get('openLogin');
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const openLogin = urlParams.get('openLogin');
-
-    if (openLogin === 'true') {
-      router.push('/login');
+      if (openLogin === 'true') {
+        router.push('/login');
+      }
     }
-  }, [isClient, router]);
+  }, [router]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -48,10 +47,6 @@ export default function Home() {
       setShowContent(true);
     }, 100);
   };
-
-  if (!isClient) {
-    return null; // or a loading skeleton
-  }
 
   return (
     <main className="min-h-screen bg-white">

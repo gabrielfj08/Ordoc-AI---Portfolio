@@ -4,6 +4,12 @@ import React from 'react';
 import { BadgeCheck, Download, Calendar, FileCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Mock data based on existing page logic
 const mockSigned = [
@@ -18,7 +24,7 @@ export const SignSignedView = () => {
             {mockSigned.map((doc) => (
                 <div
                     key={doc.id}
-                    className="group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card hover:bg-accent/50 border border-border hover:border-primary/30 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer gap-4"
+                    className="group relative flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card border border-border rounded-xl gap-4"
                 >
                     {/* Left: Icon & Info */}
                     <div className="flex items-start gap-4 flex-1">
@@ -29,7 +35,16 @@ export const SignSignedView = () => {
                         <div className="flex flex-col gap-1">
                             <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
                                 {doc.title}
-                                <Badge variant="outline" className="text-[10px] text-green-700 border-green-200 bg-green-50">Assinado</Badge>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Badge variant="outline" className="text-[10px] text-green-700 border-green-200 bg-green-50">Assinado</Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p className="text-xs">Ricardo assinou em {new Date(doc.signed_at).toLocaleDateString('pt-BR')}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </h3>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
