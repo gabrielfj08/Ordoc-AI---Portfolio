@@ -53,9 +53,7 @@ async function DashboardContent({ searchParams }: DashboardProps) {
         )}
 
         {activeTab === 'documents' && (
-          <Suspense fallback={<div>Carregando documentos...</div>}>
-            <DocumentsView />
-          </Suspense>
+          <DocumentsView />
         )}
 
         {activeTab === 'workflows' && (

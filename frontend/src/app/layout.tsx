@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
+import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -48,6 +49,7 @@ export default function RootLayout({
             <TooltipProvider>
               {children}
               <Toaster position="top-right" />
+              <SonnerToaster position="top-right" richColors />
             </TooltipProvider>
           </AuthProvider>
         </QueryProvider>
