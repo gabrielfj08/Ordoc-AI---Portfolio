@@ -1035,3 +1035,126 @@ def _extract_document_text(document) -> str:
         parts.append(f"Descrição: {document.description}")
 
     return '\n'.join(parts) if parts else ''
+
+
+@shared_task
+def analyze_audit_patterns():
+    """
+    Analisa padrões nos logs de auditoria (ActivityLog) para detectar insights.
+    
+    Detecta:
+    - Horários de pico de atividade
+    - Usuários mais ativos
+    - Tipos de ações mais comuns
+    - Documentos com muitas modificações (possivel trabalho em andamento)
+    - Padrões suspeitos (muitas exclusões, downloads em massa)
+    
+    Execução: A cada 24 horas (configurado no Celery Beat)
+    """
+    from ordoc_air.models import ActivityLog, Organization
+    from django.db.models import Count, Q
+    from collections import Counter
+    from datetime import datetime
+    
+    try:
+        # Analisar últimos 7 dias
+        cutoff = timezone.now() - timedelta(days=7)
+        
+        # Iterar por organizações ativas
+        for org in Organization.objects.filter(is_active=True):
+            logs = ActivityLog.objects.filter(
+                organization=org,
+                created_at__gte=cutoff
+            )
+            
+            total_activities = logs.count()
+            
+            if total_activities == 0:
+                continue
+            
+            # 1. Detectar horários de pico (agrupar por hora do dia)
+            hour_distribution = Counter()
+            for log in logs:
+                hour = log.created_at.hour
+                hour_distribution[hour] += 1
+            
+            # Encontrar hora de pico
+            if hour_distribution:
+                peak_hour = max(hour_distribution, key=hour_distribution.get)
+                peak_count = hour_distribution[peak_hour]
+                peak_percentage = (peak_count / total_activities) * 100
+            
+            # 2. Detectar usuários mais ativos
+            top_users = logs.values('user__username', 'user__first_name', 'user__last_name').annotate(
+                activity_count=Count('id')
+            ).order_by('-activity_count')[:5]
+            
+            # 3. Detectar ações mais comuns
+            top_actions = logs.values('action').annotate(
+                count=Count('id')
+            ).order_by('-count')[:5]
+            
+            # 4. Detectar documentos com muitas modificações (trabalho em andamento)
+            hot_documents = logs.filter(
+                entity_type='document',
+                action__in=['update', 'version']
+            ).values('entity_id', 'entity_name').annotate(
+                modification_count=Count('id')
+            ).filter(modification_count__gte=10).order_by('-modification_count')[:5]
+            
+            # 5. Detectar padrões suspeitos
+            suspicious_patterns = []
+            
+            # Muitas exclusões (>20 em 7 dias)
+            delete_count = logs.filter(action='delete').count()
+            if delete_count > 20:
+                suspicious_patterns.append({
+                    'pattern': 'high_deletion_rate',
+                    'message': f'{delete_count} documentos excluídos nos últimos 7 dias',
+                    'severity': 'warning'
+                })
+            
+            # Downloads em massa por um único usuário (>50 em 7 dias)
+            download_by_user = logs.filter(action='download').values('user__username').annotate(
+                download_count=Count('id')
+            ).filter(download_count__gt=50)
+            
+            if download_by_user.exists():
+                for user_data in download_by_user:
+                    suspicious_patterns.append({
+                        'pattern': 'mass_download',
+                        'message': f'Usuário {user_data["user__username"]} fez {user_data["download_count"]} downloads',
+                        'severity': 'warning'
+                    })
+            
+            # Armazenar insights no cache ou banco (usando um modelo auxiliar se necessário)
+            logger.info(
+                f"[Org: {org.corporate_name}] Análise de auditoria concluída: "
+                f"{total_activities} atividades, "
+                f"pico às {peak_hour}h ({peak_percentage:.1f}%), "
+                f"{len(hot_documents)} docs em trabalho intenso, "
+                f"{len(suspicious_patterns)} padrões suspeitos"
+            )
+            
+            # Retornar insights (podem ser salvos em cache ou modelo)
+            insights = {
+                'organization_id': str(org.id),
+                'period': '7_days',
+                'total_activities': total_activities,
+                'peak_hour': peak_hour if hour_distribution else None,
+                'peak_percentage': peak_percentage if hour_distribution else 0,
+                'top_users': list(top_users),
+                'top_actions': list(top_actions),
+                'hot_documents': list(hot_documents),
+                'suspicious_patterns': suspicious_patterns,
+                'analyzed_at': timezone.now().isoformat()
+            }
+            
+            # Salvar insights em cache do Django (expira em 24h)
+            from django.core.cache import cache
+            cache.set(f'audit_insights_{org.id}', insights, 60 * 60 * 24)
+        
+        logger.info("Análise de padrões de auditoria concluída para todas as organizações")
+        
+    except Exception as e:
+        logger.exception(f"Erro na análise de padrões de auditoria: {e}")

@@ -77,6 +77,13 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=9, minute=0, day_of_week=1),  # Segunda-feira 9h
         'options': {'expires': 86400}
     },
+
+    # Intelligence: Análise de padrões de auditoria (diariamente às 2h)
+    'intelligence-audit-patterns-analysis': {
+        'task': 'intelligence.tasks.analyze_audit_patterns',
+        'schedule': crontab(hour=2, minute=0),  # 02:00 todos os dias
+        'options': {'expires': 86400}  # Expira em 24h
+    },
 }
 
 

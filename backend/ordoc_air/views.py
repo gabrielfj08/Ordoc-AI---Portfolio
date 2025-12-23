@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.http import Http404
 from guardian.shortcuts import assign_perm, remove_perm
 from ordoc_ai.base_viewset import BaseViewSet
@@ -713,6 +713,58 @@ class ActivityLogViewSet(BaseViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def insights(self, request):
+        """Retorna insights de IA sobre padrões de auditoria da organização"""
+        from django.core.cache import cache
+        
+        org = self.get_current_organization()
+        if not org:
+            return Response({'error': 'Organization not found'}, status=404)
+        
+        # Buscar insights do cache (gerados pela task analyze_audit_patterns)
+        cache_key = f'audit_insights_{org.id}'
+        insights = cache.get(cache_key)
+        
+        # Se não houver insights em cache, gerar em tempo real (versão simplificada)
+        if not insights:
+            from datetime import timedelta
+            from django.utils import timezone
+            from collections import Counter
+            
+            cutoff = timezone.now() - timedelta(days=7)
+            logs = self.get_queryset().filter(created_at__gte=cutoff)
+            
+            total_activities = logs.count()
+            
+            if total_activities == 0:
+                return Response({
+                    'message': 'Sem atividades nos últimos 7 dias',
+                    'total_activities': 0
+                })
+            
+            # Top ações
+            top_actions = list(logs.values('action').annotate(
+                count=Count('id')
+            ).order_by('-count')[:5])
+            
+            # Top usuários
+            top_users = list(logs.values('user__username').annotate(
+                activity_count=Count('id')
+            ).order_by('-activity_count')[:5])
+            
+            insights = {
+                'organization_id': str(org.id),
+                'period': '7_days',
+                'total_activities': total_activities,
+                'top_actions': top_actions,
+                'top_users': top_users,
+                'generated_on_demand': True,
+                'analyzed_at': timezone.now().isoformat()
+            }
+        
+        return Response(insights)
 
 
 class ShareableLinkViewSet(BaseViewSet):
