@@ -748,11 +748,11 @@ export const dashboardService = {
     async getSmartCategories(): Promise<SmartCategory[]> {
         try {
             // 1. Buscar categorias existentes (tags) do backend
-            const tagsResponse = await api.get('/ordoc-air/api/tags/');
+            const tagsResponse = await api.get('/ordoc-air/tags/');
             const tags = Array.isArray(tagsResponse.data) ? tagsResponse.data : tagsResponse.data.results || [];
             
             // 2. Buscar sugestões de IA do backend
-            const suggestionsResponse = await api.get('/ordoc-air/api/tags/suggestions/');
+            const suggestionsResponse = await api.get('/ordoc-air/tags/suggestions/');
             const aiSuggestions = Array.isArray(suggestionsResponse.data) ? suggestionsResponse.data : suggestionsResponse.data.results || [];
             
             // 3. Converter tags existentes para formato SmartCategory
@@ -792,11 +792,11 @@ export const dashboardService = {
     async getSmartTemplates(): Promise<SmartTemplate[]> {
         try {
             // 1. Buscar templates existentes do backend
-            const templatesResponse = await api.get('/ordoc-air/api/document-templates/');
+            const templatesResponse = await api.get('/ordoc-air/document-templates/');
             const templates = Array.isArray(templatesResponse.data) ? templatesResponse.data : templatesResponse.data.results || [];
             
             // 2. Buscar sugestões de IA do backend
-            const suggestionsResponse = await api.get('/ordoc-air/api/document-templates/suggestions/');
+            const suggestionsResponse = await api.get('/ordoc-air/document-templates/suggestions/');
             const aiSuggestions = Array.isArray(suggestionsResponse.data) ? suggestionsResponse.data : suggestionsResponse.data.results || [];
             
             // 3. Converter templates existentes para formato SmartTemplate
