@@ -876,6 +876,141 @@ def generate_insights_report():
         logger.exception(f"Erro ao gerar relatório de insights: {e}")
 
 
+@shared_task
+def analyze_directories_health():
+    """
+    Analisa saúde de pastas periodicamente (Feature 1.2).
+
+    Detecta e gera alertas para:
+    - Pastas com muitos documentos sem categoria (>20)
+    - Pastas muito grandes que precisam ser subdivididas (>150 docs)
+    - Pastas com documentos antigos sem revisão (>1 ano)
+
+    Execução: A cada 6 horas (configurado no Celery Beat)
+    """
+    from ordoc_air.models import Directory, Document, Organization
+    from .models import ProactiveAlert
+    from django.db.models import Count, Q
+
+    try:
+        total_alerts = 0
+
+        # Iterar por todas as organizações ativas
+        for org in Organization.objects.filter(is_active=True):
+            # Buscar todas as pastas da organização (via department)
+            directories = Directory.objects.filter(
+                department__organization=org,
+                is_active=True
+            )
+
+            for directory in directories:
+                # Contar documentos na pasta (documentos não deletados)
+                docs = Document.objects.filter(
+                    directory=directory,
+                    deleted_at__isnull=True
+                )
+                total_docs = docs.count()
+
+                # Se pasta vazia, pular
+                if total_docs == 0:
+                    continue
+
+                # 1. Detectar documentos sem tags (não categorizados)
+                uncategorized_count = docs.filter(tags__isnull=True).count()
+
+                if uncategorized_count > 20:
+                    ProactiveAlert.objects.get_or_create(
+                        document_id=f"dir-{directory.id}-uncategorized",
+                        organization_id=org.id,
+                        defaults={
+                            'document_type': 'directory',
+                            'alert_type': 'warning',
+                            'severity': 'warning',
+                            'title': f'Pasta "{directory.name}" precisa de organização',
+                            'message': f'Esta pasta contém {uncategorized_count} documentos sem tags de um total de {total_docs} documentos.',
+                            'details': {
+                                'directory_id': str(directory.id),
+                                'directory_name': directory.name,
+                                'uncategorized_count': uncategorized_count,
+                                'total_documents': total_docs
+                            },
+                            'suggested_actions': [
+                                {
+                                    'action_type': 'categorize',
+                                    'label': 'Categorizar documentos',
+                                    'auto_applicable': False
+                                }
+                            ]
+                        }
+                    )
+                    total_alerts += 1
+
+                # 2. Detectar pastas muito grandes (>150 docs)
+                if total_docs > 150:
+                    ProactiveAlert.objects.get_or_create(
+                        document_id=f"dir-{directory.id}-toolarge",
+                        organization_id=org.id,
+                        defaults={
+                            'document_type': 'directory',
+                            'alert_type': 'suggestion',
+                            'severity': 'info',
+                            'title': f'Pasta "{directory.name}" pode ser subdividida',
+                            'message': f'Esta pasta contém {total_docs} documentos. Considere criar subpastas para melhor organização.',
+                            'details': {
+                                'directory_id': str(directory.id),
+                                'directory_name': directory.name,
+                                'total_documents': total_docs
+                            },
+                            'suggested_actions': [
+                                {
+                                    'action_type': 'organize',
+                                    'label': 'Criar subpastas',
+                                    'auto_applicable': False
+                                }
+                            ]
+                        }
+                    )
+                    total_alerts += 1
+
+                # 3. Detectar documentos antigos sem revisão (>1 ano)
+                one_year_ago = timezone.now() - timedelta(days=365)
+                old_docs_count = docs.filter(
+                    created_at__lt=one_year_ago
+                ).count()
+
+                if old_docs_count > 30:  # Alerta apenas se tiver muitos docs antigos
+                    ProactiveAlert.objects.get_or_create(
+                        document_id=f"dir-{directory.id}-oldocs",
+                        organization_id=org.id,
+                        defaults={
+                            'document_type': 'directory',
+                            'alert_type': 'info',
+                            'severity': 'info',
+                            'title': f'Pasta "{directory.name}" contém documentos antigos',
+                            'message': f'Esta pasta possui {old_docs_count} documentos com mais de 1 ano. Considere revisar ou arquivar.',
+                            'details': {
+                                'directory_id': str(directory.id),
+                                'directory_name': directory.name,
+                                'old_documents_count': old_docs_count,
+                                'total_documents': total_docs
+                            },
+                            'suggested_actions': [
+                                {
+                                    'action_type': 'review',
+                                    'label': 'Revisar documentos antigos',
+                                    'auto_applicable': False
+                                }
+                            ]
+                        }
+                    )
+                    total_alerts += 1
+
+        logger.info(f"Análise de saúde de pastas concluída: {total_alerts} alertas gerados/atualizados")
+
+    except Exception as e:
+        logger.exception(f"Erro na análise de saúde de pastas: {e}")
+
+
 # Helper functions
 def _extract_document_text(document) -> str:
     """

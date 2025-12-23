@@ -42,6 +42,13 @@ app.conf.beat_schedule = {
         'options': {'expires': 21600}  # Expira em 6h
     },
 
+    # Intelligence: Análise de saúde de pastas (a cada 6 horas)
+    'intelligence-directories-health-analysis': {
+        'task': 'intelligence.tasks.analyze_directories_health',
+        'schedule': crontab(minute=30, hour='*/6'),  # 00:30, 06:30, 12:30, 18:30
+        'options': {'expires': 21600}  # Expira em 6h
+    },
+
     # ========================================
     # COMPLIANCE E SEGURANÇA
     # ========================================
