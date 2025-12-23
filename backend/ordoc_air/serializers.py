@@ -45,11 +45,26 @@ class CategorizationRuleSerializer(serializers.ModelSerializer):
 
 class TagSerializer(serializers.ModelSerializer):
     """Serializer for Tag model"""
+    
+    doc_count = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    last_update = serializers.DateTimeField(source='updated_at', read_only=True, format='%Y-%m-%d')
 
     class Meta:
         model = Tag
-        fields = ['id', 'name', 'slug', 'color', 'description', 'organization', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'slug', 'color', 'description', 'organization', 
+            'doc_count', 'status', 'last_update', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'slug', 'organization', 'doc_count', 'status', 'last_update', 'created_at', 'updated_at']
+    
+    def get_doc_count(self, obj):
+        """Count active documents with this tag"""
+        return obj.documents.filter(deleted_at__isnull=True).count()
+    
+    def get_status(self, obj):
+        """Return 'active' status (tags don't have archived state in current model)"""
+        return 'active'
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

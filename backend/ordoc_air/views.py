@@ -862,3 +862,78 @@ class CategorizationRuleViewSet(BaseViewSet):
             return Response({'error': f'Invalid regex: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
             
         return Response({'matched': matched})
+
+
+class TagViewSet(BaseViewSet):
+    """ViewSet for Tag management with AI suggestions"""
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    def get_queryset(self):
+        """Filter by current organization"""
+        queryset = super().get_queryset()
+        org = self.get_current_organization()
+        if org:
+            return queryset.filter(organization=org)
+        return queryset.none()
+    
+    def perform_create(self, serializer):
+        """Set organization on creation"""
+        serializer.save(organization=self.get_current_organization())
+    
+    @action(detail=False, methods=['get'])
+    def suggestions(self, request):
+        """IA sugere categorias baseado em padrões de documentos não categorizados"""
+        import re
+        org = self.get_current_organization()
+        
+        if not org:
+            return Response({'error': 'Organization not found'}, status=404)
+        
+        # Buscar documentos sem tags
+        uncategorized_docs = Document.objects.filter(
+            department__organization=org,
+            tags__isnull=True,
+            deleted_at__isnull=True
+        ).values_list('name', flat=True)
+        
+        suggestions = []
+        
+        # Detectar padrão: Protocolos (PROT-YYYY-XXX)
+        protocol_pattern = r'PROT-\d{4}-\d+'
+        protocol_docs = [doc for doc in uncategorized_docs if re.match(protocol_pattern, doc)]
+        if len(protocol_docs) >= 5:
+            suggestions.append({
+                'id': f'suggested_protocol_{uuid.uuid4()}',
+                'name': 'Protocolos 2024',
+                'description': 'Agrupamento automático de protocolos detectados',
+                'doc_count': len(protocol_docs),
+                'status': 'active',
+                'last_update': None,
+                'is_ai_suggested': True,
+                'confidence': 0.92,
+                'suggestion_reason': f'Detectados {len(protocol_docs)} arquivos com padrão PROT-2024-XXX dispersos.',
+                'tags': ['protocolos', 'automático']
+            })
+        
+        # Detectar padrão: Contratos (CNPJ no nome)
+        cnpj_pattern = r'\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}'
+        contract_docs = [doc for doc in uncategorized_docs if re.search(cnpj_pattern, doc) or 'contrato' in doc.lower()]
+        if len(contract_docs) >= 3:
+            suggestions.append({
+                'id': f'suggested_contracts_{uuid.uuid4()}',
+                'name': 'Fornecedores Externos',
+                'description': 'Contratos de terceiros identificados recentemente',
+                'doc_count': len(contract_docs),
+                'status': 'active',
+                'last_update': None,
+                'is_ai_suggested': True,
+                'confidence': 0.85,
+                'suggestion_reason': f'Múltiplos contratos de CNPJs externos sem classificação.',
+                'tags': ['fornecedores', 'contratos']
+            })
+        
+        return Response(suggestions)

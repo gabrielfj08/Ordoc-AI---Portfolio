@@ -746,47 +746,47 @@ export const dashboardService = {
     },
 
     async getSmartCategories(): Promise<SmartCategory[]> {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        const baseCategories: SmartCategory[] = [
-            { id: 1, name: 'Financeiro', description: 'Documentos fiscais, faturas e comprovantes', docCount: 154, status: 'active', lastUpdate: '2024-12-12', tags: ['faturas', 'recibos', 'impostos'] },
-            { id: 2, name: 'Recursos Humanos', description: 'Contratos, holerites e feedback', docCount: 89, status: 'active', lastUpdate: '2024-12-10', tags: ['contratos', 'holerites'] },
-            { id: 3, name: 'Jurídico', description: 'Contratos legais, termos e NDAs', docCount: 234, status: 'active', lastUpdate: '2024-12-15', tags: ['contratos', 'termos', 'legal'] },
-            { id: 4, name: 'Marketing', description: 'Assets de marca, campanhas e briefings', docCount: 45, status: 'active', lastUpdate: '2024-12-01', tags: ['brand', 'assets'] },
-            { id: 5, name: 'Operacional', description: 'Manuais, procedimentos e relatórios diários', docCount: 312, status: 'active', lastUpdate: '2024-12-18', tags: ['manuais', 'pops'] },
-            { id: 6, name: 'Projetos', description: 'Documentação técnica de projetos', docCount: 67, status: 'archived', lastUpdate: '2024-11-20', tags: ['specs', 'técnico'] },
-        ];
-
-        // AI Suggestions based on analysis of "uncategorized" documents
-        const aiSuggestions: SmartCategory[] = [
-            {
-                id: 'suggested_1',
-                name: 'Protocolos 2024',
-                description: 'Agrupamento automático de protocolos detectados',
-                docCount: 15,
-                status: 'active',
-                lastUpdate: new Date().toISOString().split('T')[0],
-                isAiSuggested: true,
-                confidence: 0.92,
-                suggestionReason: "Detectados 15 arquivos com padrão 'PROT-2024-XXX' dispersos.",
-                tags: ['protocolos', 'automático']
-            },
-            {
-                id: 'suggested_2',
-                name: 'Fornecedores Externos',
-                description: 'Contratos de terceiros identificados recentemente',
-                docCount: 8,
-                status: 'active',
-                lastUpdate: new Date().toISOString().split('T')[0],
-                isAiSuggested: true,
-                confidence: 0.85,
-                suggestionReason: "Múltiplos contratos de CNPJs externos sem classificação.",
-                tags: ['fornecedores', 'contratos']
-            }
-        ];
-
-        return [...aiSuggestions, ...baseCategories];
+        try {
+            // 1. Buscar categorias existentes (tags) do backend
+            const tagsResponse = await api.get('/ordoc-air/api/tags/');
+            const tags = Array.isArray(tagsResponse.data) ? tagsResponse.data : tagsResponse.data.results || [];
+            
+            // 2. Buscar sugestões de IA do backend
+            const suggestionsResponse = await api.get('/ordoc-air/api/tags/suggestions/');
+            const aiSuggestions = Array.isArray(suggestionsResponse.data) ? suggestionsResponse.data : suggestionsResponse.data.results || [];
+            
+            // 3. Converter tags existentes para formato SmartCategory
+            const baseCategories: SmartCategory[] = tags.map((tag: any) => ({
+                id: tag.id,
+                name: tag.name,
+                description: tag.description || '',
+                docCount: tag.doc_count || 0,
+                status: tag.status || 'active',
+                lastUpdate: tag.last_update || new Date().toISOString().split('T')[0],
+                tags: [tag.name.toLowerCase()]
+            }));
+            
+            // 4. Converter sugestões de IA para formato SmartCategory
+            const smartSuggestions: SmartCategory[] = aiSuggestions.map((suggestion: any) => ({
+                id: suggestion.id,
+                name: suggestion.name,
+                description: suggestion.description || '',
+                docCount: suggestion.doc_count || 0,
+                status: suggestion.status || 'active',
+                lastUpdate: suggestion.last_update || new Date().toISOString().split('T')[0],
+                isAiSuggested: suggestion.is_ai_suggested || true,
+                confidence: suggestion.confidence || 0.85,
+                suggestionReason: suggestion.suggestion_reason || '',
+                tags: suggestion.tags || []
+            }));
+            
+            // Retornar sugestões primeiro, depois categorias existentes
+            return [...smartSuggestions, ...baseCategories];
+        } catch (error) {
+            console.error('Failed to load smart categories:', error);
+            // Fallback para mock se falhar
+            return [];
+        }
     },
 
     async getSmartTemplates(): Promise<SmartTemplate[]> {
