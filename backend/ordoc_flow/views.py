@@ -444,6 +444,24 @@ class TaskViewSet(BaseViewSet):
             'task_fields'
         ).filter(procedure__organization=self.get_current_organization())
     
+    def perform_create(self, serializer):
+        ordoc_user = self.get_current_ordoc_user()
+        organization = self.get_current_organization()
+
+        # Validar se o procedimento pertence à organização
+        procedure = serializer.validated_data.get('procedure')
+        if procedure and procedure.organization != organization:
+            raise permissions.exceptions.PermissionDenied(
+                "O procedimento não pertence à sua organização."
+            )
+
+        # Atribuição manual de responsável, se fornecida no payload
+        # Se não fornecida, assignee/group_assignee ficarão nulos (pendente)
+        # O usuário atual é sempre o criador
+        serializer.save(
+            created_by=ordoc_user
+        )
+
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Estatísticas de tarefas"""
