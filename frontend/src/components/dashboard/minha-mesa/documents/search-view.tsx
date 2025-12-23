@@ -25,6 +25,57 @@ import {
 } from '@/components/ui/select';
 import searchService, { SearchResult, SearchFilters } from '@/services/search';
 
+interface SmartFilterPreset {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    query?: string;
+    filters: SearchFilters;
+}
+
+// Intelligent filter presets based on common patterns
+const smartFilterPresets: SmartFilterPreset[] = [
+    {
+        id: 'recent-contracts',
+        name: 'Contratos Recentes',
+        description: 'Documentos jurídicos dos últimos 30 dias',
+        icon: '📋',
+        query: 'contrato',
+        filters: {
+            date_from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            mime_type: 'application/pdf'
+        }
+    },
+    {
+        id: 'pending-signatures',
+        name: 'Pendentes de Assinatura',
+        description: 'Documentos aguardando assinatura',
+        icon: '✍️',
+        query: 'assinatura pendente',
+        filters: {
+            status: 'active'
+        }
+    },
+    {
+        id: 'financial-docs',
+        name: 'Documentos Financeiros',
+        description: 'Faturas, recibos e comprovantes',
+        icon: '💰',
+        query: 'fatura OR recibo OR pagamento',
+        filters: {}
+    },
+    {
+        id: 'this-week',
+        name: 'Desta Semana',
+        description: 'Todos os documentos da semana atual',
+        icon: '📅',
+        filters: {
+            date_from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        }
+    }
+];
+
 export const SearchView = () => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -33,6 +84,7 @@ export const SearchView = () => {
     const [hasSearched, setHasSearched] = useState(false);
     const [filters, setFilters] = useState<SearchFilters>({});
     const [showFilters, setShowFilters] = useState(false);
+    const [activePreset, setActivePreset] = useState<string | null>(null);
 
     const handleSearch = async (searchQuery?: string) => {
         const q = searchQuery !== undefined ? searchQuery : query;
@@ -62,6 +114,18 @@ export const SearchView = () => {
 
     const clearFilters = () => {
         setFilters({});
+        setActivePreset(null);
+    };
+
+    const applyPreset = (preset: SmartFilterPreset) => {
+        setActivePreset(preset.id);
+        setFilters(preset.filters);
+        if (preset.query) {
+            setQuery(preset.query);
+            handleSearch(preset.query);
+        } else {
+            handleSearch('*');
+        }
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -116,6 +180,41 @@ export const SearchView = () => {
                     <p className="text-xs text-muted-foreground">
                         Busca inteligente por conteúdo, contexto e significado
                     </p>
+                </div>
+            </div>
+
+            {/* Smart Filter Presets */}
+            <div>
+                <div className="flex items-center gap-2 mb-3">
+                    <Filter className="w-4 h-4 text-orange-600" />
+                    <h3 className="text-sm font-semibold text-foreground">Filtros Inteligentes</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {smartFilterPresets.map((preset) => (
+                        <Card
+                            key={preset.id}
+                            className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                                activePreset === preset.id
+                                    ? 'border-orange-400 bg-orange-50/50 shadow-sm'
+                                    : 'border-border hover:border-orange-300'
+                            }`}
+                            onClick={() => applyPreset(preset)}
+                        >
+                            <CardContent className="p-3">
+                                <div className="flex items-start gap-2">
+                                    <div className="text-2xl shrink-0">{preset.icon}</div>
+                                    <div className="min-w-0">
+                                        <h4 className={`text-sm font-medium mb-0.5 ${activePreset === preset.id ? 'text-orange-700' : 'text-foreground'}`}>
+                                            {preset.name}
+                                        </h4>
+                                        <p className="text-[10px] text-muted-foreground line-clamp-2">
+                                            {preset.description}
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
             </div>
 
