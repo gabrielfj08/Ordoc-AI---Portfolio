@@ -61,11 +61,13 @@ import { SignSignedView } from './signatures/sign-signed-view';
 import { SignHistoryView } from './signatures/sign-history-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SmartUploadDialog } from './smart-upload-dialog';
+import FolderCard from './folder-card';
 
 // Types
 interface Directory {
     id: string | number;
     name: string;
+    documentCount?: number;
     healthStatus?: 'healthy' | 'needs_attention' | 'critical';
     pendingActions?: number;
     insights?: any[];
@@ -165,6 +167,7 @@ const DocumentsView = () => {
             return folders.map((f: any) => ({
                 id: f.id,
                 name: f.name,
+                documentCount: f.documentCount || 0,
                 healthStatus: f.healthStatus || 'healthy',
                 pendingActions: f.pendingActions || 0,
                 insights: f.insights || []
@@ -430,6 +433,30 @@ const DocumentsView = () => {
                     {/* Files View */}
                     {currentView === 'files' && (
                         <>
+                            {/* Grid de Pastas (Root level only) */}
+                            {currentDirId === null && directories && directories.length > 0 && (
+                                <section className="mb-8">
+                                    <h2 className="text-lg font-semibold text-neutral-800 mb-4 flex items-center gap-2">
+                                        <Folder className="h-5 w-5 text-primary-600" />
+                                        Minhas Pastas
+                                    </h2>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {directories.map((dir: Directory) => (
+                                            <FolderCard
+                                                key={dir.id}
+                                                id={dir.id}
+                                                name={dir.name}
+                                                documentCount={dir.documentCount || 0}
+                                                healthStatus={dir.healthStatus}
+                                                insights={dir.insights}
+                                                pendingActions={dir.pendingActions}
+                                                onClick={() => handleNavigate(dir)}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
                             {/* Recentes com IA */}
                             {currentDirId === null && documents && documents.length > 0 && (
                                 <section className="mb-8">
@@ -546,10 +573,6 @@ const DocumentsView = () => {
             {/* Document Preview Modal */}
             <Dialog open={!!previewDocument} onOpenChange={(open) => !open && setPreviewDocument(null)}>
                 <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden rounded-xl">
-
-
-                    // ...
-
                     <div className="flex items-center justify-between p-4 border-b bg-background z-10">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
