@@ -63,6 +63,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SmartUploadDialog } from './smart-upload-dialog';
 import FolderCard from './folder-card';
 import { CreateFolderDialog } from './dialogs/create-folder-dialog';
+import { CreateCategoryDialog } from './dialogs/create-category-dialog';
+import { CreateTemplateDialog } from './dialogs/create-template-dialog';
 
 // Types
 interface Directory {
@@ -693,8 +695,17 @@ const DocumentsView = () => {
                 parentDirId={currentDirId}
             />
 
-            {/* TODO: Add CreateCategoryDialog */}
-            {/* TODO: Add CreateTemplateDialog */}
+            {/* Create Category Dialog */}
+            <CreateCategoryDialog 
+                open={createCategoryOpen} 
+                onOpenChange={setCreateCategoryOpen}
+            />
+
+            {/* Create Template Dialog */}
+            <CreateTemplateDialog 
+                open={createTemplateOpen} 
+                onOpenChange={setCreateTemplateOpen}
+            />
 
         </div>
     )
