@@ -85,9 +85,14 @@ const TasksPage = () => {
 
   const handleCreateTask = async (data: any) => {
     try {
-      await tasksService.createTask(data);
-      toast.success('Tarefa criada com sucesso!');
-      loadTasks(); // Reload to show new task
+      const response = await tasksService.createTask(data);
+      if (response.success) {
+        toast.success('Tarefa criada com sucesso!');
+        await loadTasks(); // Reload to show new task
+        setIsNewTaskModalOpen(false); // Close modal
+      } else {
+        toast.error(response.message || 'Erro ao criar tarefa');
+      }
     } catch (error) {
       console.error('Erro ao criar tarefa:', error);
       toast.error('Erro ao criar tarefa. Verifique os dados.');
