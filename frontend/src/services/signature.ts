@@ -182,6 +182,13 @@ class SignatureService {
     return response.data.results || response.data;
   }
 
+  async getMySignedDocuments(): Promise<SignatureRequestSigner[]> {
+    const response = await api.get(`${this.base}/signers/my_assignments/`, {
+      params: { status: 'signed', ordering: '-signed_at' }
+    });
+    return response.data.results || response.data;
+  }
+
   async getAssignment(id: string): Promise<SignatureRequestSigner> {
     const response = await api.get(`${this.base}/signers/${id}/`);
     return response.data;
