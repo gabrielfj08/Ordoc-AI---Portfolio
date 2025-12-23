@@ -29,6 +29,7 @@ interface SelectItemProps {
 interface SelectTriggerProps {
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }
 
 interface SelectContentProps {
@@ -64,7 +65,7 @@ export function Select({ children, value, defaultValue, onValueChange, name, dis
   );
 }
 
-export function SelectTrigger({ children, className = '' }: SelectTriggerProps) {
+export function SelectTrigger({ children, className = '', disabled = false }: SelectTriggerProps) {
   const context = useContext(SelectContext);
   if (!context) throw new Error('SelectTrigger must be used within Select');
 
@@ -73,7 +74,8 @@ export function SelectTrigger({ children, className = '' }: SelectTriggerProps) 
   return (
     <button
       type="button"
-      onClick={() => setOpen(!open)}
+      onClick={() => !disabled && setOpen(!open)}
+      disabled={disabled}
       className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 flex items-center justify-between ${className}`}
     >
       {children}

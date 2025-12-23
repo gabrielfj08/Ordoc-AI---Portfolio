@@ -24,7 +24,7 @@ export const AnalyticsView = () => {
             <div className="lg:col-span-1 space-y-6">
                 <Card className="border-border/50 shadow-sm bg-background/50 backdrop-blur sticky top-6">
                     <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Analytics</CardTitle>
+                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Análises</CardTitle>
                     </CardHeader>
                     <CardContent className="p-2 space-y-1">
                         <button
@@ -39,7 +39,7 @@ export const AnalyticsView = () => {
                             className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-colors ${view === 'intelligence' ? 'bg-orange-50 text-orange-700 font-medium' : 'hover:bg-secondary/80 text-foreground'}`}
                         >
                             <Brain className={`w-5 h-5 ${view === 'intelligence' ? 'text-orange-600' : 'text-muted-foreground'}`} />
-                            <span className="text-sm">Intelligence</span>
+                            <span className="text-sm">Inteligência</span>
                         </button>
                         <button
                             onClick={() => setView('reports')}

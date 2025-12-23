@@ -60,6 +60,16 @@ def process_document_ocr(self, document_id):
             pass
         document.save()
         
+        # Auto-categorização
+        try:
+            from .services import CategorizationService
+            applied_rules = CategorizationService.classify_document(document)
+            if applied_rules:
+                logger.info(f"Categorização aplicada para {document.name}: {', '.join(applied_rules)}")
+        except Exception as cat_exc:
+            logger.error(f"Erro na auto-categorização: {cat_exc}")
+            # Não falha o processo todo, apenas loga o erro
+        
         logger.info(f"OCR concluído para documento: {document.name}")
         
         # Indexar no Solr (será implementado posteriormente)

@@ -21,6 +21,21 @@ from .models import (
     SignatureRequestSigner, DocumentSignature, SignatureAuditLog,
     SignatureBatch
 )
+from ordoc_air.models import Document
+from django.core.files.base import ContentFile
+from io import BytesIO
+import os
+
+# PyHanko imports
+try:
+    from pyhanko.sign import signers, pdf_signer
+    from pyhanko.sign.fields import SigSeedSubFilter
+    from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
+    from pyhanko.keys import load_cert_from_pem, load_private_key_from_pem
+except ImportError:
+    PYHANKO_AVAILABLE = False
+else:
+    PYHANKO_AVAILABLE = True
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -334,11 +349,94 @@ class SignatureService:
             return False, f"Erro ao submeter solicitação: {str(e)}"
     
     @staticmethod
+    def _resolve_document_to_sign(signature_request):
+        """Retorna o documento mais recente para assinar (suporta assinatura sequencial)"""
+        # Verificar se já existem assinaturas válidas para pegar o documento resultante
+        last_signature = signature_request.signatures.filter(status='valid').order_by('-signed_at').first()
+        if last_signature:
+            # Assinar a versão resultante da última assinatura
+            return last_signature.document
+        # Caso contrário, assinar o documento original
+        return signature_request.document
+
+    @staticmethod
+    def _create_signed_version(original_document, signed_content, signer):
+        """Cria uma nova versão do documento com a assinatura"""
+        new_version_number = original_document.get_next_version_number()
+        
+        # Nome do arquivo: original_v2_signed.pdf
+        base_name, ext = os.path.splitext(original_document.name)
+        # Remove sufixos anteriores se existirem para evitar _v2_v3_v4
+        import re
+        base_name = re.sub(r'_v\d+.*$', '', base_name)
+        new_filename = f"{base_name}_v{new_version_number}_signed{ext}"
+        
+        new_doc = Document.objects.create(
+            name=new_filename,
+            description=f"Versão {new_version_number} assinada por {signer.full_name}",
+            file_size=len(signed_content),
+            mime_type='application/pdf',
+            prn=f"{original_document.prn}_v{new_version_number}", # Unique PRN
+            version=new_version_number,
+            is_current_version=True,
+            parent_document=original_document,
+            directory=original_document.directory,
+            department=original_document.department,
+            created_by=signer.user, # Pode ser None se externo
+            status='processed'
+        )
+        
+        # Salvar arquivo
+        new_doc.file.save(new_filename, ContentFile(signed_content), save=True)
+        
+        # Atualizar flag is_current do pai e irmãos
+        # Excluir o próprio documento recém-criado
+        original_document.versions.exclude(id=new_doc.id).update(is_current_version=False)
+        original_document.is_current_version = False
+        original_document.save()
+        
+        return new_doc
+
+    @staticmethod
+    def _sign_pdf_pades(input_stream, private_key_pem, cert_pem, signer_id, reason=None, location=None):
+        """Executa assinatura PAdES usando pyHanko"""
+        if not PYHANKO_AVAILABLE:
+            raise ImportError("pyHanko não está instalado.")
+
+        # Carregar chaves
+        cert = load_cert_from_pem(cert_pem.encode())
+        key = load_private_key_from_pem(private_key_pem.encode())
+        
+        signer = signers.SimpleSigner(
+            signing_cert=cert,
+            signing_key=key,
+            cert_registry=None
+        )
+        
+        # Preparar output
+        output = BytesIO()
+        
+        # Assinar
+        pdf_signer.sign_pdf(
+            IncrementalPdfFileWriter(input_stream),
+            signers.PdfSignatureMetadata(
+                field_name=f'Signature_{signer_id}',
+                reason=reason,
+                location=location,
+                subfilter=SigSeedSubFilter.ADOBE_PKCS7_DETACHED
+            ),
+            signer=signer,
+            output=output,
+        )
+        
+        return output.getvalue()
+
+    @staticmethod
     def sign_document(
         signature_request: SignatureRequest,
         signer: SignatureRequestSigner,
         certificate: DigitalCertificate,
-        signature_data: str,
+        signature_data: str, # Mantido para compatibilidade, mas ignorado no fluxo backend
         **kwargs
     ) -> Tuple[bool, Any]:
         """
@@ -355,30 +453,61 @@ class SignatureService:
                 if not cert_valid:
                     return False, f"Certificado inválido: {cert_msg}"
                 
-                # Calcular hash do documento
-                document_hash = SignatureService._calculate_document_hash(
-                    signature_request.document
+                # Calcular hash do documento (simbólico aqui pois validaremos o PDF assinado depois)
+                # documento alvo
+                target_document = SignatureService._resolve_document_to_sign(signature_request)
+                
+                # Ler arquivo original
+                try:
+                    if not target_document.file:
+                        return False, "Arquivo do documento não encontrado"
+                        
+                    input_stream = target_document.file.open('rb')
+                except Exception as e:
+                    return False, f"Erro ao abrir arquivo: {str(e)}"
+
+                # Executar assinatura PAdES real
+                try:
+                    signed_content = SignatureService._sign_pdf_pades(
+                        input_stream,
+                        certificate.private_key, # Decrypted by field
+                        certificate.certificate_data,
+                        signer.id,
+                        reason=kwargs.get('signing_reason'),
+                        location=kwargs.get('signing_location')
+                    )
+                except Exception as e:
+                    logger.error(f"Erro no pyHanko: {str(e)}")
+                    # Fallback para simulação apenas se não crítico? Não, erro de assinatura é crítico.
+                    return False, f"Falha na assinatura digital: {str(e)}"
+                
+                if not signed_content:
+                    return False, "Falha ao gerar conteúdo assinado"
+
+                # Criar NOVA VERSÃO do documento com o conteúdo assinado
+                signed_document = SignatureService._create_signed_version(
+                    target_document, 
+                    signed_content, 
+                    signer
                 )
                 
-                # Criar assinatura
+                # Calcular hash do NOVO documento
+                document_hash = hashlib.sha256(signed_content).hexdigest()
+                
+                # Criar assinatura linkada ao NOVO documento
                 document_signature = DocumentSignature.objects.create(
                     organization=signature_request.organization,
-                    document=signature_request.document,
+                    document=signed_document, # Link to the output document
                     signature_request=signature_request,
                     signer=signer,
                     certificate=certificate,
-                    signature_type=kwargs.get('signature_type', 'digital'),
-                    signature_data=signature_data,
-                    hash_algorithm=kwargs.get('hash_algorithm', 'SHA256'),
+                    signature_type='digital',
+                    signature_data='PAdES-Embedded', # Marker
+                    hash_algorithm='SHA256',
                     document_hash=document_hash,
                     signing_reason=kwargs.get('signing_reason', ''),
                     signing_location=kwargs.get('signing_location', ''),
                     contact_info=kwargs.get('contact_info', ''),
-                    page_number=kwargs.get('page_number'),
-                    position_x=kwargs.get('position_x'),
-                    position_y=kwargs.get('position_y'),
-                    width=kwargs.get('width'),
-                    height=kwargs.get('height'),
                     ip_address=kwargs.get('ip_address'),
                     user_agent=kwargs.get('user_agent', ''),
                     geolocation=kwargs.get('geolocation', {})
@@ -401,7 +530,7 @@ class SignatureService:
                     signature_request=signature_request,
                     document_signature=document_signature,
                     action='document_signed',
-                    description=f'Documento assinado por {signer.full_name}',
+                    description=f'Documento assinado digitalmente por {signer.full_name} (versão {signed_document.version})',
                     user_email=signer.email,
                     user_name=signer.full_name,
                     ip_address=kwargs.get('ip_address'),
@@ -433,16 +562,32 @@ class SignatureService:
                 return False, "Documento foi modificado após a assinatura"
             
             # Verificar assinatura digital
-            signature_valid = SignatureService._verify_digital_signature(
-                document_signature.signature_data,
-                document_signature.document_hash,
-                document_signature.certificate
-            )
-            
-            if not signature_valid:
-                document_signature.status = 'invalid'
-                document_signature.save()
-                return False, "Assinatura digital inválida"
+            if document_signature.signature_data == 'PAdES-Embedded':
+                # Validação Robusta PAdES (com CRL/OCSP)
+                if not document_signature.document.file:
+                    return False, "Arquivo do documento não encontrado para validação"
+                
+                with document_signature.document.file.open('rb') as f:
+                    content = f.read()
+                    
+                signature_valid, sig_msg = SignatureService._verify_pades_signature(content, document_signature.certificate)
+                
+                if not signature_valid:
+                    document_signature.status = 'invalid'
+                    document_signature.save()
+                    return False, f"Assinatura PAdES inválida: {sig_msg}"
+            else:
+                # Validação Legada (Apenas hash criptográfico)
+                signature_valid = SignatureService._verify_digital_signature(
+                    document_signature.signature_data,
+                    document_signature.document_hash,
+                    document_signature.certificate
+                )
+                
+                if not signature_valid:
+                    document_signature.status = 'invalid'
+                    document_signature.save()
+                    return False, "Assinatura digital inválida"
             
             # Atualizar status
             document_signature.status = 'valid'
@@ -479,8 +624,61 @@ class SignatureService:
             return ""
     
     @staticmethod
+    def _verify_pades_signature(signed_pdf_content: bytes, certificate: DigitalCertificate) -> Tuple[bool, str]:
+        """
+        Verifica a assinatura PAdES de forma robusta, incluindo integridade do PDF e revogação.
+        """
+        if not PYHANKO_AVAILABLE:
+            return False, "pyHanko não instalado"
+
+        try:
+            from pyhanko.sign import validation
+            from pyhanko.pdf_utils.reader import PdfFileReader
+            from pyhanko_certvalidator import ValidationContext
+
+            # Criar leitor PDF
+            input_stream = BytesIO(signed_pdf_content)
+            pdf_reader = PdfFileReader(input_stream)
+            
+            # Verificar assinaturas presentes
+            if not pdf_reader.embedded_signatures:
+                return False, "Nenhuma assinatura PAdES encontrada no PDF"
+
+            # Validar última assinatura
+            sig_status = validation.validate_pdf_signature(
+                pdf_reader.embedded_signatures[-1],
+                validation_context=ValidationContext(allow_fetching=True) # Habilita CRL/OCSP online
+            )
+            
+            # Verificar integridade e confiança
+            if not sig_status.intact:
+                return False, "Integridade do documento comprometida (hash mismatch)"
+            
+            if not sig_status.valid:
+                return False, f"Assinatura inválida: {sig_status.summary()}"
+                
+            if sig_status.revoked:
+                return False, "Certificado revogado (verificado via CRL/OCSP)"
+            
+            # Verificação extra: match com o certificado esperado
+            signer_cert = sig_status.signing_cert
+            stored_cert = x509.load_pem_x509_certificate(certificate.certificate_data.encode())
+            
+            if signer_cert.public_bytes(serialization.Encoding.DER) != stored_cert.public_bytes(serialization.Encoding.DER):
+                return False, "Assinatura válida mas não corresponde ao certificado informado"
+
+            return True, "Assinatura PAdES válida e verificada"
+
+        except Exception as e:
+            logger.error(f"Erro na validação PAdES robusta: {str(e)}")
+            return False, f"Erro na validação PAdES: {str(e)}"
+
+    @staticmethod
     def _verify_digital_signature(signature_data: str, document_hash: str, certificate: DigitalCertificate) -> bool:
-        """Verifica assinatura digital usando criptografia"""
+        """
+        [DEPRECATED] Mantido apenas para assinaturas legadas não-PAdES.
+        Use _verify_pades_signature para novos documentos.
+        """
         try:
             # Decodificar dados da assinatura
             signature_bytes = base64.b64decode(signature_data)

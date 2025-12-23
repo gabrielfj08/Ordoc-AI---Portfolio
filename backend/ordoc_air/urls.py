@@ -11,8 +11,10 @@ from .views import (
     ShareableLinkViewSet,
     RecentDocumentViewSet,
     PermissionViewSet,
+    PermissionViewSet,
     TagViewSet,
     ActivityLogViewSet,
+    CategorizationRuleViewSet,
 )
 
 # Create router for OrdocAir API endpoints
@@ -28,6 +30,7 @@ router.register(r'recent-documents', RecentDocumentViewSet, basename='recentdocu
 router.register(r'permissions', PermissionViewSet, basename='permission')
 router.register(r'tags', TagViewSet, basename='tag')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activitylog')
+router.register(r'categorization-rules', CategorizationRuleViewSet, basename='categorizationrule')
 
 app_name = 'ordoc_air'
 

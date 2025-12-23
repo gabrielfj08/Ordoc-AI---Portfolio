@@ -124,7 +124,7 @@ export const IntelligenceDashboard = () => {
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
                         <Brain className="w-6 h-6 text-primary" />
-                        Intelligence Dashboard
+                        Painel de Inteligência
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
                         Visão geral da análise inteligente de documentos

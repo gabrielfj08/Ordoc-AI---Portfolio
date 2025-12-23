@@ -231,7 +231,10 @@ class ProcedureSerializer(serializers.ModelSerializer):
             'tasks', 'is_closed',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'process_number', 'prn', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'process_number', 'prn', 'created_at', 'updated_at',
+            'requester', 'responsible_group', 'created_by', 'organization'
+        ]
     
     def validate(self, data):
         """Validações customizadas"""

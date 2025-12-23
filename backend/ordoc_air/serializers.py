@@ -16,8 +16,31 @@ from .models import (
     Permission,
     Tag,
     ActivityLog,
+    CategorizationRule,
 )
 from ordoc_cloud.models import OrdocUser
+
+
+class CategorizationRuleSerializer(serializers.ModelSerializer):
+    """Serializer for CategorizationRule"""
+    
+    target_tag_name = serializers.CharField(source='target_tag.name', read_only=True)
+    target_directory_path = serializers.CharField(source='target_directory.get_full_path', read_only=True)
+    
+    class Meta:
+        model = CategorizationRule
+        fields = [
+            'id', 'name', 'description', 'match_type', 'pattern', 'is_active',
+            'target_tag', 'target_tag_name', 
+            'target_directory', 'target_directory_path',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'target_tag_name', 'target_directory_path']
+
+    def create(self, validated_data):
+        """Set organization from context"""
+        validated_data['organization'] = self.context['current_organization']
+        return super().create(validated_data)
 
 
 class TagSerializer(serializers.ModelSerializer):

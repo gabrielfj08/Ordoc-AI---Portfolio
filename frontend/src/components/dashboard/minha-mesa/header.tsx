@@ -25,11 +25,11 @@ export const DashboardHeader = () => {
     const folderName = searchParams.get('folderName');
 
     const tabs = [
+        { id: 'workflows', label: 'Processos' },
         { id: 'home', label: 'Minha Mesa' },
         { id: 'documents', label: 'Documentos' },
-        { id: 'workflows', label: 'Workflows' },
         { id: 'signatures', label: 'Assinaturas' },
-        { id: 'analytics', label: 'Analytics' },
+        { id: 'analises', label: 'Análises' },
     ];
 
     const handleTabChange = (tabId: string) => {

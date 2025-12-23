@@ -22,16 +22,42 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Input } from '@/components/ui/input';
+import reportsService, { Report } from '@/services/reports';
+import toast from 'react-hot-toast';
 
-// Mock Data
-const mockReports = [
-    { id: 1, title: 'Relatório Mensal de Vendas', type: 'PDF', size: '2.4 MB', created_at: '2024-12-19', status: 'ready' },
-    { id: 2, title: 'Auditoria de Acessos Q4', type: 'XLSX', size: '850 KB', created_at: '2024-12-18', status: 'ready' },
-    { id: 3, title: 'Performance da Equipe', type: 'PDF', size: '1.2 MB', created_at: '2024-12-15', status: 'ready' },
-    { id: 4, title: 'Exportação Completa 2024', type: 'CSV', size: '-', created_at: '2024-12-20', status: 'processing' },
-];
+import { CreateReportDialog } from './create-report-dialog';
 
 export const ReportsManager = () => {
+    const [reports, setReports] = React.useState<Report[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+
+    const loadReports = async () => {
+        try {
+            const data = await reportsService.getReports();
+            setReports(data);
+        } catch (error) {
+            console.error('Falha ao carregar relatórios', error);
+            toast.error('Não foi possível carregar os relatórios.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        loadReports();
+    }, []);
+
+    const handleDelete = async (id: string) => {
+        try {
+            await reportsService.deleteReport(id);
+            setReports(prev => prev.filter(r => r.id !== id));
+            toast.success('Relatório excluído.');
+        } catch (error) {
+            toast.error('Erro ao excluir relatório.');
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Actions Bar */}
@@ -41,11 +67,17 @@ export const ReportsManager = () => {
                     <Input placeholder="Filtrar relatórios..." className="pl-9 bg-background" />
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                    <Button onClick={() => setIsCreateOpen(true)} className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
                         <Plus className="w-4 h-4" /> Novo Relatório
                     </Button>
                 </div>
             </div>
+
+            <CreateReportDialog
+                isOpen={isCreateOpen}
+                onClose={() => setIsCreateOpen(false)}
+                onSuccess={loadReports}
+            />
 
             {/* Reports List */}
             <Card className="border-border/50 shadow-sm">
@@ -65,49 +97,73 @@ export const ReportsManager = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {mockReports.map((report) => (
-                                <TableRow key={report.id}>
-                                    <TableCell className="font-medium">
-                                        <div className="flex items-center gap-2">
-                                            {report.type === 'XLSX' || report.type === 'CSV' ? (
-                                                <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                                            ) : (
-                                                <FileText className="w-4 h-4 text-red-500" />
-                                            )}
-                                            {report.title}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="secondary" className="font-mono text-xs">
-                                            {report.type}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground text-sm">
-                                        {report.created_at}
-                                    </TableCell>
-                                    <TableCell>
-                                        {report.status === 'processing' ? (
-                                            <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 animate-pulse">
-                                                Processando
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                                                Pronto
-                                            </Badge>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" disabled={report.status !== 'ready'}>
-                                                <Download className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8">Carregando relatórios...</TableCell>
                                 </TableRow>
-                            ))}
+                            ) : reports.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum relatório encontrado.</TableCell>
+                                </TableRow>
+                            ) : (
+                                reports.map((report) => (
+                                    <TableRow key={report.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-2">
+                                                {report.format === 'excel' || report.format === 'csv' || report.format === 'json' ? (
+                                                    <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                                ) : (
+                                                    <FileText className="w-4 h-4 text-red-500" />
+                                                )}
+                                                {report.title}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary" className="font-mono text-xs uppercase">
+                                                {report.format}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground text-sm">
+                                            {new Date(report.created_at).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            {report.status === 'generating' ? (
+                                                <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 animate-pulse">
+                                                    Processando
+                                                </Badge>
+                                            ) : report.status === 'completed' ? (
+                                                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                                                    Pronto
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">
+                                                    {report.status}
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                    disabled={report.status !== 'completed'}
+                                                    onClick={() => window.open(reportsService.getDownloadUrl(report.id), '_blank')}
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => handleDelete(report.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )))}
                         </TableBody>
                     </Table>
                 </CardContent>

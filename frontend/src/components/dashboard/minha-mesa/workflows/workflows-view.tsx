@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Layout,
@@ -14,11 +14,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TasksKanban } from './tasks-kanban';
 import { ProceduresList } from './procedures-list';
+import { CreateProcedureDialog } from './create-procedure-dialog';
+import { CreateTaskDialog } from './create-task-dialog';
 
 export const WorkflowsView = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const workflowView = searchParams.get('workflowView') || 'procedures'; // procedures, tasks
+    const [isCreateProcOpen, setIsCreateProcOpen] = useState(false);
+    const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
 
     const handleViewChange = (view: string) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -40,11 +44,11 @@ export const WorkflowsView = () => {
                     </div>
                     {/* Contextual New Button */}
                     {workflowView === 'procedures' ? (
-                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2" onClick={() => setIsCreateProcOpen(true)}>
                             <Plus className="w-4 h-4" /> Novo Procedimento
                         </Button>
                     ) : (
-                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2" onClick={() => setIsCreateTaskOpen(true)}>
                             <Plus className="w-4 h-4" /> Nova Tarefa
                         </Button>
                     )}
@@ -104,6 +108,9 @@ export const WorkflowsView = () => {
 
                 </div>
             </div>
+
+            <CreateProcedureDialog open={isCreateProcOpen} onOpenChange={setIsCreateProcOpen} />
+            <CreateTaskDialog open={isCreateTaskOpen} onOpenChange={setIsCreateTaskOpen} />
         </div>
     )
 }

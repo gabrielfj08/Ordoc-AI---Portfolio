@@ -19,11 +19,13 @@ interface DocumentCardProps {
     title: string;
     type: string;
     size?: string;
-    updatedAt: string;
+    updatedAt: string; // ISO string ou formatted
     sharedBy?: string; // If present, displays shared tag
     suggested?: boolean; // IA sugere este documento
     suggestionReason?: string; // Motivo da sugestão
+    relevanceScore?: number;
     onClick?: () => void;
+    onAction?: (action: 'download' | 'share' | 'delete') => void;
 }
 
 export const DocumentCard: React.FC<DocumentCardProps> = ({
@@ -34,8 +36,21 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
     sharedBy,
     suggested = false,
     suggestionReason,
-    onClick
+    relevanceScore,
+    onClick,
+    onAction
 }) => {
+    // Format date logic reuse or simplified
+    const formatDate = (dateString: string) => {
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString; // already formatted
+            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        } catch {
+            return dateString;
+        }
+    };
+
     const SuggestedBadge = () => {
         if (!suggested) return null;
 
@@ -43,7 +58,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Badge variant="secondary" className="text-xs font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20">
+                        <Badge variant="secondary" className="text-xs font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 ml-2">
                             <Sparkles className="w-3 h-3 mr-1" />
                             Sugerido
                         </Badge>
@@ -69,27 +84,33 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
 
                 {/* Info */}
                 <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-sm flex items-center gap-2">
+                    <span className="font-semibold text-foreground text-sm flex items-center flex-wrap gap-1">
                         {title}
                         <SuggestedBadge />
                         {sharedBy && (
-                            <span className="text-muted-foreground" title={`Compartilhado por ${sharedBy}`}>
+                            <span className="text-muted-foreground ml-1" title={`Compartilhado por ${sharedBy}`}>
                                 <Share2 className="w-3.5 h-3.5 text-blue-500" />
                             </span>
                         )}
                     </span>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span className="uppercase font-medium text-orange-600/70">{type}</span>
+                        <span className={`uppercase font-medium ${suggested ? 'text-primary' : 'text-orange-600/70'}`}>{type}</span>
                         <span>•</span>
                         <span>{size}</span>
                         <span>•</span>
-                        <span>{updatedAt}</span>
+                        <span>{formatDate(updatedAt)}</span>
+                        {relevanceScore !== undefined && relevanceScore > 0 && suggested && (
+                            <>
+                                <span>•</span>
+                                <span className="text-primary font-medium">{relevanceScore}% relevância</span>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Actions - Menu Only */}
-            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-background/80">
@@ -97,9 +118,9 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Baixar</DropdownMenuItem>
-                        <DropdownMenuItem>Compartilhar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onAction?.('download')}>Baixar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onAction?.('share')}>Compartilhar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => onAction?.('delete')}>Excluir</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

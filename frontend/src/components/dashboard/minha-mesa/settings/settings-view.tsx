@@ -16,8 +16,10 @@ import { UsersManager } from './users-manager';
 import { GroupsManager } from './groups-manager';
 import { OrganizationsManager } from './organizations-manager';
 import { AccessPoliciesManager } from './access-policies-manager';
+import { CategorizationRules } from './categorization-rules';
+import { Sparkles } from 'lucide-react';
 
-type View = 'profile' | 'users' | 'groups' | 'organizations' | 'policies';
+type View = 'profile' | 'users' | 'groups' | 'organizations' | 'policies' | 'categorization';
 
 interface SettingsViewProps {
     initialView?: View;
@@ -73,6 +75,10 @@ export const SettingsView = ({ initialView = 'profile' }: SettingsViewProps) => 
                                     <AccessPoliciesManager />
                                 </div>
                             )}
+
+                            {view === 'categorization' && (
+                                <CategorizationRules />
+                            )}
                         </div>
 
                         {/* Sidebar Navigation (Right) */}
@@ -109,6 +115,13 @@ export const SettingsView = ({ initialView = 'profile' }: SettingsViewProps) => 
                                     >
                                         <ShieldCheck className={`w-5 h-5 ${view === 'policies' ? 'text-orange-600' : 'text-muted-foreground'}`} />
                                         <span className="text-sm">Políticas de Acesso</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setView('categorization')}
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-colors ${view === 'categorization' ? 'bg-orange-50 text-orange-700 font-medium' : 'hover:bg-secondary/80 text-foreground'}`}
+                                    >
+                                        <Sparkles className={`w-5 h-5 ${view === 'categorization' ? 'text-orange-600' : 'text-muted-foreground'}`} />
+                                        <span className="text-sm">Regras de Categorização</span>
                                     </button>
                                 </CardContent>
                             </Card>
