@@ -62,17 +62,17 @@ export const DashboardHeader = () => {
 
     return (
         <header className="sticky top-0 flex flex-col border-b bg-background z-10 w-full animate-in fade-in duration-300">
-            <div className="flex h-16 shrink-0 items-center justify-between px-4">
+            <div className="flex h-16 shrink-0 items-center justify-between px-6">
                 {/* Left: Trigger & Logo */}
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-500 to-orange-400 flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-orange-500/20">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-orange-500 to-orange-400 flex items-center justify-center text-white font-bold text-base shadow-sm shadow-orange-500/20">
                             O
                         </div>
                         <div className="flex flex-col leading-none hidden lg:flex">
-                            <span className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">ORDOC</span>
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">ORDOC</span>
                             <div className="flex items-center gap-1">
-                                <span className="text-sm font-bold text-foreground">{currentTabLabel}</span>
+                                <span className="text-base font-bold text-foreground">{currentTabLabel}</span>
                                 {folderName && (
                                     <>
                                         <span className="text-muted-foreground/50">|</span>
@@ -94,7 +94,7 @@ export const DashboardHeader = () => {
                         <button
                             key={tab.id}
                             onClick={() => handleTabChange(tab.id)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-200 whitespace-nowrap ${activeTab === tab.id
+                            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-all duration-200 whitespace-nowrap ${activeTab === tab.id
                                 ? 'bg-orange-100 text-orange-700 font-semibold'
                                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                                 }`}
@@ -118,7 +118,7 @@ export const DashboardHeader = () => {
 
                     <div className="flex items-center gap-1 border-r border-border/60 pr-4 hidden sm:flex">
                         <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground hover:text-primary">
-                            <Bell className="h-4 w-4" />
+                            <Bell className="h-5 w-5" />
                         </Button>
                     </div>
 
@@ -127,7 +127,7 @@ export const DashboardHeader = () => {
                             <div className="flex items-center gap-3 cursor-pointer group">
                                 <div className="text-right hidden lg:block">
                                     <div className="text-sm font-bold leading-none text-foreground group-hover:text-primary transition-colors">Ricardo Ferreira</div>
-                                    <div className="text-[10px] text-muted-foreground font-medium">Coordenador Jurídico</div>
+                                    <div className="text-[11px] text-muted-foreground font-medium">Coordenador Jurídico</div>
                                 </div>
                                 <Avatar className="h-8 w-8 border-2 border-background ring-1 ring-border bg-orange-100 dark:bg-orange-900/20 group-hover:opacity-80 transition-opacity">
                                     <AvatarFallback className="text-orange-600 dark:text-orange-400 font-bold text-[10px]">RF</AvatarFallback>
