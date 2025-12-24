@@ -85,7 +85,6 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
             // Clean payload
             const payload = {
                 ...values,
-                // Kanban columns: 'pending' (map to draft?), 'in_progress' (running), 'completed' (finished)
                 status: defaultStatus === 'in_progress' ? 'running' : 'draft',
                 deadline: values.deadline || null,
                 assignee: values.assignee_id || null,
@@ -101,7 +100,7 @@ export const CreateTaskDialog = ({ open, onOpenChange, defaultStatus = 'pending'
             return flowService.createTask(payload);
         },
         onSuccess: () => {
-            // Invalida todas as queries de tasks para atualizar tanto o workflow quanto o kanban
+            // Invalida queries de tasks para atualizar a lista
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
             queryClient.invalidateQueries({ queryKey: ['procedures'] });
             toast.success("Tarefa criada com sucesso!");
