@@ -61,10 +61,14 @@ import { SignSignedView } from './signatures/sign-signed-view';
 import { SignHistoryView } from './signatures/sign-history-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SmartUploadDialog } from './smart-upload-dialog';
+import { ShareDocumentDialog } from './dialogs/share-document-dialog';
+import { DeleteDocumentDialog } from './dialogs/delete-document-dialog';
 import FolderCard from './folder-card';
 import { CreateFolderDialog } from './dialogs/create-folder-dialog';
 import { CreateCategoryDialog } from './dialogs/create-category-dialog';
 import { CreateTemplateDialog } from './dialogs/create-template-dialog';
+import { useDeleteDocuments, useDownloadDocument, useDocumentView, DocumentView, useToggleStar } from '@/hooks/use-document-actions';
+import { DocumentSidebar } from './document-sidebar';
 
 // Types
 interface Directory {
@@ -105,14 +109,20 @@ const DocumentsView = () => {
     const currentDirId = searchParams.get('folder');
     const currentFolderName = searchParams.get('folderName');
 
-    const [previewDocument, setPreviewDocument] = useState<any | null>(null);
+    const [previewDocument, setPreviewDocument] = useState<any>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sharingDocument, setSharingDocument] = useState<any>(null);
+    const [deletingDocument, setDeletingDocument] = useState<any>(null);
     const [csvData, setCsvData] = useState<string[][] | null>(null);
     const [isLoadingCsv, setIsLoadingCsv] = useState(false);
-    
+
     // Dialog states
     const [createFolderOpen, setCreateFolderOpen] = useState(false);
     const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
     const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
+
+    // Gmail-style view state
+    const [gmailView, setGmailView] = useState<DocumentView>('inbox');
 
     const handleCardClick = (doc: any) => {
         setPreviewDocument(doc);
@@ -146,23 +156,20 @@ const DocumentsView = () => {
     const isImage = (filename?: string) => filename?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i);
     const isPDF = (filename?: string) => filename?.match(/\.pdf$/i);
 
-    const handleAction = (action: 'download' | 'share' | 'delete', doc: any) => {
+    const downloadDocumentMutation = useDownloadDocument();
+
+    const handleAction = async (action: 'download' | 'share' | 'delete', doc: any) => {
         console.log(`Action ${action} on doc ${doc.id}`);
+
         if (action === 'download') {
-            const link = document.createElement('a');
-            link.href = doc.previewUrl || '#';
-            link.download = doc.filename || 'documento';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            await downloadDocumentMutation.mutateAsync({
+                documentId: doc.id,
+                filename: doc.filename || doc.title || 'documento'
+            });
         } else if (action === 'share') {
-            alert(`Compartilhar link de: ${doc.title}`);
+            setSharingDocument(doc);
         } else if (action === 'delete') {
-            if (confirm(`Tem certeza que deseja excluir ${doc.title}?`)) {
-                alert('Documento excluído (simulação).');
-                queryClient.invalidateQueries({ queryKey: ['documents'] });
-                setPreviewDocument(null);
-            }
+            setDeletingDocument(doc);
         }
     };
 
@@ -202,9 +209,20 @@ const DocumentsView = () => {
             }));
         }
 
-        // TODO: Fetch documents for specific directory
-        // For now returning empty if inside directory until folder logic is full
-        return [];
+        // Fetch documents for specific directory from API
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/ordoc-air/documents/?directory=${dirId}`, {
+            headers: {
+                'X-Subdomain': 'demo',
+                'Authorization': `Bearer ${localStorage.getItem('ordoc_token')}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch documents');
+        }
+
+        const data = await response.json();
+        return data.results || data;
     };
 
     const { data: directories } = useQuery({
@@ -251,23 +269,70 @@ const DocumentsView = () => {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex h-full">
+            {/* Gmail-style Sidebar */}
+            <DocumentSidebar
+                currentView={gmailView}
+                onViewChange={setGmailView}
+            />
 
-            {/* Top Bar: Search & Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                    {/* Only show Back button if inside a specific folder in Files view */}
-                    {currentView === 'files' && currentDirId !== null && (
-                        <Button variant="ghost" size="sm" onClick={handleReset} className="text-muted-foreground hover:text-primary gap-1 pl-0">
-                            <Home className="w-4 h-4" /> Voltar ao Meu Drive
-                        </Button>
-                    )}
-                </div>
+            {/* Main Content */}
+            <div className="flex-1 overflow-auto">
+                <div className="p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Buscar..." className="pl-9 w-[200px] h-9 bg-background" disabled title="Busca será implementada em breve" />
+                    {/* Top Bar: Search & Actions */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1">
+                            {/* Only show Back button if inside a specific folder in Files view */}
+                            {currentView === 'files' && currentDirId !== null && (
+                                <Button variant="ghost" size="sm" onClick={handleReset} className="text-muted-foreground hover:text-primary gap-1 pl-0">
+                                    <Home className="w-4 h-4" /> Voltar ao Meu Drive
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Buscar..." className="pl-9 w-[200px] h-9 bg-background" disabled title="Busca será implementada em breve" />
+                            </div>
+
+                            {currentView === 'files' && (
+                                <>
+                                    <SmartUploadDialog onUploadComplete={handleUploadComplete}>
+                                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
+                                            <Upload className="w-4 h-4" /> Upload
+                                        </Button>
+                                    </SmartUploadDialog>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="gap-2"
+                                        onClick={() => setCreateFolderOpen(true)}
+                                    >
+                                        <Plus className="w-4 h-4" /> Pasta
+                                    </Button>
+                                </>
+                            )}
+                            {currentView === 'categories' && (
+                                <Button
+                                    size="sm"
+                                    className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
+                                    onClick={() => setCreateCategoryOpen(true)}
+                                >
+                                    <Plus className="w-4 h-4" /> Nova Categoria
+                                </Button>
+                            )}
+                            {currentView === 'templates' && (
+                                <Button
+                                    size="sm"
+                                    className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
+                                    onClick={() => setCreateTemplateOpen(true)}
+                                >
+                                    <Plus className="w-4 h-4" /> Novo Template
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     {currentView === 'files' && (
@@ -277,9 +342,9 @@ const DocumentsView = () => {
                                     <Upload className="w-4 h-4" /> Upload
                                 </Button>
                             </SmartUploadDialog>
-                            <Button 
-                                size="sm" 
-                                variant="outline" 
+                            <Button
+                                size="sm"
+                                variant="outline"
                                 className="gap-2"
                                 onClick={() => setCreateFolderOpen(true)}
                             >
@@ -288,8 +353,8 @@ const DocumentsView = () => {
                         </>
                     )}
                     {currentView === 'categories' && (
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="sm"
                             className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
                             onClick={() => setCreateCategoryOpen(true)}
                         >
@@ -297,8 +362,8 @@ const DocumentsView = () => {
                         </Button>
                     )}
                     {currentView === 'templates' && (
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="sm"
                             className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
                             onClick={() => setCreateTemplateOpen(true)}
                         >
@@ -389,16 +454,16 @@ const DocumentsView = () => {
                                         const FolderContent = (
                                             <button
                                                 onClick={() => handleNavigate(dir)}
-                                                className={`w-full flex items-center justify-between p-2.5 rounded-lg text-left transition-colors group ${isCritical ? 'hover:bg-red-50' : hasIssues ? 'hover:bg-yellow-50' : 'hover:bg-secondary/80'}`}
+                                                className={`w-full flex items-center justify-between p-2.5 rounded-lg text-left transition-colors group ${isCritical ? 'hover:bg-red-50' : hasIssues ? 'hover:bg-orange-50' : 'hover:bg-secondary/80'}`}
                                             >
                                                 <div className="flex items-center gap-3 overflow-hidden">
                                                     <div className="relative">
-                                                        <Folder className={`w-4 h-4 ${isCritical ? 'text-red-500 fill-red-50' : hasIssues ? 'text-yellow-600 fill-yellow-50' : 'text-orange-400 fill-orange-50 group-hover:fill-orange-100'}`} />
+                                                        <Folder className={`w-4 h-4 ${isCritical ? 'text-red-500 fill-red-50' : hasIssues ? 'text-orange-600 fill-orange-50' : 'text-orange-400 fill-orange-50 group-hover:fill-orange-100'}`} />
                                                         {!isHealthy && (
-                                                            <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ring-1 ring-white ${isCritical ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                                                            <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ring-1 ring-white ${isCritical ? 'bg-red-500' : 'bg-orange-500'}`} />
                                                         )}
                                                     </div>
-                                                    <span className={`text-sm font-medium truncate ${isCritical ? 'text-red-700' : hasIssues ? 'text-yellow-700' : 'text-foreground'}`}>
+                                                    <span className={`text-sm font-medium truncate ${isCritical ? 'text-red-700' : hasIssues ? 'text-orange-700' : 'text-foreground'}`}>
                                                         {dir.name}
                                                     </span>
                                                 </div>
@@ -508,7 +573,7 @@ const DocumentsView = () => {
                                 <h2 className="flex items-center gap-2 text-lg font-semibold mb-3">
                                     {currentFolderName || (documents && documents.length > 4 ? 'Outros Arquivos' : 'Arquivos')}
                                 </h2>
-                                <div className="flex flex-col gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {(documents || [])
                                         .slice(currentDirId === null ? 4 : 0) // If root, skip first 4 (shown in Recents). If folder, show all.
                                         .map((doc: any) => (
@@ -689,22 +754,36 @@ const DocumentsView = () => {
             </Dialog>
 
             {/* Create Folder Dialog */}
-            <CreateFolderDialog 
-                open={createFolderOpen} 
+            <CreateFolderDialog
+                open={createFolderOpen}
                 onOpenChange={setCreateFolderOpen}
                 parentDirId={currentDirId}
             />
 
             {/* Create Category Dialog */}
-            <CreateCategoryDialog 
-                open={createCategoryOpen} 
+            <CreateCategoryDialog
+                open={createCategoryOpen}
                 onOpenChange={setCreateCategoryOpen}
             />
 
             {/* Create Template Dialog */}
-            <CreateTemplateDialog 
-                open={createTemplateOpen} 
+            <CreateTemplateDialog
+                open={createTemplateOpen}
                 onOpenChange={setCreateTemplateOpen}
+            />
+
+            {/* Share Document Dialog */}
+            <ShareDocumentDialog
+                open={!!sharingDocument}
+                document={sharingDocument}
+                onOpenChange={(open) => !open && setSharingDocument(null)}
+            />
+
+            {/* Delete Document Dialog */}
+            <DeleteDocumentDialog
+                open={!!deletingDocument}
+                document={deletingDocument}
+                onOpenChange={(open) => !open && setDeletingDocument(null)}
             />
 
         </div>

@@ -42,7 +42,7 @@ const FolderCard = ({
       case 'healthy':
         return <CheckCircle2 className="h-4 w-4 text-medical-500" />;
       case 'needs_attention':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
       case 'critical':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
     }
@@ -59,7 +59,7 @@ const FolderCard = ({
         );
       case 'needs_attention':
         return (
-          <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200">
+          <Badge className="bg-orange-50 text-orange-700 border-orange-200">
             Atenção
           </Badge>
         );
@@ -80,7 +80,7 @@ const FolderCard = ({
       case 'info':
         return <Info className="h-3 w-3 text-blue-500" />;
       case 'warning':
-        return <AlertTriangle className="h-3 w-3 text-yellow-500" />;
+        return <AlertTriangle className="h-3 w-3 text-orange-500" />;
       case 'error':
         return <AlertCircle className="h-3 w-3 text-red-500" />;
     }
@@ -92,7 +92,7 @@ const FolderCard = ({
         'cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105',
         'border-2',
         healthStatus === 'healthy' && 'border-neutral-200 hover:border-medical-300',
-        healthStatus === 'needs_attention' && 'border-yellow-200 hover:border-yellow-400',
+        healthStatus === 'needs_attention' && 'border-orange-200 hover:border-orange-400',
         healthStatus === 'critical' && 'border-red-200 hover:border-red-400'
       )}
       onClick={onClick}
@@ -113,7 +113,7 @@ const FolderCard = ({
               </p>
             </div>
           </div>
-          
+
           {/* Status Badge */}
           <TooltipProvider>
             <Tooltip>
@@ -159,7 +159,7 @@ const FolderCard = ({
                 </Tooltip>
               </TooltipProvider>
             ))}
-            
+
             {insights.length > 2 && (
               <p className="text-xs text-neutral-400 italic">
                 +{insights.length - 2} {insights.length - 2 === 1 ? 'insight' : 'insights'}

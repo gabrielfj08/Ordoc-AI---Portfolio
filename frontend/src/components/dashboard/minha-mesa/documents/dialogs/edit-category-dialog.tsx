@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Grid, Loader2 } from 'lucide-react';
+import { Pencil, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { SmartCategory } from '@/services/dashboard';
 
-interface CreateCategoryDialogProps {
+interface EditCategoryDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    category: SmartCategory | null;
 }
 
 interface CategoryFormData {
@@ -60,7 +62,7 @@ const PRESET_COLORS = [
     '#EC4899', // pink
 ];
 
-export function CreateCategoryDialog({ open, onOpenChange }: CreateCategoryDialogProps) {
+export function EditCategoryDialog({ open, onOpenChange, category }: EditCategoryDialogProps) {
     const queryClient = useQueryClient();
     const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<CategoryFormData>({
         defaultValues: {
@@ -70,9 +72,19 @@ export function CreateCategoryDialog({ open, onOpenChange }: CreateCategoryDialo
     const [isSubmitting, setIsSubmitting] = useState(false);
     const selectedColor = watch('color');
 
-    const createCategoryMutation = useMutation({
+    // Preencher formulário quando categoria mudar
+    useEffect(() => {
+        if (category) {
+            setValue('name', category.name);
+            setValue('color', category.color || '#3B82F6');
+            setValue('description', category.description || '');
+        }
+    }, [category, setValue]);
+
+    const updateCategoryMutation = useMutation({
         mutationFn: async (data: CategoryFormData) => {
-            const response = await api.post('/ordoc-air/tags/', {
+            if (!category) throw new Error('Categoria não selecionada');
+            const response = await api.patch(`/ordoc-air/tags/${category.id}/`, {
                 name: data.name,
                 color: data.color,
                 description: data.description || '',
@@ -80,13 +92,13 @@ export function CreateCategoryDialog({ open, onOpenChange }: CreateCategoryDialo
             return response.data;
         },
         onSuccess: () => {
-            toast.success('Categoria criada com sucesso!');
+            toast.success('Categoria atualizada com sucesso!');
             queryClient.invalidateQueries({ queryKey: ['smart-categories'] });
             reset();
             onOpenChange(false);
         },
         onError: (error: any) => {
-            const message = error.response?.data?.detail || error.response?.data?.name?.[0] || 'Erro ao criar categoria';
+            const message = error.response?.data?.detail || error.response?.data?.name?.[0] || 'Erro ao atualizar categoria';
             toast.error(message);
         },
     });
@@ -94,7 +106,7 @@ export function CreateCategoryDialog({ open, onOpenChange }: CreateCategoryDialo
     const onSubmit = async (data: CategoryFormData) => {
         setIsSubmitting(true);
         try {
-            await createCategoryMutation.mutateAsync(data);
+            await updateCategoryMutation.mutateAsync(data);
         } finally {
             setIsSubmitting(false);
         }
@@ -105,11 +117,11 @@ export function CreateCategoryDialog({ open, onOpenChange }: CreateCategoryDialo
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Grid className="w-5 h-5 text-orange-600" />
-                        Nova Categoria
+                        <Pencil className="w-5 h-5 text-orange-600" />
+                        Editar Categoria
                     </DialogTitle>
                     <DialogDescription>
-                        Crie uma nova categoria para organizar seus documentos.
+                        Atualize as informações da categoria.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -186,7 +198,7 @@ export function CreateCategoryDialog({ open, onOpenChange }: CreateCategoryDialo
                             disabled={isSubmitting}
                         >
                             {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Criar Categoria
+                            Salvar Alterações
                         </Button>
                     </div>
                 </form>

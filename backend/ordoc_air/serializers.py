@@ -496,12 +496,6 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
                 return obj.created_by.username
         return 'Sistema'
     
-    def create(self, validated_data):
-        """Set organization and created_by from context"""
-        validated_data['organization'] = self.context.get('current_organization')
-        validated_data['created_by'] = self.context.get('current_user')
-        return super().create(validated_data)
-    
     def update(self, instance, validated_data):
         """Set updated_by from context"""
         validated_data['updated_by'] = self.context.get('current_user')

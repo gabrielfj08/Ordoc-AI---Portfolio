@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Folder, MoreVertical, Pencil, Trash2, Brain, Sparkles, Tag, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,8 +18,13 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { EditCategoryDialog } from './dialogs/edit-category-dialog';
+import { DeleteCategoryDialog } from './dialogs/delete-category-dialog';
 
 export const CategoriesView = () => {
+    const [editingCategory, setEditingCategory] = useState<SmartCategory | null>(null);
+    const [deletingCategory, setDeletingCategory] = useState<SmartCategory | null>(null);
+
     const { data: categories, isLoading } = useQuery({
         queryKey: ['smart-categories'],
         queryFn: () => dashboardService.getSmartCategories(),
@@ -112,11 +117,18 @@ export const CategoriesView = () => {
                     {regularCategories.map((cat: SmartCategory) => (
                         <div
                             key={cat.id}
-                            className="group relative flex flex-col justify-between p-4 bg-card border border-border rounded-xl"
+                            className="group relative flex flex-col justify-between p-4 bg-card rounded-xl border-2 transition-colors hover:shadow-md"
+                            style={{ borderColor: cat.color || '#E5E7EB' }}
                         >
                             <div className="flex items-start justify-between mb-2">
-                                <div className="w-10 h-10 flex items-center justify-center -ml-2">
-                                    <Folder className={`w-6 h-6 ${cat.status === 'archived' ? 'text-muted-foreground' : 'text-orange-500'} fill-orange-50`} />
+                                <div
+                                    className="w-10 h-10 flex items-center justify-center -ml-2 rounded-lg"
+                                    style={{ backgroundColor: `${cat.color || '#F97316'}20` }}
+                                >
+                                    <Folder
+                                        className="w-6 h-6"
+                                        style={{ color: cat.color || '#F97316' }}
+                                    />
                                 </div>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -125,8 +137,15 @@ export const CategoriesView = () => {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem><Pencil className="w-4 h-4 mr-2" /> Editar</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" /> Excluir</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setEditingCategory(cat)}>
+                                            <Pencil className="w-4 h-4 mr-2" /> Editar
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="text-destructive"
+                                            onClick={() => setDeletingCategory(cat)}
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -148,6 +167,19 @@ export const CategoriesView = () => {
                     ))}
                 </div>
             </section>
+
+            {/* Diálogos de Edição e Exclusão */}
+            <EditCategoryDialog
+                open={!!editingCategory}
+                category={editingCategory}
+                onOpenChange={(open) => !open && setEditingCategory(null)}
+            />
+
+            <DeleteCategoryDialog
+                open={!!deletingCategory}
+                category={deletingCategory}
+                onOpenChange={(open) => !open && setDeletingCategory(null)}
+            />
         </div>
     );
 };

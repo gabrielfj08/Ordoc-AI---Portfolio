@@ -377,10 +377,66 @@ class DocumentViewSet(BaseViewSet):
         return context
     
     def get_queryset(self):
-        """Override to filter current versions by default"""
-        queryset = super().get_queryset()
+        """Override to filter documents based on view type (Gmail-style)"""
+        from datetime import timedelta
+        from django.utils import timezone
         
-        # By default, show only current versions
+        queryset = super().get_queryset()
+        user = self.request.user
+        view_type = self.request.query_params.get('view', 'inbox')
+        
+        # Exclude documents hidden for this user
+        queryset = queryset.exclude(hidden_for_users=user)
+        
+        # Apply view-specific filters
+        if view_type == 'inbox' or view_type == 'files':
+            # Meu Drive: active documents, not deleted
+            queryset = queryset.filter(
+                document_status='active',
+                deleted_at__isnull=True
+            )
+        
+        elif view_type == 'starred':
+            # Prioridades: starred documents
+            queryset = queryset.filter(
+                document_status='active',
+                starred=True,
+                deleted_at__isnull=True
+            )
+        
+        elif view_type == 'pending':
+            # Pendentes: unread or needs signature
+            queryset = queryset.filter(
+                document_status='active',
+                deleted_at__isnull=True
+            ).filter(
+                Q(unread=True) | Q(needs_signature=True)
+            )
+        
+        elif view_type == 'shared':
+            # Compartilhados: shared documents
+            queryset = queryset.filter(
+                document_status='active',
+                is_shared=True,
+                deleted_at__isnull=True
+            )
+        
+        elif view_type == 'templates':
+            # Templates: draft status
+            queryset = queryset.filter(
+                document_status='draft',
+                deleted_at__isnull=True
+            )
+        
+        elif view_type == 'trash':
+            # Lixeira: deleted in last 30 days
+            cutoff = timezone.now() - timedelta(days=30)
+            queryset = queryset.filter(
+                deleted_at__isnull=False,
+                deleted_at__gte=cutoff
+            )
+        
+        # Filter by current versions only (unless specified)
         show_all_versions = self.request.query_params.get('all_versions', 'false').lower() == 'true'
         if not show_all_versions:
             queryset = queryset.filter(is_current_version=True)
@@ -554,6 +610,117 @@ class DocumentViewSet(BaseViewSet):
             )
 
         return Response({'message': 'Document unarchived successfully'})
+    
+    @action(detail=True, methods=['post'])
+    def toggle_star(self, request, pk=None):
+        """Toggle starred status of document (Gmail-style)"""
+        document = self.get_object()
+        document.starred = not document.starred
+        document.save(update_fields=['starred'])
+        
+        return Response({
+            'starred': document.starred,
+            'message': 'Documento marcado como prioridade' if document.starred else 'Marcação removida'
+        })
+    
+    @action(detail=False, methods=['post'])
+    def delete_batch(self, request):
+        """Delete multiple documents with validation (Gmail-style)"""
+        from django.utils import timezone
+        
+        document_ids = request.data.get('document_ids', [])
+        permanent = request.data.get('permanent', False)
+        
+        if not document_ids:
+            return Response(
+                {'error': 'No document IDs provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get documents
+        documents = self.get_queryset().filter(id__in=document_ids)
+        
+        # Validations
+        shared_docs = documents.filter(is_shared=True)
+        not_owned = documents.exclude(created_by=request.user)
+        
+        warnings = {}
+        if shared_docs.exists():
+            warnings['shared_count'] = shared_docs.count()
+            warnings['shared_docs'] = list(shared_docs.values('id', 'name'))
+        
+        if not_owned.exists():
+            warnings['not_owned_count'] = not_owned.count()
+            warnings['not_owned_docs'] = list(not_owned.values('id', 'name', 'created_by__username'))
+        
+        # If there are warnings and user hasn't confirmed, return warnings
+        if warnings and not request.data.get('confirmed', False):
+            return Response({
+                'requires_confirmation': True,
+                'warnings': warnings,
+                'message': 'Alguns documentos são compartilhados ou não pertencem a você. Confirme para continuar.'
+            }, status=status.HTTP_200_OK)
+        
+        # Execute deletion
+        if permanent:
+            # Permanent delete
+            count = documents.count()
+            documents.delete()
+            message = f'{count} documento(s) excluído(s) permanentemente'
+        else:
+            # Soft delete (move to trash)
+            count = documents.update(
+                deleted_at=timezone.now(),
+                deleted_by=request.user,
+                document_status='trashed'
+            )
+            message = f'{count} documento(s) movido(s) para lixeira'
+        
+        return Response({
+            'deleted': count,
+            'message': message
+        })
+    
+    @action(detail=False, methods=['post'])
+    def restore_batch(self, request):
+        """Restore documents from trash (Gmail-style)"""
+        document_ids = request.data.get('document_ids', [])
+        
+        if not document_ids:
+            return Response(
+                {'error': 'No document IDs provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get documents from trash
+        documents = Document.objects.filter(
+            id__in=document_ids,
+            deleted_at__isnull=False
+        )
+        
+        # Restore
+        count = documents.update(
+            deleted_at=None,
+            deleted_by=None,
+            document_status='active'
+        )
+        
+        return Response({
+            'restored': count,
+            'message': f'{count} documento(s) restaurado(s)'
+        })
+    
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark document as read (Gmail-style)"""
+        document = self.get_object()
+        document.unread = False
+        document.save(update_fields=['unread'])
+        
+        return Response({
+            'unread': False,
+            'message': 'Documento marcado como lido'
+        })
 
     @action(detail=True, methods=['post'])
     def add_tags(self, request, pk=None):
@@ -1032,6 +1199,38 @@ class DocumentTemplateViewSet(BaseViewSet):
         template.increment_usage()
         serializer = self.get_serializer(template)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """Duplicate a template with its file"""
+        from django.core.files.base import ContentFile
+        import os
+        
+        original_template = self.get_object()
+        
+        # Create new template instance
+        new_template = DocumentTemplate.objects.create(
+            name=f"{original_template.name} (Cópia)",
+            description=original_template.description,
+            category=original_template.category,
+            version='1.0',
+            status='draft',
+            organization=self.get_current_organization(),
+            created_by=self.request.user
+        )
+        
+        # Copy the file
+        if original_template.file:
+            original_file = original_template.file
+            file_content = original_file.read()
+            file_name = os.path.basename(original_file.name)
+            new_template.file.save(file_name, ContentFile(file_content), save=True)
+        
+        # Copy tags
+        new_template.tags.set(original_template.tags.all())
+        
+        serializer = self.get_serializer(new_template)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['get'])
     def suggestions(self, request):

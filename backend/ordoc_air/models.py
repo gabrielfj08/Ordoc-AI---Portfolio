@@ -258,6 +258,35 @@ class Document(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
     
+    # Document status for Gmail-like views
+    DOCUMENT_STATUS_CHOICES = [
+        ('active', 'Ativo'),
+        ('archived', 'Arquivado'),
+        ('trashed', 'Lixeira'),
+        ('draft', 'Rascunho'),
+    ]
+    document_status = models.CharField(
+        max_length=20,
+        choices=DOCUMENT_STATUS_CHOICES,
+        default='active',
+        verbose_name="Status do Documento",
+        db_index=True
+    )
+    
+    # Gmail-like flags
+    starred = models.BooleanField(default=False, verbose_name="Marcado com Estrela", db_index=True)
+    unread = models.BooleanField(default=True, verbose_name="Não Lido")
+    needs_signature = models.BooleanField(default=False, verbose_name="Aguardando Assinatura")
+    is_shared = models.BooleanField(default=False, verbose_name="Compartilhado", db_index=True)
+    
+    # Hidden for specific users (when user "deletes" a shared document)
+    hidden_for_users = models.ManyToManyField(
+        User, 
+        blank=True, 
+        related_name='hidden_documents',
+        verbose_name="Oculto para Usuários"
+    )
+    
     # User tracking
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_documents')
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_documents')

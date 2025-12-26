@@ -1,11 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { FileText, MoreVertical, Pencil, Copy, Trash2, FileCode, Sparkles, Brain, Clock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
-import { dashboardService } from '@/services/dashboard';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { dashboardService, SmartTemplate } from '@/services/dashboard';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,12 +19,54 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { DeleteTemplateDialog } from './dialogs/delete-template-dialog';
+import { EditTemplateDialog } from './dialogs/edit-template-dialog';
+import { toast } from 'sonner';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+const api = axios.create({
+    baseURL: `${API_BASE_URL}/api/v1`,
+});
+
+api.interceptors.request.use((config) => {
+    config.headers['X-Subdomain'] = 'demo';
+    const token = localStorage.getItem('ordoc_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
 export const TemplatesView = () => {
+    const queryClient = useQueryClient();
+    const [deletingTemplate, setDeletingTemplate] = useState<SmartTemplate | null>(null);
+    const [editingTemplate, setEditingTemplate] = useState<SmartTemplate | null>(null);
+
     const { data: templates, isLoading } = useQuery({
         queryKey: ['smart-templates'],
         queryFn: () => dashboardService.getSmartTemplates(),
     });
+
+    const duplicateTemplateMutation = useMutation({
+        mutationFn: async (template: SmartTemplate) => {
+            const response = await api.post(`/ordoc-air/document-templates/${template.id}/duplicate/`);
+            return response.data;
+        },
+        onSuccess: () => {
+            toast.success('Template duplicado com sucesso!');
+            queryClient.invalidateQueries({ queryKey: ['smart-templates'] });
+        },
+        onError: (error: any) => {
+            const message = error.response?.data?.detail || 'Erro ao duplicar template';
+            toast.error(message);
+        },
+    });
+
+    const handleDuplicate = async (template: SmartTemplate) => {
+        await duplicateTemplateMutation.mutateAsync(template);
+    };
 
     if (isLoading) {
         return (
@@ -124,10 +166,19 @@ export const TemplatesView = () => {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem><Pencil className="w-4 h-4 mr-2" /> Editar</DropdownMenuItem>
-                                        <DropdownMenuItem><Copy className="w-4 h-4 mr-2" /> Duplicar</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setEditingTemplate(tmpl)}>
+                                            <Pencil className="w-4 h-4 mr-2" /> Editar
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDuplicate(tmpl)}>
+                                            <Copy className="w-4 h-4 mr-2" /> Duplicar
+                                        </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" /> Excluir</DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="text-destructive"
+                                            onClick={() => setDeletingTemplate(tmpl)}
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
@@ -149,6 +200,19 @@ export const TemplatesView = () => {
                     ))}
                 </div>
             </section>
+
+            {/* Diálogos */}
+            <EditTemplateDialog
+                open={!!editingTemplate}
+                template={editingTemplate}
+                onOpenChange={(open) => !open && setEditingTemplate(null)}
+            />
+
+            <DeleteTemplateDialog
+                open={!!deletingTemplate}
+                template={deletingTemplate}
+                onOpenChange={(open) => !open && setDeletingTemplate(null)}
+            />
         </div>
     );
 };

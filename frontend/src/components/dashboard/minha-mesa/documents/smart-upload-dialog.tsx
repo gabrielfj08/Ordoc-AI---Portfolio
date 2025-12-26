@@ -125,24 +125,28 @@ export const SmartUploadDialog: React.FC<SmartUploadDialogProps> = ({ children, 
     };
 
     const handleUpload = async () => {
-        // Simulate upload process
         const unfinished = files.filter(f => f.status === 'ready');
         if (unfinished.length === 0) return;
 
         // Set all ready files to uploading
         setFiles(prev => prev.map(f => f.status === 'ready' ? { ...f, status: 'uploading' } : f));
 
-        // Simulate progress per file
+        // Upload each file to the real API
         for (const fileObj of unfinished) {
-            // Register mock document in service
-            await dashboardService.uploadDocumentMock(fileObj.file, fileObj.suggestedFolder?.name || 'Meu Drive');
+            try {
+                // Upload to real API
+                await dashboardService.uploadDocument(fileObj.file, fileObj.suggestedFolder?.id !== 'root' ? fileObj.suggestedFolder?.id : undefined);
 
-            // Simular progresso visual
-            for (let i = 0; i <= 100; i += 20) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                setFiles(prev => prev.map(f => f.file === fileObj.file ? { ...f, progress: i } : f));
+                // Simular progresso visual
+                for (let i = 0; i <= 100; i += 20) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    setFiles(prev => prev.map(f => f.file === fileObj.file ? { ...f, progress: i } : f));
+                }
+                setFiles(prev => prev.map(f => f.file === fileObj.file ? { ...f, status: 'complete', progress: 100 } : f));
+            } catch (error) {
+                console.error('Upload error:', error);
+                setFiles(prev => prev.map(f => f.file === fileObj.file ? { ...f, status: 'error' } : f));
             }
-            setFiles(prev => prev.map(f => f.file === fileObj.file ? { ...f, status: 'complete', progress: 100 } : f));
         }
 
         setTimeout(() => {

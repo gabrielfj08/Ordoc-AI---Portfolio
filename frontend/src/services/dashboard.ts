@@ -139,6 +139,7 @@ export interface SmartCategory {
     docCount: number;
     status: 'active' | 'archived';
     lastUpdate: string;
+    color?: string;
     isAiSuggested?: boolean;
     confidence?: number;
     suggestionReason?: string;
@@ -622,6 +623,27 @@ export const dashboardService = {
     },
 
     /**
+     * Upload real de documento para o banco de dados
+     */
+    async uploadDocument(file: File, directoryId?: string): Promise<any> {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('name', file.name);
+
+        if (directoryId) {
+            formData.append('directory', directoryId);
+        }
+
+        const response = await api.post('/ordoc-air/documents/', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        return response.data;
+    },
+
+    /**
      * Simula upload de documento para a sessão atual
      */
     async uploadDocumentMock(file: File, folderName: string): Promise<boolean> {
@@ -750,11 +772,11 @@ export const dashboardService = {
             // 1. Buscar categorias existentes (tags) do backend
             const tagsResponse = await api.get('/ordoc-air/tags/');
             const tags = Array.isArray(tagsResponse.data) ? tagsResponse.data : tagsResponse.data.results || [];
-            
+
             // 2. Buscar sugestões de IA do backend
             const suggestionsResponse = await api.get('/ordoc-air/tags/suggestions/');
             const aiSuggestions = Array.isArray(suggestionsResponse.data) ? suggestionsResponse.data : suggestionsResponse.data.results || [];
-            
+
             // 3. Converter tags existentes para formato SmartCategory
             const baseCategories: SmartCategory[] = tags.map((tag: any) => ({
                 id: tag.id,
@@ -763,9 +785,10 @@ export const dashboardService = {
                 docCount: tag.doc_count || 0,
                 status: tag.status || 'active',
                 lastUpdate: tag.last_update || new Date().toISOString().split('T')[0],
+                color: tag.color || '#3B82F6',
                 tags: [tag.name.toLowerCase()]
             }));
-            
+
             // 4. Converter sugestões de IA para formato SmartCategory
             const smartSuggestions: SmartCategory[] = aiSuggestions.map((suggestion: any) => ({
                 id: suggestion.id,
@@ -779,7 +802,7 @@ export const dashboardService = {
                 suggestionReason: suggestion.suggestion_reason || '',
                 tags: suggestion.tags || []
             }));
-            
+
             // Retornar sugestões primeiro, depois categorias existentes
             return [...smartSuggestions, ...baseCategories];
         } catch (error) {
@@ -794,11 +817,11 @@ export const dashboardService = {
             // 1. Buscar templates existentes do backend
             const templatesResponse = await api.get('/ordoc-air/document-templates/');
             const templates = Array.isArray(templatesResponse.data) ? templatesResponse.data : templatesResponse.data.results || [];
-            
+
             // 2. Buscar sugestões de IA do backend
             const suggestionsResponse = await api.get('/ordoc-air/document-templates/suggestions/');
             const aiSuggestions = Array.isArray(suggestionsResponse.data) ? suggestionsResponse.data : suggestionsResponse.data.results || [];
-            
+
             // 3. Converter templates existentes para formato SmartTemplate
             const baseTemplates: SmartTemplate[] = templates.map((template: any) => ({
                 id: template.id,
@@ -809,7 +832,7 @@ export const dashboardService = {
                 lastUpdate: template.last_update || new Date().toISOString().split('T')[0],
                 usageCount: template.usage_count || 0
             }));
-            
+
             // 4. Converter sugestões de IA para formato SmartTemplate
             const smartSuggestions: SmartTemplate[] = aiSuggestions.map((suggestion: any) => ({
                 id: suggestion.id,
@@ -823,7 +846,7 @@ export const dashboardService = {
                 confidence: suggestion.confidence || 0.85,
                 suggestionReason: suggestion.suggestion_reason || ''
             }));
-            
+
             // Retornar sugestões primeiro, depois templates existentes
             return [...smartSuggestions, ...baseTemplates];
         } catch (error) {

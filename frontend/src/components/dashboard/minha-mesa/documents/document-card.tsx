@@ -58,7 +58,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Badge variant="secondary" className="text-xs font-medium px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 ml-2">
+                        <Badge variant="secondary" className="text-xs font-medium px-2 py-0 bg-primary/10 text-primary border border-primary/20 ml-2">
                             <Sparkles className="w-3 h-3 mr-1" />
                             Sugerido
                         </Badge>
@@ -93,7 +93,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
                             </span>
                         )}
                     </span>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                         <span className={`uppercase font-medium ${suggested ? 'text-primary' : 'text-orange-600/70'}`}>{type}</span>
                         <span>•</span>
                         <span>{size}</span>
