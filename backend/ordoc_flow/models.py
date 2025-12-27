@@ -758,12 +758,27 @@ class Procedure(models.Model):
         for status, _ in cls.STATUS_CHOICES:
             if status not in status_counts:
                 status_counts[status] = 0
+                
+        # Adiciona total
+        status_counts['total'] = sum(status_counts.values())
         
         return status_counts
     
     @property
     def is_closed(self):
         return self.status in ['archived', 'finished']
+    
+    def clean(self):
+        # Validação de payload se schema estiver presente
+        if self.schema and not self.payload and self.status != 'draft':
+            raise ValidationError('Payload é obrigatório quando schema está presente.')
+        
+        # Validação de deadline
+        if self.deadline and self.deadline < date.today():
+             # Se for criação (pk é None), não permite data no passado
+             if not self.pk:
+                 raise ValidationError('Prazo não pode ser anterior à data atual.')
+             # Se for edição, permite manter data antiga
     
     # FSM Transitions
     @transition(field=status, source='archived', target='draft')
@@ -965,6 +980,14 @@ class Task(models.Model):
     def is_closed(self):
         return self.status in ['finished', 'refused']
     
+    def clean(self):
+        # Validação de deadline
+        if self.deadline and self.deadline < date.today():
+             # Se for criação (pk é None), não permite data no passado
+             if not self.pk:
+                 raise ValidationError('Prazo não pode ser anterior à data atual.')
+             # Se for edição, permite manter data antiga
+    
     @classmethod
     def count_by_status(cls, organization=None, user=None, group_id=None, **filters):
         """Conta tarefas por status"""
@@ -1011,27 +1034,30 @@ class Task(models.Model):
         for status, _ in cls.STATUS_CHOICES:
             if status not in status_counts:
                 status_counts[status] = 0
+                
+        # Adiciona total
+        status_counts['total'] = sum(status_counts.values())
         
         return status_counts
     
     # FSM Transitions
-    @transition(field=status, source=['running', 'draft', 'started'], target='running')
+    @transition(field=status, source=['running', 'draft', 'started', 'finished', 'refused'], target='running')
     def run(self):
-        if not self.procedure.status == 'running':
+        if self.procedure.status == 'draft':
             self.procedure.run()
             self.procedure.save()
     
-    @transition(field=status, source='running', target='started')
+    @transition(field=status, source=['running', 'draft', 'started', 'finished', 'refused'], target='started')
     def start(self):
         if not self.procedure.status == 'started':
             self.procedure.start()
             self.procedure.save()
     
-    @transition(field=status, source='started', target='finished')
+    @transition(field=status, source=['running', 'draft', 'started', 'finished', 'refused'], target='finished')
     def finish(self):
         pass
     
-    @transition(field=status, source='running', target='refused')
+    @transition(field=status, source=['running', 'draft', 'started', 'finished', 'refused'], target='refused')
     def refuse(self):
         if not self.procedure.status == 'started':
             self.procedure.start()

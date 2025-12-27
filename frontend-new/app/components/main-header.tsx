@@ -29,7 +29,9 @@ import {
     ChevronLeft,
 } from "lucide-react"
 import { AppDrawer } from "./app-drawer"
-import { useNotifications } from "@/hooks/use-notifications"
+import { useNotifications } from "@/contexts/notification-context"
+import { useAlerts } from "@/contexts/alerts-context"
+import { useAuth } from "@/contexts/auth-context"
 
 interface MainHeaderProps {
     showSidebarToggle?: boolean
@@ -41,7 +43,19 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
     const pathname = usePathname()
     const [appDrawerOpen, setAppDrawerOpen] = useState(false)
     const [searchFocused, setSearchFocused] = useState(false)
+    const { user, logout, isAuthenticated } = useAuth()
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+    const { unreadCount: aiAlertsCount } = useAlerts()
+
+    // Não mostrar header na página de login
+    if (pathname === '/login') {
+        return null
+    }
+
+    // Iniciais do usuário
+    const userInitials = user ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase() : 'U'
+    const userName = user ? `${user.first_name} ${user.last_name}` : 'Usuário'
+    const userRole = user?.organization?.name || 'Sem organização'
 
     const navItems = [
         { id: "my-day", label: "Meu Dia", icon: Calendar, href: "/my-day" },
@@ -110,8 +124,14 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-secondary/50">
                                 <Bell className="size-5" />
-                                {unreadCount > 0 && (
-                                    <span className="absolute top-2 right-2 size-2 bg-destructive rounded-full animate-pulse" />
+                                {/* Badge combinado de notificações + alertas IA */}
+                                {(unreadCount + aiAlertsCount) > 0 && (
+                                    <>
+                                        <span className="absolute top-1.5 right-1.5 size-2 bg-destructive rounded-full animate-pulse" />
+                                        <span className="absolute -top-1 -right-1 size-5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                                            {(unreadCount + aiAlertsCount) > 9 ? '9+' : (unreadCount + aiAlertsCount)}
+                                        </span>
+                                    </>
                                 )}
                             </Button>
                         </DropdownMenuTrigger>
@@ -119,13 +139,21 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                             <div className="p-4 border-b">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-semibold text-lg">Notificações</h3>
-                                    {unreadCount > 0 && (
-                                        <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full font-medium">
-                                            {unreadCount} {unreadCount === 1 ? 'nova' : 'novas'}
-                                        </span>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {aiAlertsCount > 0 && (
+                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                                                🤖 {aiAlertsCount} IA
+                                            </span>
+                                        )}
+                                        {unreadCount > 0 && (
+                                            <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full font-medium">
+                                                {unreadCount} {unreadCount === 1 ? 'nova' : 'novas'}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
+
                             <div className="max-h-[400px] overflow-y-auto">
                                 {notifications.length === 0 ? (
                                     <div className="p-8 text-center text-muted-foreground">
@@ -133,32 +161,53 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                                         <p>Nenhuma notificação</p>
                                     </div>
                                 ) : (
-                                    notifications.map((notif) => (
-                                        <div
-                                            key={notif.id}
-                                            className={`p-4 border-b hover:bg-secondary/30 cursor-pointer transition-colors ${notif.status !== 'read' ? "bg-orange-600/5" : ""
-                                                }`}
-                                            onClick={() => markAsRead(notif.id)}
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                {notif.status !== 'read' && (
-                                                    <div className="size-2 rounded-full bg-primary mt-2 shrink-0" />
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-semibold text-sm mb-1">{notif.subject}</p>
-                                                    <p className="text-sm text-muted-foreground mb-1">{notif.message}</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {new Date(notif.created_at).toLocaleDateString('pt-BR', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
-                                                    </p>
+                                    notifications.map((notif) => {
+                                        // Determinar ícone baseado no tipo
+                                        const getTypeIcon = () => {
+                                            switch (notif.type) {
+                                                case 'task':
+                                                    return <Workflow className="size-4 text-blue-500" />
+                                                case 'approval':
+                                                    return <FileText className="size-4 text-green-500" />
+                                                case 'deadline':
+                                                    return <Calendar className="size-4 text-red-500" />
+                                                default:
+                                                    return <Bell className="size-4 text-orange-500" />
+                                            }
+                                        }
+
+                                        return (
+                                            <div
+                                                key={notif.id}
+                                                className={`p-4 border-b hover:bg-secondary/30 cursor-pointer transition-colors ${notif.status !== 'read' ? "bg-orange-600/5" : ""
+                                                    }`}
+                                                onClick={() => markAsRead(notif.id)}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className="mt-1">
+                                                        {getTypeIcon()}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <p className="font-semibold text-sm">{notif.subject}</p>
+                                                            {notif.status !== 'read' && (
+                                                                <div className="size-2 rounded-full bg-primary shrink-0" />
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground mb-1">{notif.body}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {new Date(notif.created_at).toLocaleDateString('pt-BR', {
+                                                                day: '2-digit',
+                                                                month: 'short',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                            })}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        )
+                                    })
                                 )}
                             </div>
                             <div className="p-3 border-t">
@@ -192,10 +241,10 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                             <Button variant="ghost" className="gap-3 rounded-full hover:bg-secondary/50 pl-2 pr-4">
                                 <Avatar className="size-8 ring-2 ring-primary/20">
                                     <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-sm font-semibold">
-                                        RF
+                                        {userInitials}
                                     </AvatarFallback>
                                 </Avatar>
-                                <span className="hidden lg:inline text-sm font-medium">Ricardo</span>
+                                <span className="hidden lg:inline text-sm font-medium">{user?.first_name || 'Usuário'}</span>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 p-2">
@@ -203,12 +252,12 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                                 <div className="flex items-center gap-3">
                                     <Avatar className="size-12 ring-2 ring-primary/20">
                                         <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-semibold">
-                                            RF
+                                            {userInitials}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="flex flex-col">
-                                        <p className="text-sm font-semibold">Ricardo Ferreira</p>
-                                        <p className="text-xs text-muted-foreground">Coordenador Jurídico</p>
+                                        <p className="text-sm font-semibold">{userName}</p>
+                                        <p className="text-xs text-muted-foreground">{userRole}</p>
                                     </div>
                                 </div>
                             </DropdownMenuLabel>
@@ -217,7 +266,12 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                                 <Settings className="mr-3 size-4" />
                                 Configurações
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="rounded-lg text-destructive">Sair</DropdownMenuItem>
+                            <DropdownMenuItem
+                                className="rounded-lg text-destructive cursor-pointer"
+                                onClick={logout}
+                            >
+                                Sair
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

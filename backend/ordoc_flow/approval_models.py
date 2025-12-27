@@ -604,8 +604,8 @@ class NotificationLog(models.Model):
     )
     
     # Generic foreign key para o objeto relacionado
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.UUIDField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.UUIDField(null=True, blank=True)
     related_object = GenericForeignKey('content_type', 'object_id')
     
     # Timestamps

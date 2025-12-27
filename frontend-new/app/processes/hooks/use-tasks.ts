@@ -31,6 +31,7 @@ export function useTasks(procedureId?: string) {
             setTasks(response.results)
             return response.results
         } catch (err: any) {
+            console.error('FetchTasks Error:', err, err.response?.data)
             const errorMessage = err.response?.data?.detail || err.message || 'Erro ao buscar tarefas'
             setError(errorMessage)
             toast({
@@ -207,7 +208,8 @@ export function useTasks(procedureId?: string) {
                 description: 'Tarefa executada com sucesso',
             })
         } catch (err: any) {
-            const errorMessage = err.response?.data?.detail || err.message || 'Erro ao executar tarefa'
+            console.error('RunTask Error:', err, err.response?.data)
+            const errorMessage = err.response?.data?.detail || err.response?.data?.error || err.message || 'Erro ao executar tarefa'
             toast({
                 title: 'Erro',
                 description: errorMessage,
@@ -339,6 +341,7 @@ export function useTasks(procedureId?: string) {
                 await action()
             }
         } catch (err) {
+            console.error('TransitionTaskStatus Error:', err)
             // Erro já tratado nas funções individuais
             throw err
         }
@@ -346,6 +349,7 @@ export function useTasks(procedureId?: string) {
 
     return {
         tasks,
+        setTasks, // Expor para updates otimistas
         loading,
         error,
         fetchTasks,

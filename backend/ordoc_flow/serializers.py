@@ -211,10 +211,15 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Validações customizadas"""
-        if data.get('deadline') and data['deadline'] < timezone.now().date():
-            raise serializers.ValidationError({
-                'deadline': 'Prazo não pode ser anterior à data atual.'
-            })
+        # Só valida deadline se for novo ou se estiver mudando o deadline
+        if data.get('deadline'):
+            is_new = self.instance is None
+            deadline_changed = self.instance and self.instance.deadline != data['deadline']
+            
+            if (is_new or deadline_changed) and data['deadline'] < timezone.now().date():
+                raise serializers.ValidationError({
+                    'deadline': 'Prazo não pode ser anterior à data atual.'
+                })
         return data
 
     def get_assignee_name(self, obj):
@@ -268,10 +273,15 @@ class ProcedureSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """Validações customizadas"""
-        if data.get('deadline') and data['deadline'] < timezone.now().date():
-            raise serializers.ValidationError({
-                'deadline': 'Prazo não pode ser anterior à data atual.'
-            })
+        # Só valida deadline se for novo ou se estiver mudando o deadline
+        if data.get('deadline'):
+            is_new = self.instance is None
+            deadline_changed = self.instance and self.instance.deadline != data['deadline']
+            
+            if (is_new or deadline_changed) and data['deadline'] < timezone.now().date():
+                raise serializers.ValidationError({
+                    'deadline': 'Prazo não pode ser anterior à data atual.'
+                })
         return data
 
     def get_requester_name(self, obj):

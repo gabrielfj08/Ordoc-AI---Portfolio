@@ -175,9 +175,19 @@ class AlertViewSet(viewsets.ModelViewSet):
         if document_id:
             queryset = queryset.filter(document_id=document_id)
         
-        # Filter by status
-        response_status = self.request.query_params.get('status', 'pending')
-        if response_status != 'all':
+        # Filter by is_read (maps to user_response != 'pending')
+        is_read = self.request.query_params.get('is_read')
+        if is_read is not None:
+            if is_read.lower() in ('true', '1'):
+                # Read means user has responded (not pending)
+                queryset = queryset.exclude(user_response='pending')
+            elif is_read.lower() in ('false', '0'):
+                # Unread means pending
+                queryset = queryset.filter(user_response='pending')
+        
+        # Filter by status (legacy support)
+        response_status = self.request.query_params.get('status')
+        if response_status and response_status != 'all':
             queryset = queryset.filter(user_response=response_status)
         
         return queryset.order_by('-created_at')
@@ -222,6 +232,39 @@ class AlertViewSet(viewsets.ModelViewSet):
         
         return Response(
             ProactiveAlertSerializer(alert).data,
+            status=status.HTTP_200_OK
+        )
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """Mark an alert as read."""
+        alert = self.get_object()
+        
+        # Mark as read by setting user_response to 'dismissed'
+        # (we'll use 'dismissed' to indicate "read but not responded to")
+        if alert.user_response == 'pending':
+            alert.user_response = 'dismissed'
+            alert.responded_by = request.user
+            alert.responded_at = timezone.now()
+            alert.save()
+        
+        return Response(
+            ProactiveAlertSerializer(alert).data,
+            status=status.HTTP_200_OK
+        )
+    
+    @action(detail=False, methods=['post'])
+    def mark_all_as_read(self, request):
+        """Mark all pending alerts as read."""
+        queryset = self.get_queryset().filter(user_response='pending')
+        updated_count = queryset.update(
+            user_response='dismissed',
+            responded_by=request.user,
+            responded_at=timezone.now()
+        )
+        
+        return Response(
+            {'message': f'{updated_count} alertas marcados como lidos'},
             status=status.HTTP_200_OK
         )
 

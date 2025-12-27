@@ -397,10 +397,10 @@ class DocumentViewSet(BaseViewSet):
             )
         
         elif view_type == 'starred':
-            # Prioridades: starred documents
+            # Prioridades: documents favorited by current user
             queryset = queryset.filter(
                 document_status='active',
-                starred=True,
+                favorited_by=user,
                 deleted_at__isnull=True
             )
         
@@ -621,6 +621,62 @@ class DocumentViewSet(BaseViewSet):
         return Response({
             'starred': document.starred,
             'message': 'Documento marcado como prioridade' if document.starred else 'Marcação removida'
+        })
+    
+    @action(detail=True, methods=['post'])
+    def favorite(self, request, pk=None):
+        """Mark document as favorite"""
+        document = self.get_object()
+        document.favorited_by.add(request.user)
+        
+        # Keep starred for backward compatibility or remove if not needed. 
+        # For now, we sync it if needed, but per-user is primary.
+        # document.starred = True 
+        # document.save(update_fields=['starred'])
+        
+        # Log activity
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='favorite',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+            )
+        
+        return Response({
+            'is_favorite': True,
+            'starred': True,
+            'message': 'Documento marcado como favorito'
+        })
+    
+    @action(detail=True, methods=['post'])
+    def unfavorite(self, request, pk=None):
+        """Remove favorite mark from document"""
+        document = self.get_object()
+        document.favorited_by.remove(request.user)
+        
+        # document.starred = False
+        # document.save(update_fields=['starred'])
+        
+        # Log activity
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='unfavorite',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+            )
+        
+        return Response({
+            'is_favorite': False,
+            'starred': False,
+            'message': 'Documento removido dos favoritos'
         })
     
     @action(detail=False, methods=['post'])

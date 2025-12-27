@@ -345,7 +345,7 @@ class ProcedureViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -363,7 +363,7 @@ class ProcedureViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -381,7 +381,7 @@ class ProcedureViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -399,7 +399,7 @@ class ProcedureViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -417,7 +417,7 @@ class ProcedureViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -520,7 +520,7 @@ class TaskViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -538,7 +538,7 @@ class TaskViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -556,7 +556,7 @@ class TaskViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -574,7 +574,7 @@ class TaskViewSet(BaseViewSet):
             })
         except Exception as e:
             return Response(
-                {'error': str(e)},
+                {'detail': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -641,11 +641,12 @@ class WorkflowDashboardViewSet(BaseViewSet):
         
         recent_activities = []
         for proc in recent_procedures:
+            creator_name = proc.created_by.user.get_full_name() or proc.created_by.user.username if proc.created_by else 'Sistema'
             recent_activities.append({
                 'id': proc.id,
                 'type': 'procedure_created',
                 'title': f'Procedimento {proc.process_number} criado',
-                'description': f'{proc.procedure_template_name} por {proc.created_by.name}',
+                'description': f'{proc.procedure_template_name} por {creator_name}',
                 'created_at': proc.created_at,
                 'status': proc.status
             })

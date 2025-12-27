@@ -21,6 +21,6 @@ app_name = 'ordoc_sign'
 
 urlpatterns = [
     # Incluir rotas do router
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
     # Additional custom endpoints can be added here
 ]

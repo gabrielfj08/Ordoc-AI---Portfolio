@@ -13,7 +13,7 @@ import type {
     PaginatedResponse,
 } from '../types'
 
-const BASE_URL = '/api/ordoc-sign/api'
+const BASE_URL = '/api/v1/ordoc-sign'
 
 // ===========================
 // SIGNATURE REQUESTS API

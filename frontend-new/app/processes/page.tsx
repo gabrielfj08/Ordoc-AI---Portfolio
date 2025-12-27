@@ -26,35 +26,35 @@ import type { Task, TaskStatus, KanbanColumn } from "./types"
 const KANBAN_COLUMNS: KanbanColumn[] = [
   {
     id: "draft",
-    title: "To Do",
+    title: "A Fazer",
     status: "draft",
     color: "bg-blue-500",
     tasks: [],
   },
   {
     id: "running",
-    title: "In Progress",
+    title: "Em Andamento",
     status: "running",
     color: "bg-orange-500",
     tasks: [],
   },
   {
     id: "started",
-    title: "Started",
+    title: "Iniciado",
     status: "started",
     color: "bg-purple-500",
     tasks: [],
   },
   {
     id: "finished",
-    title: "Completed",
+    title: "Concluído",
     status: "finished",
     color: "bg-green-500",
     tasks: [],
   },
   {
     id: "refused",
-    title: "Blocked",
+    title: "Bloqueado",
     status: "refused",
     color: "bg-red-500",
     tasks: [],
@@ -71,7 +71,7 @@ export default function ProcessesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
 
-  const { tasks, loading, fetchTasks, transitionTaskStatus } = useTasks()
+  const { tasks, loading, fetchTasks, transitionTaskStatus, setTasks } = useTasks()
   const { procedures, fetchProcedures } = useProcedures()
 
   // Carregar dados iniciais
@@ -128,17 +128,28 @@ export default function ProcessesPage() {
     }
 
     const newStatus = destination.droppableId as TaskStatus
+    const oldTasks = [...tasks]
+
+    // 1. Atualização Otimista
+    setTasks(prev => prev.map(task =>
+      task.id === draggableId ? { ...task, status: newStatus } : task
+    ))
+
+    if (selectedTask && selectedTask.id === draggableId) {
+      setSelectedTask({ ...selectedTask, status: newStatus })
+    }
 
     try {
-      // Transição de status via API
+      // 2. Chamada à API
       await transitionTaskStatus(draggableId, newStatus)
-
-      // Atualizar selectedTask se for o card sendo movido
-      if (selectedTask && selectedTask.id === draggableId) {
-        setSelectedTask({ ...selectedTask, status: newStatus })
-      }
+      // 3. Atualizar procedimentos (pode ter mudado status do pai)
+      fetchProcedures()
     } catch (error) {
-      // Erro já tratado no hook
+      // 4. Reversão em caso de erro
+      setTasks(oldTasks)
+      if (selectedTask && selectedTask.id === draggableId) {
+        setSelectedTask({ ...selectedTask, status: source.droppableId as TaskStatus })
+      }
       console.error('Erro ao mover tarefa:', error)
     }
   }
@@ -157,6 +168,7 @@ export default function ProcessesPage() {
     // Implementar duplicação via API
     console.log('Duplicar tarefa:', task, columnId)
   }
+
 
   return (
     <div className="container mx-auto p-6 max-w-[1600px]">
@@ -207,11 +219,11 @@ export default function ProcessesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="draft">To Do</SelectItem>
-              <SelectItem value="running">In Progress</SelectItem>
-              <SelectItem value="started">Started</SelectItem>
-              <SelectItem value="finished">Completed</SelectItem>
-              <SelectItem value="refused">Blocked</SelectItem>
+              <SelectItem value="draft">A Fazer</SelectItem>
+              <SelectItem value="running">Em Andamento</SelectItem>
+              <SelectItem value="started">Iniciado</SelectItem>
+              <SelectItem value="finished">Concluído</SelectItem>
+              <SelectItem value="refused">Bloqueado</SelectItem>
             </SelectContent>
           </Select>
 
@@ -296,10 +308,16 @@ export default function ProcessesPage() {
                                         </Badge>
                                       )}
                                       <Badge
+                                        variant="outline"
+                                        className="text-[10px] px-2 border-primary/20 bg-primary/5"
+                                      >
+                                        Status: {KANBAN_COLUMNS.find(c => c.status === task.status)?.title || task.status}
+                                      </Badge>
+                                      <Badge
                                         variant="secondary"
                                         className={`text-[10px] px-2 ${priorityColor}`}
                                       >
-                                        Priority: {task.priority === 'high' ? 'Alta' : 'Normal'}
+                                        Prioridade: {task.priority === 'high' ? 'Alta' : 'Normal'}
                                       </Badge>
                                     </div>
                                   </div>

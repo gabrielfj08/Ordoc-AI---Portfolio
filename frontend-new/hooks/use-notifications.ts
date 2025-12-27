@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { notificationsApi } from '@/services/notifications-api'
 import type { NotificationLog } from '@/types/notifications'
 
-export function useNotifications() {
+export function useNotifications(enabled: boolean = true) {
     const [notifications, setNotifications] = useState<NotificationLog[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
     const [loading, setLoading] = useState(false)
@@ -63,6 +63,11 @@ export function useNotifications() {
     }, [])
 
     useEffect(() => {
+        // Só busca notificações se enabled for true
+        if (!enabled) {
+            return
+        }
+
         fetchNotifications()
         fetchUnreadCount()
 
@@ -73,7 +78,7 @@ export function useNotifications() {
         }, 30000)
 
         return () => clearInterval(interval)
-    }, [fetchNotifications, fetchUnreadCount])
+    }, [enabled, fetchNotifications, fetchUnreadCount])
 
     return {
         notifications,

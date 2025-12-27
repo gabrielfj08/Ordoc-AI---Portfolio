@@ -52,10 +52,10 @@ class JWTService:
     @staticmethod
     def expiration_time() -> datetime:
         """
-        Get expiration time for JWT tokens (12 hours from now)
-        Equivalent to Rails JsonWebToken.expiration_time
+        Get expiration time for JWT access tokens (15 minutes from now)
+        Refresh tokens have separate expiration (7 days)
         """
-        return datetime.utcnow() + timedelta(hours=12)
+        return datetime.utcnow() + timedelta(minutes=15)
     
     @classmethod
     def create_user_token(cls, user) -> str:
@@ -83,6 +83,22 @@ class JWTService:
             'type': 'external_requester',
             'exp': cls.expiration_time(),
             'iat': datetime.utcnow()
+        }
+        return cls.encode(payload)
+    
+    @classmethod
+    def create_short_lived_token(cls, user) -> str:
+        """
+        Create a short-lived JWT access token (15 minutes)
+        Used with refresh token system
+        """
+        payload = {
+            'sub': str(user.id),
+            'email': user.email,
+            'name': user.get_full_name() or user.username,
+            'exp': cls.expiration_time(),
+            'iat': datetime.utcnow(),
+            'token_type': 'access'
         }
         return cls.encode(payload)
 

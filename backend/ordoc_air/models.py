@@ -291,6 +291,9 @@ class Document(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_documents')
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_documents')
     deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='deleted_documents')
+    
+    # Favorites
+    favorited_by = models.ManyToManyField(User, related_name='favorite_documents', blank=True, verbose_name="Favoritado por")
 
     # Process tracking
     enqueued_at = models.DateTimeField(null=True, blank=True)

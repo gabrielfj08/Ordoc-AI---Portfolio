@@ -11,6 +11,7 @@ from .views import (
     WorkflowAnalyticsViewSet, ProcedureDocumentViewSet, TaskAttachmentViewSet,
     WorkflowHistoryViewSet
 )
+from .api.notification_views import NotificationViewSet
 from .external_views import (
     ExternalProcedureViewSet, ExternalProcedureTemplateViewSet, ExternalTaskViewSet
 )
@@ -33,6 +34,7 @@ router.register(r'approval-instances', ApprovalInstanceViewSet, basename='approv
 # ViewSets para sistema de notificações
 router.register(r'notification-templates', NotificationTemplateViewSet, basename='notification-template')
 router.register(r'notification-logs', NotificationLogViewSet, basename='notification-log')
+router.register(r'notifications', NotificationViewSet, basename='notification')  # Nova API REST
 
 # ViewSets para documentos e anexos
 router.register(r'procedure-documents', ProcedureDocumentViewSet, basename='procedure-document')
@@ -49,7 +51,7 @@ app_name = 'ordoc_flow'
 
 urlpatterns = [
     # APIs REST
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
     
     # APIs específicas para usuários externos (OrdocCidadao)
     path('api/external/', include([

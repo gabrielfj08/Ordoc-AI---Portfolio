@@ -45,6 +45,7 @@ class UserResponse(models.TextChoices):
     ACCEPTED = 'accepted', 'Aceito'
     REJECTED = 'rejected', 'Rejeitado'
     MODIFIED = 'modified', 'Modificado'
+    DISMISSED = 'dismissed', 'Dispensado'
 
 
 class KnowledgeFeedback(models.Model):

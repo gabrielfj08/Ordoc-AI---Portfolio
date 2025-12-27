@@ -590,3 +590,100 @@ class AuditLog(models.Model):
             target_type=target_type,
             target_id=target_id,
         )
+
+
+class RefreshToken(models.Model):
+    """
+    Modelo para refresh tokens
+    Permite revogação e rotação de tokens para maior segurança
+    """
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token = models.CharField(max_length=255, unique=True, db_index=True)
+    user = models.ForeignKey(
+        OrdocUser,
+        on_delete=models.CASCADE,
+        related_name='refresh_tokens'
+    )
+    
+    # Metadata
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, null=True)
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Expiration
+    expires_at = models.DateTimeField()
+    
+    # Rotation tracking
+    replaced_by = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='replaced_tokens'
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Refresh Token"
+        verbose_name_plural = "Refresh Tokens"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['expires_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user} - {self.token[:20]}... (expires: {self.expires_at})"
+    
+    @property
+    def is_valid(self):
+        """Verifica se o token é válido"""
+        return (
+            self.is_active and
+            self.revoked_at is None and
+            timezone.now() < self.expires_at
+        )
+    
+    def revoke(self, reason=None):
+        """Revoga o refresh token"""
+        self.is_active = False
+        self.revoked_at = timezone.now()
+        self.revoked_reason = reason
+        self.save()
+    
+    @classmethod
+    def create_token(cls, user, ip_address=None, user_agent=None):
+        """Cria um novo refresh token"""
+        import secrets
+        from datetime import timedelta
+        
+        token = secrets.token_urlsafe(64)
+        expires_at = timezone.now() + timedelta(days=7)
+        
+        return cls.objects.create(
+            token=token,
+            user=user,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            expires_at=expires_at
+        )
+    
+    @classmethod
+    def cleanup_expired(cls):
+        """Remove tokens expirados (task periódica)"""
+        expired_tokens = cls.objects.filter(
+            expires_at__lt=timezone.now()
+        )
+        count = expired_tokens.count()
+        expired_tokens.delete()
+        return count
+

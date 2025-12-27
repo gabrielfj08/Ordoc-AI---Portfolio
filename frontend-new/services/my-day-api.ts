@@ -1,0 +1,152 @@
+import apiClient from './api-client'
+
+const ORDOC_FLOW_BASE = '/api/v1/ordoc-flow'
+const ORDOC_AIR_BASE = '/api/v1/ordoc-air'
+const ORDOC_SIGN_BASE = '/api/v1/ordoc-sign'
+
+export interface DashboardOverview {
+    total_documents: number
+    active_users: number
+    active_procedures: number
+    approval_rate: number
+    documents_change: string
+    users_change: string
+    procedures_change: string
+    approval_rate_change: string
+    procedure_stats: {
+        urgent: number
+        normal: number
+        completed: number
+        total: number
+    }
+    task_stats: {
+        urgent: number
+        normal: number
+        completed: number
+        total: number
+    }
+}
+
+export interface RecentDocument {
+    id: string
+    title: string
+    file_name: string
+    file_size: number
+    created_at: string
+    relevance_score?: number
+    is_starred?: boolean
+    document_type?: string
+}
+
+export interface ActiveWorkflow {
+    id: string
+    name: string
+    document_count: number
+    average_time_days: number
+    status: 'active' | 'paused'
+}
+
+export interface PendingSummary {
+    pending_signatures: number
+    pending_approvals: number
+}
+
+export const myDayApi = {
+    /**
+     * Get dashboard overview with all metrics
+     */
+    getDashboardOverview: async () => {
+        const response = await apiClient.get<DashboardOverview>(
+            `${ORDOC_FLOW_BASE}/dashboard/overview/`
+        )
+        return response.data
+    },
+
+    /**
+     * Get recent documents
+     */
+    getRecentDocuments: async (limit = 5) => {
+        const response = await apiClient.get<{ results: RecentDocument[] }>(
+            `${ORDOC_AIR_BASE}/documents/`,
+            {
+                params: {
+                    ordering: '-created_at',
+                    page_size: limit,
+                },
+            }
+        )
+        return response.data.results
+    },
+
+    /**
+     * Get active workflows with document counts
+     */
+    getActiveWorkflows: async (limit = 3) => {
+        const response = await apiClient.get<{ results: any[] }>(
+            `${ORDOC_FLOW_BASE}/procedures/`,
+            {
+                params: {
+                    status: 'running,started',
+                    ordering: '-created_at',
+                    page_size: limit,
+                },
+            }
+        )
+        
+        // Transform to ActiveWorkflow format
+        const workflows: ActiveWorkflow[] = response.data.results.map(proc => ({
+            id: proc.id,
+            name: proc.name || 'Workflow sem nome',
+            document_count: proc.document_count || 0,
+            average_time_days: proc.average_processing_time_days || 0,
+            status: proc.status === 'running' || proc.status === 'started' ? 'active' : 'paused',
+        }))
+        
+        return workflows
+    },
+
+    /**
+     * Get pending signatures and approvals count
+     */
+    getPendingSummary: async () => {
+        // Get pending signatures (using valid status values: pending and in_progress)
+        const signaturesResponse = await apiClient.get<{ count: number }>(
+            `${ORDOC_SIGN_BASE}/requests/`,
+            {
+                params: {
+                    status: 'pending,in_progress',
+                    page_size: 1,
+                },
+            }
+        )
+
+        // Get pending approvals (tasks assigned to current user)
+        const approvalsResponse = await apiClient.get<{ count: number }>(
+            `${ORDOC_FLOW_BASE}/tasks/`,
+            {
+                params: {
+                    status: 'running,started',
+                    page_size: 1,
+                },
+            }
+        )
+
+        return {
+            pending_signatures: signaturesResponse.data.count,
+            pending_approvals: approvalsResponse.data.count,
+        }
+    },
+
+    /**
+     * Get user info for greeting
+     */
+    getUserInfo: async () => {
+        const response = await apiClient.get<{
+            username: string
+            first_name: string
+            last_name: string
+            email: string
+        }>('/api/auth/me/')
+        return response.data
+    },
+}

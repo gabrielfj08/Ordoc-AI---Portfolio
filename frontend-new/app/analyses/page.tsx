@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { OrdocLogo } from "@/components/ordoc-logo"
+import { analysesApi, type IntelligenceAlert, type LearnedPattern, type AuditLog } from "@/services/analyses-api"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -117,17 +118,20 @@ function AnalisesView() {
           </div>
           <Button
             className="gap-2 rounded-full shadow-lg bg-gradient-to-r from-primary to-primary/80"
-            onClick={() => {
-              const csvData = `Período,Total de Documentos,Usuários Ativos,Taxa de Aprovação,Tempo Médio\n${timeRange},177,6,89%,1.3h`
-              const blob = new Blob([csvData], { type: 'text/csv' })
-              const url = window.URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url
-              a.download = `analises-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`
-              document.body.appendChild(a)
-              a.click()
-              document.body.removeChild(a)
-              window.URL.revokeObjectURL(url)
+            onClick={async () => {
+              try {
+                const blob = await analysesApi.exportAnalytics(timeRange, 'csv', 'documents')
+                const url = window.URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `analises-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                window.URL.revokeObjectURL(url)
+              } catch (error) {
+                console.error('Erro ao exportar:', error)
+              }
             }}
           >
             <Download className="size-4" />
@@ -171,46 +175,49 @@ interface AnalyticsProps {
 }
 
 function VisaoGeralAnalytics({ timeRange }: AnalyticsProps) {
+  const [loading, setLoading] = useState(true)
+  const [overview, setOverview] = useState<any>(null)
+  const [trends, setTrends] = useState<any[]>([])
+  const [heatmap, setHeatmap] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log('Carregando dados para período:', timeRange)
+        setLoading(true)
+        const [overviewData, trendsData, heatmapData] = await Promise.all([
+          analysesApi.getAnalyticsOverview(timeRange),
+          analysesApi.getDocumentTrends(timeRange),
+          analysesApi.getActivityHeatmap('7d')
+        ])
+        setOverview(overviewData)
+        setTrends(trendsData)
+        setHeatmap(heatmapData)
+        console.log('Dados carregados com sucesso para:', timeRange)
+      } catch (error) {
+        console.error('Erro ao carregar dados de análises:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [timeRange])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Carregando dados...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      {/* Métricas principais em destaque com tendências */}
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Total de Documentos", value: "177", change: "+12%", trend: "up", icon: FileText, target: "200" },
-          { label: "Usuários Ativos", value: "6", change: "+4%", trend: "up", icon: Users, target: "10" },
-          { label: "Taxa de Aprovação", value: "89%", change: "-2%", trend: "down", icon: Target, target: "95%" },
-          { label: "Tempo Médio", value: "1.3h", change: "-15%", trend: "up", icon: Clock, target: "1h" },
-        ].map((stat, i) => (
-          <Card
-            key={i}
-            className="p-6 hover:shadow-xl transition-all border-border/50 hover:border-primary/20 group cursor-pointer relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-600/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-orange-600/10 transition-colors" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-4">
-                <div className="size-12 rounded-2xl bg-orange-600/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <stat.icon className="size-6 text-primary" />
-                </div>
-                <Badge
-                  variant="secondary"
-                  className={`gap-1 font-semibold ${stat.trend === "up" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-                    }`}
-                >
-                  {stat.trend === "up" ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                  {stat.change}
-                </Badge>
-              </div>
-              <div className="text-3xl font-bold tracking-tight mb-1">{stat.value}</div>
-              <div className="text-sm text-muted-foreground mb-3">{stat.label}</div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Meta: {stat.target}</span>
-                <span className="text-primary font-semibold">Ver detalhes →</span>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
       {/* Métricas de Processos */}
       <ProcessMetrics timeRange={timeRange} />
 
@@ -348,18 +355,18 @@ function VisaoGeralAnalytics({ timeRange }: AnalyticsProps) {
           </div>
 
           {/* Insights abaixo do gráfico */}
-          <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-border/50">
+          <div className="grid grid-cols-3 gap-4 pt-4 border-t border-border/50">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">+45%</div>
-              <div className="text-xs text-muted-foreground mt-1">Crescimento previsto</div>
+              <div className="text-xs text-muted-foreground">Crescimento previsto</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">256</div>
-              <div className="text-xs text-muted-foreground mt-1">Previsão próx. mês</div>
+              <div className="text-xs text-muted-foreground">Previsão próx. mês</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-success">98%</div>
-              <div className="text-xs text-muted-foreground mt-1">Confiabilidade IA</div>
+              <div className="text-xs text-muted-foreground">Confiabilidade IA</div>
             </div>
           </div>
         </Card>
@@ -367,82 +374,40 @@ function VisaoGeralAnalytics({ timeRange }: AnalyticsProps) {
         {/* Sidebar com gráficos complementares */}
         <div className="space-y-6">
           <Card className="p-6 border-border/50">
-            <h3 className="font-bold mb-4 flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              Distribuição por Tipo
-            </h3>
-
-            <div className="relative size-48 mx-auto mb-6">
-              <svg className="size-full -rotate-90" viewBox="0 0 200 200">
-                {/* Gráfico de donut */}
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  fill="none"
-                  stroke="rgb(var(--primary))"
-                  strokeWidth="40"
-                  strokeDasharray="251.2 251.2"
-                  strokeDashoffset="0"
-                  opacity="0.2"
-                />
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  fill="none"
-                  stroke="rgb(var(--primary))"
-                  strokeWidth="40"
-                  strokeDasharray="157 94.2"
-                  strokeDashoffset="0"
-                  className="transition-all duration-1000"
-                />
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  fill="none"
-                  stroke="rgb(var(--chart-2))"
-                  strokeWidth="40"
-                  strokeDasharray="62.8 188.4"
-                  strokeDashoffset="-157"
-                  className="transition-all duration-1000"
-                />
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  fill="none"
-                  stroke="rgb(var(--chart-3))"
-                  strokeWidth="40"
-                  strokeDasharray="31.4 219.8"
-                  strokeDashoffset="-219.8"
-                  className="transition-all duration-1000"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold">177</div>
-                <div className="text-xs text-muted-foreground">Total</div>
-              </div>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold flex items-center gap-2">
+                <Sparkles className="size-4 text-primary" />
+                Distribuição por Tipo
+              </h3>
+              <div className="text-2xl font-bold text-primary">177</div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {[
-                { label: "Contratos", value: 98, percentage: 55, color: "primary" },
-                { label: "Propostas", value: 48, percentage: 27, color: "chart-2" },
-                { label: "Relatórios", value: 31, percentage: 18, color: "chart-3" },
+                { label: "Contratos", value: 98, percentage: 55, color: "bg-primary" },
+                { label: "Propostas", value: 48, percentage: 27, color: "bg-chart-2" },
+                { label: "Relatórios", value: 31, percentage: 18, color: "bg-chart-3" },
               ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`size-3 rounded-full bg-${item.color}`} />
-                    <span className="text-sm font-medium">{item.label}</span>
+                <div key={i} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{item.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold">{item.value}</span>
+                      <span className="text-xs text-muted-foreground">({item.percentage}%)</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold">{item.value}</span>
-                    <span className="text-xs text-muted-foreground">({item.percentage}%)</span>
+                  <div className="h-2 bg-secondary/30 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${item.color} rounded-full transition-all duration-1000`}
+                      style={{ width: `${item.percentage}%` }}
+                    />
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 pt-4 border-t text-center">
+              <div className="text-xs text-muted-foreground">Total de documentos processados</div>
             </div>
           </Card>
 
@@ -541,27 +506,44 @@ function VisaoGeralAnalytics({ timeRange }: AnalyticsProps) {
           </div>
 
           <div className="space-y-2">
-            {["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"].map((day, dayIndex) => (
-              <div key={day} className="flex items-center gap-2">
-                <div className="w-20 text-xs text-muted-foreground text-right">{day}</div>
+            {heatmap.length > 0 ? heatmap.map((dayData, dayIndex) => (
+              <div key={dayData.day} className="flex items-center gap-2">
+                <div className="w-20 text-xs text-muted-foreground text-right">{dayData.day}</div>
                 <div className="flex-1 flex gap-1">
-                  {Array.from({ length: 24 }).map((_, hourIndex) => {
-                    // Gera intensidade determinística baseada em índices
-                    const intensity = ((dayIndex * 24 + hourIndex) * 37 % 100) / 100
+                  {dayData.hours.map((count: number, hourIndex: number) => {
+                    const maxValue = 50 // Valor máximo esperado
+                    const intensity = Math.min(count / maxValue, 1)
                     return (
                       <div
                         key={hourIndex}
                         className="flex-1 h-6 rounded transition-all hover:scale-125 hover:z-10 cursor-pointer"
                         style={{
-                          backgroundColor: `rgb(var(--primary) / ${intensity * 0.8 + 0.1})`,
+                          backgroundColor: count > 0 
+                            ? `rgb(234 88 12 / ${intensity * 0.8 + 0.2})` 
+                            : 'rgb(var(--muted) / 0.3)',
                         }}
-                        title={`${day} ${hourIndex}:00 - ${Math.round(intensity * 50)} docs`}
+                        title={`${dayData.day} ${hourIndex}:00 - ${count} docs`}
                       />
                     )
                   })}
                 </div>
               </div>
-            ))}
+            )) : (
+              // Fallback se não houver dados
+              ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"].map((day, dayIndex) => (
+                <div key={day} className="flex items-center gap-2">
+                  <div className="w-20 text-xs text-muted-foreground text-right">{day}</div>
+                  <div className="flex-1 flex gap-1">
+                    {Array.from({ length: 24 }).map((_, hourIndex) => (
+                      <div
+                        key={hourIndex}
+                        className="flex-1 h-6 rounded bg-muted/20"
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
@@ -584,6 +566,41 @@ function VisaoGeralAnalytics({ timeRange }: AnalyticsProps) {
 }
 
 function InteligenciaAnalytics() {
+  const [loading, setLoading] = useState(true)
+  const [alerts, setAlerts] = useState<IntelligenceAlert[]>([])
+  const [patterns, setPatterns] = useState<LearnedPattern[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const [alertsData, patternsData] = await Promise.all([
+          analysesApi.getIntelligenceAlerts(10),
+          analysesApi.getLearnedPatterns(10)
+        ])
+        setAlerts(alertsData)
+        setPatterns(patternsData)
+      } catch (error) {
+        console.error('Erro ao carregar dados de inteligência:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-32 bg-muted animate-pulse rounded-lg" />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="h-64 bg-muted animate-pulse rounded-lg" />
+          <div className="h-64 bg-muted animate-pulse rounded-lg" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Card className="p-8 border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
@@ -597,12 +614,12 @@ function InteligenciaAnalytics() {
               Análises preditivas impulsionadas por IA para otimizar processos e antecipar demandas
             </p>
             <div className="flex items-center gap-3">
-              <Badge className="bg-success/10 text-success border-success/20 px-4 py-1.5">
-                <div className="size-2 rounded-full bg-success mr-2 animate-pulse" />
-                IA Ativa
-              </Badge>
-              <Badge variant="secondary">2 análises realizadas</Badge>
-              <Badge variant="secondary">Última atualização: agora</Badge>
+            <Badge className="bg-success/10 text-success border-success/20 px-4 py-1.5">
+              <div className="size-2 rounded-full bg-success mr-2 animate-pulse" />
+              IA Ativa
+            </Badge>
+            <Badge variant="secondary">{alerts.length} alertas ativos</Badge>
+            <Badge variant="secondary">{patterns.length} padrões aprendidos</Badge>
             </div>
           </div>
         </div>
@@ -610,89 +627,91 @@ function InteligenciaAnalytics() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Alertas Inteligentes */}
-        <Card className="p-6 border-border/50">
-          <h3 className="font-bold mb-4 flex items-center gap-2">
+        <Card className="p-5 border-border/50">
+          <h3 className="font-bold mb-2 flex items-center gap-2">
             <AlertCircle className="size-5 text-warning" />
             Alertas de Inteligência
           </h3>
-          <div className="space-y-3">
-            {[
-              {
-                title: "Pico de demanda detectado",
-                desc: "Esperado aumento de 35% em documentos nos próximos 7 dias",
-                severity: "high",
-                time: "5 min atrás",
-              },
-              {
-                title: "Gargalo identificado",
-                desc: "Processo de aprovação 40% mais lento que a média",
-                severity: "medium",
-                time: "1h atrás",
-              },
-              {
-                title: "Oportunidade de otimização",
-                desc: "3 processos podem ser automatizados, economia de 12h/semana",
-                severity: "low",
-                time: "3h atrás",
-              },
-            ].map((alert, i) => (
+          <div className="space-y-2">
+            {alerts.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <AlertCircle className="size-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nenhum alerta ativo no momento</p>
+              </div>
+            ) : alerts.slice(0, 3).map((alert, i) => (
               <div
-                key={i}
-                className={`p-4 rounded-xl border-2 ${alert.severity === "high"
-                  ? "border-destructive/20 bg-destructive/5"
-                  : alert.severity === "medium"
+                key={alert.id}
+                className={`p-3 rounded-xl border-2 ${
+                  alert.severity === "high"
+                    ? "border-destructive/20 bg-destructive/5"
+                    : alert.severity === "medium"
                     ? "border-warning/20 bg-warning/5"
                     : "border-primary/20 bg-orange-600/5"
-                  } hover:shadow-md transition-all cursor-pointer group`}
+                } hover:shadow-md transition-all cursor-pointer group`}
               >
                 <div className="flex items-start gap-3">
                   <div
-                    className={`size-2 rounded-full mt-1.5 ${alert.severity === "high"
-                      ? "bg-destructive"
-                      : alert.severity === "medium"
+                    className={`size-2 rounded-full mt-1 ${
+                      alert.severity === "high"
+                        ? "bg-destructive"
+                        : alert.severity === "medium"
                         ? "bg-warning"
                         : "bg-orange-600"
-                      } animate-pulse`}
+                    } animate-pulse`}
                   />
                   <div className="flex-1">
-                    <div className="font-semibold mb-1 group-hover:text-primary transition-colors">{alert.title}</div>
-                    <div className="text-sm text-muted-foreground mb-2">{alert.desc}</div>
-                    <div className="text-xs text-muted-foreground">{alert.time}</div>
+                    <div className="font-semibold mb-0.5 group-hover:text-primary transition-colors text-sm">
+                      {alert.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground mb-1">
+                      {alert.description}
+                    </div>
+                    <div className="text-xs text-muted-foreground opacity-70">
+                      {new Date(alert.created_at).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
-                  <ChevronRight className="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <ChevronRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               </div>
             ))}
           </div>
-          <Button variant="outline" className="w-full mt-4 rounded-full bg-transparent">
+          <Button variant="outline" className="w-full mt-2 rounded-full bg-transparent text-sm h-9">
             Ver todos os alertas
           </Button>
         </Card>
 
         {/* Padrões Aprendidos */}
-        <Card className="p-6 border-border/50">
-          <h3 className="font-bold mb-4 flex items-center gap-2">
+        <Card className="p-5 border-border/50">
+          <h3 className="font-bold mb-2 flex items-center gap-2">
             <Rocket className="size-5 text-primary" />
             Padrões Aprendidos
           </h3>
-          <div className="space-y-4">
-            {[
-              { pattern: "Horário de pico", value: "14h - 16h", confidence: 95 },
-              { pattern: "Dia mais ativo", value: "Terça-feira", confidence: 89 },
-              { pattern: "Tempo médio processamento", value: "1.3 horas", confidence: 92 },
-              { pattern: "Taxa de rejeição", value: "11%", confidence: 87 },
-            ].map((item, i) => (
-              <div key={i} className="space-y-2">
+          <div className="space-y-2">
+            {patterns.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Rocket className="size-10 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nenhum padrão aprendido ainda</p>
+              </div>
+            ) : patterns.slice(0, 4).map((item, i) => (
+              <div key={item.id} className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{item.pattern}</span>
+                  <span className="text-sm font-medium">{item.pattern_type}</span>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold">{item.value}</span>
+                    <span className="font-bold text-sm">{item.pattern_value}</span>
                     <Badge variant="secondary" className="text-xs">
-                      {item.confidence}% confiança
+                      {Math.round(item.confidence * 100)}% confiánça
                     </Badge>
                   </div>
                 </div>
-                <Progress value={item.confidence} className="h-2" />
+                <Progress value={item.confidence * 100} className="h-1.5" />
+                {item.description && (
+                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                )}
               </div>
             ))}
           </div>
@@ -700,8 +719,8 @@ function InteligenciaAnalytics() {
       </div>
 
       {/* Análise Preditiva com múltiplos cenários */}
-      <Card className="p-6 border-border/50">
-        <div className="mb-6">
+      <Card className="p-5 border-border/50">
+        <div className="mb-3">
           <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
             <TrendingUp className="size-5 text-primary" />
             Previsão Multivariada - Próximos 90 Dias
@@ -711,7 +730,7 @@ function InteligenciaAnalytics() {
           </p>
         </div>
 
-        <div className="h-96 relative">
+        <div className="h-64 relative">
           <svg className="w-full h-full" viewBox="0 0 1000 400" preserveAspectRatio="none">
             {/* Grid de fundo */}
             <g className="opacity-10">
@@ -789,7 +808,7 @@ function InteligenciaAnalytics() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/50">
+        <div className="grid grid-cols-3 gap-4 mt-3 pt-3 border-t border-border/50">
           {[
             { label: "Cenário Otimista", value: "+68%", color: "success", desc: "420 documentos" },
             { label: "Cenário Realista", value: "+45%", color: "primary", desc: "280 documentos" },
@@ -811,6 +830,78 @@ function InteligenciaAnalytics() {
 }
 
 function RelatoriosAnalytics() {
+  const [reportType, setReportType] = useState<'documents' | 'processes' | 'users' | 'performance'>('documents')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [format, setFormat] = useState<'csv' | 'pdf' | 'excel'>('csv')
+  const [loading, setLoading] = useState(false)
+  const [savedReports, setSavedReports] = useState<any[]>([])
+  const [scheduledReports, setScheduledReports] = useState<any[]>([])
+  const [loadingReports, setLoadingReports] = useState(true)
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoadingReports(true)
+        const [saved, scheduled] = await Promise.all([
+          analysesApi.getSavedReports(3),
+          analysesApi.getScheduledReports(3)
+        ])
+        setSavedReports(saved)
+        setScheduledReports(scheduled)
+      } catch (error) {
+        console.error('Erro ao carregar relatórios:', error)
+      } finally {
+        setLoadingReports(false)
+      }
+    }
+    fetchReports()
+  }, [])
+
+  const reportTypes = [
+    { id: 'documents', label: 'Documentos' },
+    { id: 'processes', label: 'Processos' },
+    { id: 'users', label: 'Usuários' },
+    { id: 'performance', label: 'Performance' }
+  ]
+
+  const formats = [
+    { id: 'csv', label: 'CSV' },
+    { id: 'excel', label: 'Excel' },
+    { id: 'pdf', label: 'PDF' }
+  ]
+
+  const handleGenerateReport = async () => {
+    if (!startDate || !endDate) {
+      alert('Por favor, selecione as datas de início e fim')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const blob = await analysesApi.generateReport({
+        report_type: reportType,
+        format: format,
+        start_date: new Date(startDate).toISOString(),
+        end_date: new Date(endDate).toISOString()
+      })
+      
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `relatorio_${reportType}_${startDate}_${endDate}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error)
+      alert('Erro ao gerar relatório. Verifique os parâmetros e tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-3">
@@ -824,13 +915,18 @@ function RelatoriosAnalytics() {
             <div>
               <label className="text-sm font-semibold mb-2 block">Tipo de Relatório</label>
               <div className="grid grid-cols-2 gap-3">
-                {["Documentos", "Processos", "Usuários", "Performance"].map((type) => (
+                {reportTypes.map((type) => (
                   <Button
-                    key={type}
-                    variant="outline"
-                    className="rounded-xl hover:bg-orange-600/5 hover:border-primary/30 bg-transparent"
+                    key={type.id}
+                    variant={reportType === type.id ? 'default' : 'outline'}
+                    className={`rounded-xl ${
+                      reportType === type.id
+                        ? 'bg-orange-600 hover:bg-orange-600/90'
+                        : 'hover:bg-orange-600/5 hover:border-primary/30 bg-transparent'
+                    }`}
+                    onClick={() => setReportType(type.id as any)}
                   >
-                    {type}
+                    {type.label}
                   </Button>
                 ))}
               </div>
@@ -839,62 +935,160 @@ function RelatoriosAnalytics() {
             <div>
               <label className="text-sm font-semibold mb-2 block">Período</label>
               <div className="flex gap-3">
-                <Input type="date" className="rounded-xl" />
-                <Input type="date" className="rounded-xl" />
+                <Input
+                  type="date"
+                  className="rounded-xl"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  max={endDate || undefined}
+                />
+                <Input
+                  type="date"
+                  className="rounded-xl"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate || undefined}
+                />
               </div>
             </div>
 
             <div>
               <label className="text-sm font-semibold mb-2 block">Formato de Exportação</label>
               <div className="flex gap-3">
-                {["PDF", "Excel", "CSV"].map((format) => (
+                {formats.map((fmt) => (
                   <Button
-                    key={format}
-                    variant="outline"
+                    key={fmt.id}
+                    variant={format === fmt.id ? 'default' : 'outline'}
                     size="sm"
-                    className="rounded-full hover:bg-orange-600/5 hover:border-primary/30 bg-transparent"
+                    className={`rounded-full ${
+                      format === fmt.id
+                        ? 'bg-orange-600 hover:bg-orange-600/90'
+                        : 'hover:bg-orange-600/5 hover:border-primary/30 bg-transparent'
+                    }`}
+                    onClick={() => setFormat(fmt.id as any)}
                   >
-                    {format}
+                    {fmt.label}
                   </Button>
                 ))}
               </div>
             </div>
 
-            <Button className="w-full gap-2 rounded-full shadow-lg mt-6">
-              <Download className="size-4" />
-              Gerar Relatório
+            <Button
+              className="w-full gap-2 rounded-full shadow-lg mt-6"
+              onClick={handleGenerateReport}
+              disabled={loading || !startDate || !endDate}
+            >
+              {loading ? (
+                <>
+                  <div className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Download className="size-4" />
+                  Gerar Relatório
+                </>
+              )}
             </Button>
           </div>
         </Card>
 
         <div className="space-y-6">
           <Card className="p-6 border-border/50">
-            <h3 className="font-bold mb-4">Relatórios Salvos</h3>
-            <div className="text-center p-8 rounded-xl bg-muted/30 border border-dashed border-border">
-              <FileText className="size-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Nenhum relatório salvo</p>
-            </div>
+            <h3 className="font-bold mb-4 flex items-center gap-2">
+              <FileText className="size-5 text-primary" />
+              Relatórios Salvos
+            </h3>
+            {loadingReports ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+                ))}
+              </div>
+            ) : savedReports.length === 0 ? (
+              <div className="text-center p-8 rounded-xl bg-muted/30 border border-dashed border-border">
+                <FileText className="size-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Nenhum relatório salvo</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {savedReports.map((report) => (
+                  <div
+                    key={report.id}
+                    className="p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <div className="font-semibold text-sm group-hover:text-primary transition-colors">
+                        {report.title}
+                      </div>
+                      <Badge variant="secondary" className="text-xs uppercase">
+                        {report.format}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <div>
+                        {new Date(report.created_at).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                      {report.metadata?.ai_insight && (
+                        <div className="flex items-center gap-1 text-primary">
+                          <Sparkles className="size-3" />
+                          <span>{report.metadata.ai_insight}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           <Card className="p-6 border-border/50">
-            <h3 className="font-bold mb-4">Relatórios Agendados</h3>
-            <div className="space-y-3">
-              {[
-                { name: "Relatório Mensal", freq: "Mensal", next: "1 Jan 2026" },
-                { name: "Dashboard Semanal", freq: "Semanal", next: "29 Dez 2025" },
-              ].map((report, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-all cursor-pointer"
-                >
-                  <div className="font-semibold text-sm mb-1">{report.name}</div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{report.freq}</span>
-                    <span>Próximo: {report.next}</span>
+            <h3 className="font-bold mb-4 flex items-center gap-2">
+              <Clock className="size-5 text-primary" />
+              Relatórios Agendados
+            </h3>
+            {loadingReports ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+                ))}
+              </div>
+            ) : scheduledReports.length === 0 ? (
+              <div className="text-center p-8 rounded-xl bg-muted/30 border border-dashed border-border">
+                <Clock className="size-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Nenhum relatório agendado</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {scheduledReports.map((schedule) => (
+                  <div
+                    key={schedule.id}
+                    className="p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-all cursor-pointer"
+                  >
+                    <div className="font-semibold text-sm mb-1">{schedule.name}</div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {schedule.frequency}
+                        </Badge>
+                        <span className="uppercase">{schedule.default_format}</span>
+                      </div>
+                      <span>
+                        Próximo: {new Date(schedule.next_run).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: 'short'
+                        })}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>
@@ -903,8 +1097,123 @@ function RelatoriosAnalytics() {
 }
 
 function AuditoriaAnalytics() {
+  const [loading, setLoading] = useState(true)
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [aiSummary, setAiSummary] = useState<any>(null)
+  const [showFilters, setShowFilters] = useState(false)
+  
+  // Filtros
+  const [filterType, setFilterType] = useState<string>('')
+  const [filterAction, setFilterAction] = useState<string>('')
+  const [filterSearch, setFilterSearch] = useState<string>('')
+  const [filterStartDate, setFilterStartDate] = useState<string>('')
+  const [filterEndDate, setFilterEndDate] = useState<string>('')
+  const [selectedLog, setSelectedLog] = useState<any>(null)
+
+  const fetchLogs = async () => {
+    try {
+      setLoading(true)
+      const params: any = { limit: 20, offset: 0 }
+      
+      if (filterType) params.type = filterType
+      if (filterAction) params.action = filterAction
+      if (filterSearch) params.search = filterSearch
+      if (filterStartDate) params.start_date = new Date(filterStartDate).toISOString()
+      if (filterEndDate) params.end_date = new Date(filterEndDate).toISOString()
+      
+      const data = await analysesApi.getAuditLogs(params.limit, params.offset, params)
+      setLogs(data.results)
+      setTotalCount(data.count)
+      setAiSummary(data.ai_summary)
+    } catch (error) {
+      console.error('Erro ao carregar logs de auditoria:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchLogs()
+  }, [filterType, filterAction, filterSearch, filterStartDate, filterEndDate])
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-24 bg-muted animate-pulse rounded-lg" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      {/* Insights de IA */}
+      {aiSummary && (
+        <Card className={`p-5 border-2 ${
+          aiSummary.status === 'critical' ? 'border-destructive/30 bg-destructive/5' :
+          aiSummary.status === 'warning' ? 'border-warning/30 bg-warning/5' :
+          'border-success/30 bg-success/5'
+        }`}>
+          <div className="flex items-start gap-4">
+            <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${
+              aiSummary.status === 'critical' ? 'bg-destructive/20' :
+              aiSummary.status === 'warning' ? 'bg-warning/20' :
+              'bg-success/20'
+            }`}>
+              <Sparkles className={`size-6 ${
+                aiSummary.status === 'critical' ? 'text-destructive' :
+                aiSummary.status === 'warning' ? 'text-warning' :
+                'text-success'
+              }`} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold mb-1">Análise de IA - Segurança do Sistema</h4>
+              <p className="text-sm text-muted-foreground mb-3">{aiSummary.message}</p>
+              {aiSummary.recommendations && aiSummary.recommendations.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold">Recomendações:</p>
+                  <ul className="text-xs text-muted-foreground space-y-0.5">
+                    {aiSummary.recommendations.map((rec: string, i: number) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <ChevronRight className="size-3" />
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            {aiSummary.type_counts && (
+              <div className="flex gap-3">
+                <div className="text-center">
+                  <div className="size-8 rounded-lg bg-success/20 flex items-center justify-center mb-1">
+                    <span className="text-xs font-bold text-success">{aiSummary.type_counts.success}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Sucesso</span>
+                </div>
+                <div className="text-center">
+                  <div className="size-8 rounded-lg bg-warning/20 flex items-center justify-center mb-1">
+                    <span className="text-xs font-bold text-warning">{aiSummary.type_counts.warning}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Avisos</span>
+                </div>
+                <div className="text-center">
+                  <div className="size-8 rounded-lg bg-destructive/20 flex items-center justify-center mb-1">
+                    <span className="text-xs font-bold text-destructive">{aiSummary.type_counts.error}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">Erros</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       <Card className="p-6 border-border/50">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -914,50 +1223,123 @@ function AuditoriaAnalytics() {
             </h3>
             <p className="text-sm text-muted-foreground">Registro imutável de todas as ações críticas do sistema</p>
           </div>
-          <Button variant="outline" className="gap-2 rounded-full bg-transparent">
+          <Button
+            variant="outline"
+            className="gap-2 rounded-full bg-transparent"
+            onClick={() => setShowFilters(!showFilters)}
+          >
             <Filter className="size-4" />
-            Filtrar
+            {showFilters ? 'Ocultar' : 'Filtrar'}
           </Button>
         </div>
 
+        {/* Filtros */}
+        {showFilters && (
+          <div className="mb-6 p-4 rounded-xl bg-muted/30 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold mb-2 block">Buscar</label>
+                <Input
+                  placeholder="Usuário, ação ou recurso..."
+                  value={filterSearch}
+                  onChange={(e) => setFilterSearch(e.target.value)}
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-2 block">Tipo</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"
+                >
+                  <option value="">Todos os tipos</option>
+                  <option value="success">Sucesso</option>
+                  <option value="warning">Aviso</option>
+                  <option value="error">Erro</option>
+                  <option value="info">Info</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-semibold mb-2 block">Categoria</label>
+                <select
+                  value={filterAction}
+                  onChange={(e) => setFilterAction(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"
+                >
+                  <option value="">Todas as categorias</option>
+                  <option value="documento">Documento</option>
+                  <option value="usuario">Usuário</option>
+                  <option value="processo">Processo</option>
+                  <option value="sistema">Sistema</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-2 block">Data Início</label>
+                <Input
+                  type="date"
+                  value={filterStartDate}
+                  onChange={(e) => setFilterStartDate(e.target.value)}
+                  max={filterEndDate || undefined}
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-2 block">Data Fim</label>
+                <Input
+                  type="date"
+                  value={filterEndDate}
+                  onChange={(e) => setFilterEndDate(e.target.value)}
+                  min={filterStartDate || undefined}
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => {
+                  setFilterType('')
+                  setFilterAction('')
+                  setFilterSearch('')
+                  setFilterStartDate('')
+                  setFilterEndDate('')
+                }}
+              >
+                Limpar Filtros
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {totalCount} registro{totalCount !== 1 ? 's' : ''} encontrado{totalCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
-          {[
-            {
-              action: "Documento assinado",
-              user: "Ricardo Ferreira",
-              resource: "Contrato_Final.pdf",
-              time: "2 min atrás",
-              type: "success",
-            },
-            {
-              action: "Usuário autenticado",
-              user: "Maria Silva",
-              resource: "Sistema",
-              time: "15 min atrás",
-              type: "info",
-            },
-            {
-              action: "Processo aprovado",
-              user: "João Santos",
-              resource: "Processo #872",
-              time: "1h atrás",
-              type: "success",
-            },
-            {
-              action: "Tentativa de acesso negada",
-              user: "IP: 192.168.1.100",
-              resource: "Admin Panel",
-              time: "3h atrás",
-              type: "warning",
-            },
-          ].map((log, i) => (
+          {logs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Shield className="size-12 mx-auto mb-2 opacity-50" />
+              <p>Nenhum log de auditoria disponível</p>
+            </div>
+          ) : logs.map((log, i) => (
             <div
-              key={i}
+              key={log.id}
               className="flex items-center gap-4 p-4 rounded-xl hover:bg-secondary/30 transition-all cursor-pointer border border-transparent hover:border-border/50"
             >
               <div
-                className={`size-2 rounded-full ${log.type === "success" ? "bg-success" : log.type === "warning" ? "bg-warning" : "bg-orange-600"
-                  } shrink-0`}
+                className={`size-2 rounded-full ${
+                  log.type === "success" 
+                    ? "bg-success" 
+                    : log.type === "warning" 
+                    ? "bg-warning" 
+                    : log.type === "error"
+                    ? "bg-destructive"
+                    : "bg-orange-600"
+                } shrink-0`}
               />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-sm mb-1">{log.action}</div>
@@ -966,7 +1348,14 @@ function AuditoriaAnalytics() {
                   <span>•</span>
                   <span>{log.resource}</span>
                   <span>•</span>
-                  <span>{log.time}</span>
+                  <span>
+                    {new Date(log.timestamp).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
                 </div>
               </div>
               <Button variant="ghost" size="icon" className="shrink-0">

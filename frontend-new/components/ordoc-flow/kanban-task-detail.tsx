@@ -40,7 +40,19 @@ export default function TaskDetailSidebar({
   onDuplicate,
   columns,
 }: TaskDetailSidebarProps) {
-  const [editedTask, setEditedTask] = useState<Task>({ ...task })
+  // Mapeamento defensivo para suportar o modelo do backend e o modelo do Kanban genérico
+  const getInitialTask = (t: Task): Task => ({
+    ...t,
+    title: t.title || (t as any).name || 'Tarefa sem título',
+    description: t.description || '',
+    status: t.status || 'draft',
+    dueDate: t.dueDate || (t as any).deadline || undefined,
+    subtasks: t.subtasks || [],
+    customFields: t.customFields || [],
+    createdAt: t.createdAt || (t as any).created_at || new Date().toISOString(),
+  })
+
+  const [editedTask, setEditedTask] = useState<Task>(getInitialTask(task))
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("")
@@ -51,13 +63,13 @@ export default function TaskDetailSidebar({
 
   // Sincronizar editedTask quando task prop mudar
   useEffect(() => {
-    setEditedTask({ ...task })
+    setEditedTask(getInitialTask(task))
     // Resetar estados de edição ao trocar de task
     setIsEditingTitle(false)
     setIsEditingDescription(false)
     setIsAddingSubtask(false)
     setIsAddingCustomField(false)
-  }, [task.id]) // Usar task.id como dependência para detectar mudança de card
+  }, [task.id, task.status]) // Adicionado task.status para reagir ao arraste no Kanban
 
   const handleTitleSave = () => {
     if (editedTask.title.trim()) {
@@ -172,7 +184,7 @@ export default function TaskDetailSidebar({
   return (
     <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white  shadow-lg border-l  z-50 flex flex-col">
       <div className="flex items-center justify-between p-4 border-b ">
-        <h2 className="text-lg font-semibold ">Task Details</h2>
+        <h2 className="text-lg font-semibold ">Detalhes da Tarefa</h2>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-5 w-5" />
         </Button>
@@ -191,7 +203,7 @@ export default function TaskDetailSidebar({
                 />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleTitleSave}>
-                    Save
+                    Salvar
                   </Button>
                   <Button
                     size="sm"
@@ -199,7 +211,7 @@ export default function TaskDetailSidebar({
                     onClick={() => setIsEditingTitle(false)}
                     className=" "
                   >
-                    Cancel
+                    Cancelar
                   </Button>
                 </div>
               </div>
@@ -218,11 +230,11 @@ export default function TaskDetailSidebar({
             <label className="text-sm font-medium text-gray-700  block mb-1">Status</label>
             <Select value={editedTask.status} onValueChange={handleStatusChange}>
               <SelectTrigger className="  ">
-                <SelectValue placeholder="Select status" />
+                <SelectValue placeholder="Selecione o status" />
               </SelectTrigger>
               <SelectContent className=" ">
                 {columns.map((column) => (
-                  <SelectItem key={column.id} value={column.title}>
+                  <SelectItem key={column.id} value={column.id}>
                     {column.title}
                   </SelectItem>
                 ))}
@@ -232,7 +244,7 @@ export default function TaskDetailSidebar({
 
           {/* Due Date */}
           <div>
-            <label className="text-sm font-medium text-gray-700  block mb-1">Due Date</label>
+            <label className="text-sm font-medium text-gray-700  block mb-1">Prazo</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -240,7 +252,7 @@ export default function TaskDetailSidebar({
                   className="w-full justify-start text-left font-normal   "
                 >
                   <Calendar className="mr-2 h-4 w-4" />
-                  {editedTask.dueDate ? formatDate(editedTask.dueDate) : <span>Pick a date</span>}
+                  {editedTask.dueDate ? formatDate(editedTask.dueDate) : <span>Selecione uma data</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0  " align="start">
@@ -258,10 +270,10 @@ export default function TaskDetailSidebar({
           {/* Description */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium text-gray-700 ">Description</label>
+              <label className="text-sm font-medium text-gray-700 ">Descrição</label>
               {!isEditingDescription && (
                 <Button variant="ghost" size="sm" onClick={() => setIsEditingDescription(true)}>
-                  <Edit className="h-3 w-3 mr-1" /> Edit
+                  <Edit className="h-3 w-3 mr-1" /> Editar
                 </Button>
               )}
             </div>
@@ -271,13 +283,13 @@ export default function TaskDetailSidebar({
                 <Textarea
                   value={editedTask.description || ""}
                   onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-                  placeholder="Add a description..."
+                  placeholder="Adicione uma descrição..."
                   rows={4}
                   className="  "
                 />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleDescriptionSave}>
-                    Save
+                    Salvar
                   </Button>
                   <Button
                     size="sm"
@@ -285,13 +297,13 @@ export default function TaskDetailSidebar({
                     onClick={() => setIsEditingDescription(false)}
                     className=" "
                   >
-                    Cancel
+                    Cancelar
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="text-sm text-gray-600  bg-gray-50  p-3 rounded-md min-h-[60px]">
-                {editedTask.description || "No description provided."}
+                {editedTask.description || "Nenhuma descrição fornecida."}
               </div>
             )}
           </div>
@@ -301,9 +313,9 @@ export default function TaskDetailSidebar({
           {/* Subtasks */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-medium text-gray-700 ">Subtasks</h4>
+              <h4 className="text-sm font-medium text-gray-700 ">Subtarefas</h4>
               <Button variant="ghost" size="sm" onClick={() => setIsAddingSubtask(true)}>
-                <Plus className="h-3 w-3 mr-1" /> Add
+                <Plus className="h-3 w-3 mr-1" /> Adicionar
               </Button>
             </div>
 
@@ -312,12 +324,12 @@ export default function TaskDetailSidebar({
                 <Input
                   value={newSubtaskTitle}
                   onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                  placeholder="Subtask title"
+                  placeholder="Título da subtarefa"
                   className="  "
                 />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={addSubtask}>
-                    Add
+                    Adicionar
                   </Button>
                   <Button
                     size="sm"
@@ -325,7 +337,7 @@ export default function TaskDetailSidebar({
                     onClick={() => setIsAddingSubtask(false)}
                     className=" "
                   >
-                    Cancel
+                    Cancelar
                   </Button>
                 </div>
               </div>
@@ -333,7 +345,7 @@ export default function TaskDetailSidebar({
 
             <div className="space-y-2">
               {editedTask.subtasks.length === 0 ? (
-                <p className="text-sm text-gray-500 ">No subtasks yet.</p>
+                <p className="text-sm text-gray-500 ">Nenhuma subtarefa ainda.</p>
               ) : (
                 editedTask.subtasks.map((subtask) => (
                   <div
@@ -378,9 +390,9 @@ export default function TaskDetailSidebar({
           {/* Custom Fields */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-medium text-gray-700 ">Custom Fields</h4>
+              <h4 className="text-sm font-medium text-gray-700 ">Campos Personalizados</h4>
               <Button variant="ghost" size="sm" onClick={() => setIsAddingCustomField(true)}>
-                <Plus className="h-3 w-3 mr-1" /> Add
+                <Plus className="h-3 w-3 mr-1" /> Adicionar
               </Button>
             </div>
 
@@ -390,19 +402,19 @@ export default function TaskDetailSidebar({
                   <Input
                     value={newCustomFieldName}
                     onChange={(e) => setNewCustomFieldName(e.target.value)}
-                    placeholder="Field name"
+                    placeholder="Nome do campo"
                     className="  "
                   />
                   <Input
                     value={newCustomFieldValue}
                     onChange={(e) => setNewCustomFieldValue(e.target.value)}
-                    placeholder="Field value"
+                    placeholder="Valor do campo"
                     className="  "
                   />
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={addCustomField}>
-                    Add
+                    Adicionar
                   </Button>
                   <Button
                     size="sm"
@@ -410,7 +422,7 @@ export default function TaskDetailSidebar({
                     onClick={() => setIsAddingCustomField(false)}
                     className=" "
                   >
-                    Cancel
+                    Cancelar
                   </Button>
                 </div>
               </div>
@@ -418,7 +430,7 @@ export default function TaskDetailSidebar({
 
             <div className="space-y-2">
               {editedTask.customFields.length === 0 ? (
-                <p className="text-sm text-gray-500 ">No custom fields yet.</p>
+                <p className="text-sm text-gray-500 ">Nenhum campo personalizado ainda.</p>
               ) : (
                 editedTask.customFields.map((field) => (
                   <div
@@ -455,27 +467,27 @@ export default function TaskDetailSidebar({
           className="flex-1  "
           onClick={handleDuplicateTask}
         >
-          <Copy className="h-4 w-4 mr-2" /> Duplicate
+          <Copy className="h-4 w-4 mr-2" /> Duplicar
         </Button>
 
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" className="flex-1">
-              <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+              <Trash2 className="h-4 w-4 mr-2" /> Excluir Tarefa
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent className=" ">
             <AlertDialogHeader>
-              <AlertDialogTitle className="">Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle className="">Tem certeza?</AlertDialogTitle>
               <AlertDialogDescription className="">
-                This action cannot be undone. This will permanently delete the task and all its subtasks.
+                Esta ação não pode ser desfeita. Isso excluirá permanentemente a tarefa e todas as suas subtarefas.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel className="  ">
-                Cancel
+                Cancelar
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteTask}>Delete</AlertDialogAction>
+              <AlertDialogAction onClick={handleDeleteTask}>Excluir</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

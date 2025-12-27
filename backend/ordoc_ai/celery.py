@@ -84,6 +84,17 @@ app.conf.beat_schedule = {
         'schedule': crontab(hour=2, minute=0),  # 02:00 todos os dias
         'options': {'expires': 86400}  # Expira em 24h
     },
+    
+    # ========================================
+    # NOTIFICAÇÕES
+    # ========================================
+    
+    # Notifications: Verificar prazos próximos (a cada hora)
+    'notifications-check-deadlines-hourly': {
+        'task': 'ordoc_flow.tasks.check_approaching_deadlines',
+        'schedule': crontab(minute=0),  # A cada hora cheia
+        'options': {'expires': 3600}  # Expira em 1h
+    },
 }
 
 

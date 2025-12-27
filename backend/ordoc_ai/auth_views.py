@@ -8,13 +8,14 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from ordoc_cloud.models import OrdocUser
+from ordoc_cloud.models import OrdocUser, RefreshToken
 from ordoc_flow.models import ExternalRequester
 from ordoc_air.models import Organization
 from .jwt_service import JWTService
 from .password_validator import PasswordValidator
 from django.db import transaction
 from django.contrib.auth.hashers import check_password
+from django.utils import timezone
 import logging
 import requests
 from django.conf import settings
@@ -200,11 +201,21 @@ def login_internal_user(email: str, password: str, organization: Organization = 
         # Reset failed attempts on successful login
         ordoc_user.reset_failed_attempts()
         
-        # Generate JWT token
-        token = ordoc_user.get_token()
+        # Generate access token (short-lived)
+        access_token = JWTService.create_short_lived_token(user)
+        
+        # Create refresh token (long-lived)
+        refresh_token = RefreshToken.create_token(
+            user=ordoc_user,
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
         
         return Response({
-            'token': token,
+            'access_token': access_token,
+            'refresh_token': refresh_token.token,
+            'token_type': 'Bearer',
+            'expires_in': 900,  # 15 minutos em segundos
             'user': {
                 'id': str(user.id),
                 'username': user.username,
@@ -220,7 +231,6 @@ def login_internal_user(email: str, password: str, organization: Organization = 
                 'name': organization.corporate_name,
                 'subdomain': organization.subdomain,
             } if organization else None,
-            'expires_at': JWTService.expiration_time().isoformat(),
         })
         
     except Exception as e:
@@ -376,11 +386,27 @@ def login_external_requester(email: str, password: str, organization: Organizati
 def logout(request):
     """
     User logout endpoint
-    Equivalent to Rails AuthenticationController#destroy
-    
-    Note: Since we're using stateless JWT, logout is handled client-side
-    by removing the token. Server-side token blacklisting could be added later.
+    Revokes all refresh tokens for the user
     """
+    try:
+        user = request.user
+        if user and user.is_authenticated:
+            ordoc_user = user.ordoc_profile
+            
+            # Revoke all active refresh tokens
+            RefreshToken.objects.filter(
+                user=ordoc_user,
+                is_active=True
+            ).update(
+                is_active=False,
+                revoked_at=timezone.now(),
+                revoked_reason='logout'
+            )
+            
+            logger.info(f"User {user.email} logged out, all tokens revoked")
+    except Exception as e:
+        logger.exception("Error during logout")
+    
     return Response({
         'message': 'Logged out successfully',
         'status': 200
@@ -391,53 +417,68 @@ def logout(request):
 @permission_classes([AllowAny])
 def refresh_token(request):
     """
-    Refresh JWT token
+    Refresh access token using refresh token
+    Implements token rotation for security
     """
-    token = request.data.get('token')
-    if not token:
+    refresh_token_str = request.data.get('refresh_token')
+    if not refresh_token_str:
         return Response({
-            'error': 'Token is required',
+            'error': 'Refresh token is required',
             'status': 400
         }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        # Decode current token
-        token_data = JWTService.decode(token)
+        # Find refresh token
+        refresh_token_obj = RefreshToken.objects.get(token=refresh_token_str)
         
-        # Check if it's an external requester or internal user
-        if 'subject' in token_data and token_data.get('type') == 'external_requester':
-            # External requester token refresh
-            requester = ExternalRequester.objects.get(id=token_data['subject'])
-            new_token = requester.get_token()
-        elif 'sub' in token_data:
-            # Internal user token refresh
-            user = User.objects.get(id=token_data['sub'])
-            ordoc_user = user.ordoc_profile
-            new_token = ordoc_user.get_token()
-        else:
-            raise Exception('Invalid token format')
+        # Validate token
+        if not refresh_token_obj.is_valid:
+            return Response({
+                'error': 'Invalid or expired refresh token',
+                'status': 401
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Get user
+        user = refresh_token_obj.user.user
+        
+        # Create new access token
+        new_access_token = JWTService.create_short_lived_token(user)
+        
+        # Rotate refresh token (revoke old, create new)
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        
+        new_refresh_token = RefreshToken.create_token(
+            user=refresh_token_obj.user,
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
+        
+        # Mark old token as replaced
+        refresh_token_obj.replaced_by = new_refresh_token
+        refresh_token_obj.revoke(reason='rotated')
+        
+        # Log refresh event
+        logger.info(f"Token refreshed for user {user.email} from IP {client_ip}")
         
         return Response({
-            'token': new_token,
-            'expires_at': JWTService.expiration_time().isoformat(),
+            'access_token': new_access_token,
+            'refresh_token': new_refresh_token.token,
+            'token_type': 'Bearer',
+            'expires_in': 900,  # 15 minutos
         })
         
-    except (User.DoesNotExist, OrdocUser.DoesNotExist, ExternalRequester.DoesNotExist):
+    except RefreshToken.DoesNotExist:
         return Response({
-            'error': 'User not found',
-            'status': 404
-        }, status=status.HTTP_404_NOT_FOUND)
-    except JWTError as e:
-        return Response({
-            'error': str(e),
+            'error': 'Invalid refresh token',
             'status': 401
         }, status=status.HTTP_401_UNAUTHORIZED)
     except Exception as e:
         logger.exception("Unexpected error during token refresh")
         return Response({
             'error': 'Token refresh failed',
-            'status': 401
-        }, status=status.HTTP_401_UNAUTHORIZED)
+            'status': 500
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])

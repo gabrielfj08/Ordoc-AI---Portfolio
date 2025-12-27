@@ -174,3 +174,72 @@ def reindex_all_workflow_data(organization=None):
     except Exception as e:
         logger.error(f"Erro durante reindexação em massa: {str(e)}")
         raise
+
+
+# ============================================================================
+# NOTIFICATION SIGNALS
+# ============================================================================
+
+@receiver(post_save, sender=Task)
+def notify_task_assigned(sender, instance, created, **kwargs):
+    """
+    Notifica quando uma tarefa é atribuída a alguém
+    """
+    # Só notificar se a tarefa tem assignee e não foi criada pelo próprio assignee
+    if instance.assignee and instance.assignee != instance.created_by:
+        try:
+            from ordoc_flow.notification_service import NotificationService
+            NotificationService.notify_task_assigned(
+                task=instance,
+                assignee=instance.assignee
+            )
+            logger.info(f"Task assignment notification sent to {instance.assignee.user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send task assignment notification: {e}")
+
+
+@receiver(post_save, sender='ordoc_flow.ApprovalInstance')
+def notify_approval_requested(sender, instance, created, **kwargs):
+    """
+    Notifica quando uma aprovação é solicitada
+    """
+    if created and instance.approver:
+        try:
+            from ordoc_flow.notification_service import NotificationService
+            NotificationService.notify_approval_requested(
+                approval_instance=instance,
+                approver=instance.approver
+            )
+            logger.info(f"Approval notification sent to {instance.approver.user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send approval notification: {e}")
+
+
+@receiver(post_save, sender='ordoc_flow.ApprovalInstance')
+def notify_approval_status_changed(sender, instance, created, **kwargs):
+    """
+    Notifica quando status de aprovação muda (não no create)
+    """
+    if not created and instance.pk:
+        try:
+            from ordoc_flow.models import ApprovalInstance
+            from ordoc_flow.notification_service import NotificationService
+            
+            # Buscar instância anterior para comparar
+            old_instance = ApprovalInstance.objects.filter(pk=instance.pk).first()
+            if old_instance and old_instance.status != instance.status and instance.status in ['approved', 'rejected']:
+                # Notificar quem solicitou a aprovação
+                if hasattr(instance, 'requested_by') and instance.requested_by:
+                    subject = f"Aprovação {instance.get_status_display()}"
+                    body = f"Sua solicitação de aprovação foi {instance.get_status_display().lower()}."
+                    
+                    NotificationService.send_notification(
+                        recipient=instance.requested_by,
+                        subject=subject,
+                        body=body,
+                        notification_type='approval',
+                        related_object=instance
+                    )
+                    logger.info(f"Approval status notification sent to {instance.requested_by.user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send approval status notification: {e}")

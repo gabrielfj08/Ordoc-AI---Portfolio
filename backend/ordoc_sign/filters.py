@@ -1,4 +1,5 @@
 import django_filters
+from django_filters import BaseInFilter
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -66,10 +67,28 @@ class SignatureTemplateFilter(django_filters.FilterSet):
         ]
 
 
+class StatusInFilter(BaseInFilter, django_filters.CharFilter):
+    """Custom filter para aceitar múltiplos valores de status separados por vírgula"""
+    
+    def filter(self, qs, value):
+        if not value:
+            return qs
+        
+        # Validar que todos os valores são status válidos
+        valid_statuses = [choice[0] for choice in SignatureRequest.STATUS_CHOICES]
+        values = [v.strip() for v in value if v.strip() in valid_statuses]
+        
+        if not values:
+            return qs.none()  # Se nenhum valor válido, retorna queryset vazio
+        
+        # Usar __in lookup para filtrar múltiplos valores
+        return qs.filter(**{f'{self.field_name}__in': values})
+
+
 class SignatureRequestFilter(django_filters.FilterSet):
     """Filtros para solicitações de assinatura"""
     
-    status = django_filters.ChoiceFilter(choices=SignatureRequest.STATUS_CHOICES)
+    status = StatusInFilter(field_name='status')
     priority = django_filters.ChoiceFilter(choices=SignatureRequest.PRIORITY_CHOICES)
     is_expired = django_filters.BooleanFilter(method='filter_is_expired')
     expires_soon = django_filters.NumberFilter(method='filter_expires_soon')

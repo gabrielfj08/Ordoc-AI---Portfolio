@@ -95,13 +95,7 @@ class ProcedureFilter(django_filters.FilterSet):
     process_number = django_filters.CharFilter(lookup_expr='icontains')
     procedure_template_name = django_filters.CharFilter(lookup_expr='icontains')
     source = django_filters.CharFilter(lookup_expr='icontains')
-    status = django_filters.ChoiceFilter(choices=[
-        ('draft', 'Rascunho'),
-        ('running', 'Em execução'),
-        ('started', 'Iniciado'),
-        ('finished', 'Finalizado'),
-        ('archived', 'Arquivado')
-    ])
+    status = django_filters.BaseInFilter(field_name='status', lookup_expr='in')
     priority = django_filters.ChoiceFilter(choices=[
         ('normal', 'Normal'),
         ('high', 'Alta')
@@ -158,14 +152,7 @@ class TaskFilter(django_filters.FilterSet):
     
     name = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
-    status = django_filters.ChoiceFilter(choices=[
-        ('draft', 'Rascunho'),
-        ('running', 'Em execução'),
-        ('started', 'Iniciado'),
-        ('finished', 'Finalizado'),
-        ('refused', 'Recusado'),
-        ('returned', 'Devolvido')
-    ])
+    status = django_filters.BaseInFilter(field_name='status', lookup_expr='in')
     priority = django_filters.ChoiceFilter(choices=[
         ('normal', 'Normal'),
         ('high', 'Alta')

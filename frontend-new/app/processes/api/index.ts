@@ -14,7 +14,7 @@ import type {
     CommentResponse,
 } from '../types'
 
-const BASE_URL = '/api/v1/ordoc-flow/api'
+const BASE_URL = '/api/v1/ordoc-flow'
 
 // ===========================
 // PROCEDURES API
