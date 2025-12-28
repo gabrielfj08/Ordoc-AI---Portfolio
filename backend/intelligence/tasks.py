@@ -1158,3 +1158,34 @@ def analyze_audit_patterns():
         
     except Exception as e:
         logger.exception(f"Erro na análise de padrões de auditoria: {e}")
+
+
+@shared_task
+def recalculate_behavior_scores():
+    """
+    Recalcula os scores de comportamento para todos os usuários ativos.
+    Executado periodicamente via Celery Beat (Horário).
+    """
+    from django.contrib.auth import get_user_model
+    from .services.ranking_service import RankingService
+    
+    User = get_user_model()
+    service = RankingService()
+    
+    # Processar apenas usuários ativos (limitados para evitar overhead excessivo)
+    # Em produção, pode ser paginado ou processado por organização
+    active_users = User.objects.filter(is_active=True).order_by('-last_login')[:1000]
+    
+    success_count = 0
+    error_count = 0
+    
+    for user in active_users:
+        try:
+            service.calculate_user_scores(user)
+            success_count += 1
+        except Exception as e:
+            logger.error(f"Erro ao calcular scores para {user.username}: {e}")
+            error_count += 1
+            
+    logger.info(f"Recálculo de scores concluído: {success_count} sucessos, {error_count} falhas")
+    return {"success": success_count, "errors": error_count}

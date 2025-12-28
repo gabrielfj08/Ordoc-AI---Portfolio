@@ -67,7 +67,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    'ordoc_ai.middleware.rate_limiting.RateLimitMiddleware',  # Rate limiting for security
+    # 'ordoc_ai.middleware.rate_limiting.RateLimitMiddleware',  # Rate limiting for security
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

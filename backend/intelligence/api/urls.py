@@ -9,7 +9,9 @@ from .views import (
     AlertViewSet,
     FeedbackViewSet,
     PatternViewSet,
-    AnalysisViewSet
+    AnalysisViewSet,
+    RankingViewSet,
+    LanguageModelStatusView
 )
 
 app_name = 'intelligence'
@@ -19,9 +21,11 @@ router.register(r'alerts', AlertViewSet, basename='alert')
 router.register(r'feedback', FeedbackViewSet, basename='feedback')
 router.register(r'patterns', PatternViewSet, basename='pattern')
 router.register(r'analyses', AnalysisViewSet, basename='analysis')
+router.register(r'ranking', RankingViewSet, basename='ranking')
 
 urlpatterns = [
     path('analyze/', AnalyzeDocumentView.as_view(), name='analyze'),
     path('extract/', QuickExtractView.as_view(), name='extract'),
+    path('status/', LanguageModelStatusView.as_view(), name='status'),
     path('', include(router.urls)),
 ]

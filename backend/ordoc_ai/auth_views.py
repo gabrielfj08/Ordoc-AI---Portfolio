@@ -290,14 +290,41 @@ def me(request):
                 ordoc_user.language = data['language']
             if 'timezone' in data:
                 ordoc_user.timezone = data['timezone']
+            
+            # Update view_mode with permission check
+            if 'view_mode' in data:
+                new_view_mode = data['view_mode']
+                
+                # Check if user has permission for team view
+                if new_view_mode == 'team':
+                    has_permission = ordoc_user.roles.filter(
+                        role__in=['admin', 'organization_manager', 'department_manager'],
+                        is_active=True
+                    ).exists()
+                    
+                    if not has_permission:
+                        return Response({
+                            'error': 'Você não tem permissão para acessar a Visão da Equipe',
+                            'status': 403
+                        }, status=status.HTTP_403_FORBIDDEN)
+                
+                ordoc_user.view_mode = new_view_mode
+            
             # Add other fields as needed
             
             ordoc_user.save()
             
             logger.info(f"User profile updated for {user.email}")
+
         
         # Get user's organization (if any)
         organization = ordoc_user.organization if hasattr(ordoc_user, 'organization') else None
+        
+        # Check if user can access team view
+        can_access_team_view = ordoc_user.roles.filter(
+            role__in=['admin', 'organization_manager', 'department_manager'],
+            is_active=True
+        ).exists()
         
         # Return user data in the same format as login
         return Response({
@@ -316,6 +343,8 @@ def me(request):
                 'language': ordoc_user.language,
                 'timezone': ordoc_user.timezone,
                 'profile_complete': ordoc_user.profile_complete,
+                'view_mode': ordoc_user.view_mode,
+                'can_access_team_view': can_access_team_view,
                 'permissions': [],  # TODO: Implement permissions
             },
             'organization': {
@@ -324,6 +353,7 @@ def me(request):
                 'subdomain': organization.subdomain,
             } if organization else None,
         })
+
         
     except Exception as e:
         logger.exception("Error in /api/auth/me/ endpoint")

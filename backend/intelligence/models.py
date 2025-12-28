@@ -385,3 +385,50 @@ class DocumentAnalysis(models.Model):
     
     def __str__(self):
         return f"Analysis {self.document_id} ({self.status})"
+
+
+class UserBehaviorScore(models.Model):
+    """
+    Stores behavior-based relevance scores for entities per user.
+    
+    Scores are calculated based on hierarchical weights:
+    - User (Pessoal): 60%
+    - Department: 20%
+    - Organization: 15%
+    - Sector: 5%
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Target
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='behavior_scores'
+    )
+    
+    # Entity reference
+    entity_type = models.CharField(max_length=100, db_index=True)
+    entity_id = models.UUIDField(db_index=True)
+    
+    # Scores
+    score = models.FloatField(default=0.0, db_index=True)
+    
+    # Weighted components (stored for debugging/traceability)
+    personal_score = models.FloatField(default=0.0)
+    department_score = models.FloatField(default=0.0)
+    organization_score = models.FloatField(default=0.0)
+    sector_score = models.FloatField(default=0.0)
+    
+    # Metadata
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'User Behavior Score'
+        verbose_name_plural = 'User Behavior Scores'
+        unique_together = ['user', 'entity_type', 'entity_id']
+        indexes = [
+            models.Index(fields=['user', 'entity_type', 'score']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.entity_type} {self.entity_id} ({self.score})"

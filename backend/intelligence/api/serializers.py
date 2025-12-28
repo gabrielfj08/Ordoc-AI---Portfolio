@@ -8,6 +8,7 @@ from ..models import (
     LearnedPattern,
     ProactiveAlert,
     DocumentAnalysis,
+    UserBehaviorScore,
     KnowledgeLayer,
     AlertSeverity,
     AlertType,
@@ -147,3 +148,15 @@ class AnalysisResultSerializer(serializers.Serializer):
     deliberation = serializers.DictField(required=False)
     alerts = ProactiveAlertSerializer(many=True, required=False)
     processing_time_ms = serializers.FloatField()
+
+
+class UserBehaviorScoreSerializer(serializers.ModelSerializer):
+    """Serializer for behavior scores."""
+    
+    class Meta:
+        model = UserBehaviorScore
+        fields = [
+            'entity_type', 'entity_id', 'score', 
+            'personal_score', 'department_score', 
+            'organization_score', 'sector_score', 'last_updated'
+        ]

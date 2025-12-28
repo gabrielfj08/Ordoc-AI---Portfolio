@@ -31,6 +31,13 @@ app.conf.beat_schedule = {
         'options': {'expires': 3600}  # Expira em 1h se não executar
     },
 
+    # Intelligence: Recálculo de scores de comportamento (ranqueamento) (a cada hora)
+    'intelligence-behavior-ranking-hourly': {
+        'task': 'intelligence.tasks.recalculate_behavior_scores',
+        'schedule': crontab(minute=0),  # A cada hora cheia
+        'options': {'expires': 3600}  # Expira em 1h
+    },
+
     # ========================================
     # ANÁLISE PROATIVA
     # ========================================

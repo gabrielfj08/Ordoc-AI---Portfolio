@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('ordoc_air', '0008_add_storage_key'),
+        ('ordoc_air', '0007_add_missing_document_fields'),
     ]
 
     operations = [

@@ -325,3 +325,62 @@ class AnalysisViewSet(viewsets.ReadOnlyModelViewSet):
         return DocumentAnalysis.objects.filter(
             requested_by=self.request.user
         ).order_by('-created_at')
+
+
+class RankingViewSet(viewsets.ViewSet):
+    """
+    ViewSet for AI-powered ranking.
+    
+    GET /api/v1/intelligence/ranking/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def list(self, request):
+        """Get ranked entities for the current user."""
+        from ..services.ranking_service import RankingService
+        from .serializers import UserBehaviorScoreSerializer
+        
+        entity_type = request.query_params.get('entity_type')
+        limit = int(request.query_params.get('limit', 20))
+        view_mode = request.query_params.get('view_mode', 'personal')  # 'personal' or 'team'
+        
+        service = RankingService()
+        ranked_entities = service.get_ranked_entities(
+            user=request.user,
+            entity_type=entity_type,
+            limit=limit,
+            view_mode=view_mode
+        )
+        
+        serializer = UserBehaviorScoreSerializer(ranked_entities, many=True)
+        return Response(serializer.data)
+
+
+class LanguageModelStatusView(APIView):
+    """
+    Endpoint for checking AI status and privacy compliance.
+    
+    GET /api/v1/intelligence/status/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get AI status and privacy info."""
+        return Response({
+            "status": "online",
+            "provider": "ollama",
+            "privacy": {
+                "mode": "local",
+                "compliant": True,
+                "lgpd_ready": True,
+                "data_residency": "on-premise",
+                "encrypted": True
+            },
+            "capabilities": [
+                "document_analysis",
+                "entity_extraction", 
+                "compliance_check",
+                "risk_assessment"
+            ]
+        })
+

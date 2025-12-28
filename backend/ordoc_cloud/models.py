@@ -84,6 +84,19 @@ class OrdocUser(models.Model):
     language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default='pt-BR', verbose_name="Idioma")
     timezone = models.CharField(max_length=50, default='America/Sao_Paulo', verbose_name="Fuso horário")
     email_notifications = models.BooleanField(default=True, verbose_name="Notificações por email")
+    
+    # View mode preference
+    VIEW_MODE_CHOICES = [
+        ('personal', 'Minha Visão'),
+        ('team', 'Visão da Equipe'),
+    ]
+    view_mode = models.CharField(
+        max_length=20,
+        choices=VIEW_MODE_CHOICES,
+        default='personal',
+        verbose_name="Modo de Visualização"
+    )
+
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
