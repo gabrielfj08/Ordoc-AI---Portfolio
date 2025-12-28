@@ -6,25 +6,31 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
-    Brain, 
-    AlertCircle, 
-    AlertTriangle, 
-    Info, 
+import {
+    Brain,
+    AlertCircle,
+    AlertTriangle,
+    Info,
     XOctagon,
     ChevronRight,
     CheckCircle,
-    X
+    X,
+    Sparkles
 } from 'lucide-react'
 import { alertsApi, type Alert } from '@/services/intelligence-api'
 import { useToast } from '@/hooks/use-toast'
+
+import { useMyDayStore } from '@/stores/my-day-store'
+import { PrivacyBadge } from '@/components/common/privacy-badge'
 
 export function AIAlertsWidget() {
     const router = useRouter()
     const [alerts, setAlerts] = useState<Alert[]>([])
     const [loading, setLoading] = useState(true)
     const [unreadCount, setUnreadCount] = useState(0)
+    const [showExample, setShowExample] = useState(true)
     const { toast } = useToast()
+    const privacyMode = useMyDayStore(state => state.privacyMode)
 
     const fetchAlerts = async () => {
         try {
@@ -150,44 +156,63 @@ export function AIAlertsWidget() {
                         <Brain className="size-6 text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-lg flex items-center gap-2">
-                            Alertas de IA
-                            {unreadCount > 0 && (
-                                <Badge variant="destructive" className="size-6 rounded-full flex items-center justify-center p-0 text-xs">
-                                    {unreadCount > 9 ? '9+' : unreadCount}
-                                </Badge>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                Recomendações da IA
+                                {unreadCount > 0 && (
+                                    <Badge variant="destructive" className="size-6 rounded-full flex items-center justify-center p-0 text-xs text-white">
+                                        {unreadCount > 9 ? '9+' : unreadCount}
+                                    </Badge>
+                                )}
+                            </h3>
+                            {privacyMode?.mode === 'local' && (
+                                <PrivacyBadge className="bg-purple-100 text-purple-700 border-purple-200" collapsed />
                             )}
-                        </h3>
+                        </div>
                         <p className="text-xs text-muted-foreground">Insights automáticos</p>
                     </div>
                 </div>
-                {alerts.length > 0 && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleMarkAllAsRead}
-                        className="text-xs"
-                    >
-                        Marcar tudo como lido
-                    </Button>
-                )}
             </div>
 
-            {alerts.length === 0 ? (
-                <div className="text-center py-8">
-                    <div className="size-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
-                        <CheckCircle className="size-8 text-success" />
+            {/* Nova Recomendação Fixa/Exemplo */}
+            {showExample && (
+                <div className="mb-6 p-4 rounded-xl bg-white/50 dark:bg-purple-900/10 border border-purple-200/50 dark:border-purple-800/50 relative group/rec">
+                    <button
+                        onClick={() => setShowExample(false)}
+                        className="absolute top-2 right-2 size-6 rounded-full flex items-center justify-center opacity-0 group-hover/rec:opacity-100 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-400 transition-all"
+                    >
+                        <X className="size-3.5" />
+                    </button>
+
+                    <h4 className="font-bold text-purple-700 dark:text-purple-400 text-sm mb-2 flex items-center gap-2">
+                        <Sparkles className="size-4" />
+                        Padrão detectado
+                    </h4>
+                    <p className="text-sm text-purple-600 dark:text-purple-300 mb-4 leading-relaxed">
+                        80% dos documentos como <span className="font-semibold italic">"Contrato_*.pdf"</span> são categorizados como <span className="font-semibold text-purple-800 dark:text-purple-200">"Fornecedores"</span>. Quer aplicar automaticamente?
+                    </p>
+                    <div className="flex gap-2">
+                        <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex-1">
+                            Aplicar sempre
+                        </Button>
+                        <Button variant="outline" size="sm" className="border-purple-300 text-purple-600 hover:bg-purple-50 rounded-lg flex-1">
+                            Só desta vez
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg"
+                            onClick={() => setShowExample(false)}
+                        >
+                            Ignorar
+                        </Button>
                     </div>
-                    <p className="font-semibold text-success-foreground mb-1">
-                        Nenhum alerta pendente
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        Todos os documentos estão processados corretamente
-                    </p>
                 </div>
-            ) : (
+            )}
+
+            {alerts.length > 0 && (
                 <>
-                    <ScrollArea className="h-[300px] pr-4">
+                    <ScrollArea className="h-[200px] pr-4">
                         <div className="space-y-3">
                             {alerts.map(alert => (
                                 <div
@@ -234,9 +259,9 @@ export function AIAlertsWidget() {
                     </ScrollArea>
 
                     <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="w-full mt-4 rounded-full gap-2"
+                        className="w-full mt-4 rounded-full gap-2 text-purple-600"
                         onClick={() => router.push('/intelligence/alerts')}
                     >
                         Ver todos os alertas

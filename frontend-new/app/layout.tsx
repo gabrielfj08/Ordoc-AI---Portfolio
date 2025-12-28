@@ -2,9 +2,9 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { MainHeader } from "./components/main-header"
-import { AuthProvider } from "@/contexts/auth-context"
-import { NotificationProvider } from "@/contexts/notification-context"
-import { AlertsProvider } from "@/contexts/alerts-context"
+import { QueryProvider } from "@/components/providers/query-provider"
+import { AuthInitializer } from "@/components/providers/auth-initializer"
+import { NotificationsProvider } from "@/components/providers/notifications-provider"
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -20,11 +20,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR">
-      <body className={inter.className}>
-        <AuthProvider>
-          <NotificationProvider>
-            <AlertsProvider>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
+        <QueryProvider>
+          <AuthInitializer>
+            <NotificationsProvider>
               <MainHeader />
               {children}
 
@@ -34,9 +34,9 @@ export default function RootLayout({
               </button>
 
               <Toaster />
-            </AlertsProvider>
-          </NotificationProvider>
-        </AuthProvider>
+            </NotificationsProvider>
+          </AuthInitializer>
+        </QueryProvider>
       </body>
     </html>
   )

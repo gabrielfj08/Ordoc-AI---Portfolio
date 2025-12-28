@@ -1,7 +1,10 @@
-export function OrdocLogo({ className = "" }: { className?: string }) {
+export function OrdocLogo({ className = "", size }: { className?: string; size?: number }) {
+  const iconSize = size || 32
+  const iconClass = size ? `w-[${size}px] h-[${size}px]` : "size-8"
+  
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <div className="size-8 rounded-lg bg-primary flex items-center justify-center">
+      <div className={`${iconClass} rounded-lg bg-primary flex items-center justify-center`}>
         <svg
           viewBox="0 0 24 24"
           fill="none"

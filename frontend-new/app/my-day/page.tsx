@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { AIAlertsWidget } from "@/components/intelligence/ai-alerts-widget"
 import { PriorityTasksWidget } from "@/components/tasks/priority-tasks-widget"
+import { ContinueWorkingWidget } from "@/components/my-day/continue-working-widget"
+import { TeamViewWidget } from "@/components/my-day/team-view-widget"
+import dynamic from 'next/dynamic'
+
+const AssistantWidget = dynamic(() => import("@/components/my-day/assistant-widget").then(mod => ({ default: mod.AssistantWidget })), { ssr: false })
 import { DocumentPreviewTooltip } from "@/components/document-preview-tooltip"
 import {
     FileText,
@@ -40,17 +45,33 @@ import {
     Search,
 } from "lucide-react"
 import { myDayApi, type DashboardOverview, type RecentDocument, type ActiveWorkflow, type PendingSummary } from "@/services/my-day-api"
+import { rankingApi, type RankedEntity } from "@/services/ranking-api"
+import { useMyDayStore, selectSortedDocuments, selectIsRankingEnabled, selectDocumentRankings } from "@/stores/my-day-store"
+import { CardControls } from "@/components/my-day/card-controls"
 
 export default function MeuDiaPage() {
     const router = useRouter()
-    const [loading, setLoading] = useState(true)
-    const [overview, setOverview] = useState<DashboardOverview | null>(null)
-    const [recentDocs, setRecentDocs] = useState<RecentDocument[]>([])
-    const [workflows, setWorkflows] = useState<ActiveWorkflow[]>([])
-    const [pending, setPending] = useState<PendingSummary>({ pending_signatures: 0, pending_approvals: 0 })
-    const [userName, setUserName] = useState("")
+
+    // Zustand store
+    const {
+        overview,
+        recentDocuments,
+        activeWorkflows,
+        pending,
+        userName,
+        isLoading,
+        isRankingEnabled,
+        documentRankings,
+        procedureRankings,
+        viewMode,
+        fetchDashboardData,
+        toggleRanking,
+        privacyMode,
+    } = useMyDayStore()
+
+    // Local UI state (filters, pagination)
     const [docsPage, setDocsPage] = useState(1)
-    const docsPerPage = 10
+    const docsPerPage = 5
     const [showDocsFilters, setShowDocsFilters] = useState(false)
     const [docsFilters, setDocsFilters] = useState({
         search: '',
@@ -63,32 +84,12 @@ export default function MeuDiaPage() {
         status: 'all' as 'all' | 'active' | 'paused',
     })
 
+    // Fetch data on mount
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true)
-                const [overviewData, docsData, workflowsData, pendingData, userInfo] = await Promise.all([
-                    myDayApi.getDashboardOverview(),
-                    myDayApi.getRecentDocuments(30), // Buscar mais para permitir paginação
-                    myDayApi.getActiveWorkflows(3),
-                    myDayApi.getPendingSummary(),
-                    myDayApi.getUserInfo(),
-                ])
-                setOverview(overviewData)
-                setRecentDocs(docsData)
-                setWorkflows(workflowsData)
-                setPending(pendingData)
-                setUserName(userInfo.first_name || userInfo.username)
-            } catch (error) {
-                console.error('Erro ao carregar dados:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
+        fetchDashboardData()
 
-        fetchData()
-        // Atualizar a cada 5 minutos
-        const interval = setInterval(fetchData, 300000)
+        // Refresh every 5 minutes
+        const interval = setInterval(fetchDashboardData, 300000)
         return () => clearInterval(interval)
     }, [])
 
@@ -109,7 +110,7 @@ export default function MeuDiaPage() {
     }
 
     // Filtrar documentos
-    const filteredDocs = recentDocs.filter(doc => {
+    const filteredDocs = recentDocuments.filter((doc: RecentDocument) => {
         // Filtro de busca
         if (docsFilters.search) {
             const searchLower = docsFilters.search.toLowerCase()
@@ -123,7 +124,7 @@ export default function MeuDiaPage() {
             const docDate = new Date(doc.created_at)
             const now = new Date()
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-            
+
             if (docsFilters.dateRange === 'today') {
                 if (docDate < today) return false
             } else if (docsFilters.dateRange === 'week') {
@@ -149,11 +150,16 @@ export default function MeuDiaPage() {
         return true
     })
 
+    // Ordenar documentos por ranking da IA (se habilitado)
+    const sortedDocs = isRankingEnabled && documentRankings.length > 0
+        ? rankingApi.sortByRanking(filteredDocs, documentRankings)
+        : filteredDocs
+
     // Resetar página quando filtros mudarem
     const resetPage = () => setDocsPage(1)
 
     // Filtrar workflows
-    const filteredWorkflows = workflows.filter(workflow => {
+    const filteredWorkflows = activeWorkflows.filter((workflow: ActiveWorkflow) => {
         // Filtro de busca
         if (workflowsFilters.search) {
             const searchLower = workflowsFilters.search.toLowerCase()
@@ -169,7 +175,12 @@ export default function MeuDiaPage() {
         return true
     })
 
-    if (loading && !overview) {
+    // Ordenar workflows por ranking da IA (se habilitado)
+    const sortedWorkflows = isRankingEnabled && procedureRankings.length > 0
+        ? rankingApi.sortByRanking(filteredWorkflows, procedureRankings)
+        : filteredWorkflows
+
+    if (isLoading && !overview) {
         return (
             <div className="container mx-auto p-6 max-w-[1600px]">
                 <div className="space-y-8">
@@ -187,15 +198,23 @@ export default function MeuDiaPage() {
         <div className="container mx-auto p-6 max-w-[1600px]">
             <div className="space-y-8 animate-in fade-in duration-500">
                 {/* Header com saudação + Card Assistente lado a lado */}
-                <div className="grid lg:grid-cols-2 gap-6 items-start">
+                <div className="grid lg:grid-cols-2 gap-6 items-center">
                     {/* Coluna esquerda - Saudação */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Clock className="size-4" />
                             <span style={{ textTransform: 'capitalize' }}>{formatDate()}</span>
                         </div>
-                        <h1 className="text-5xl font-bold tracking-tight text-balance bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text">
-                            {getGreeting()}, {userName || 'Usuário'}
+                        <h1 className="text-5xl font-bold tracking-tight text-balance flex items-center flex-wrap gap-4">
+                            <span className="bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+                                {getGreeting()}, {userName || 'Usuário'}
+                            </span>
+                            {viewMode === 'team' && (
+                                <Badge variant="secondary" className="text-lg py-1 px-3 border-primary/20 bg-primary/5 text-primary">
+                                    <Users className="size-5 mr-2" />
+                                    Visão da Equipe
+                                </Badge>
+                            )}
                         </h1>
                         <p className="text-base text-muted-foreground">
                             Você tem{" "}
@@ -218,48 +237,10 @@ export default function MeuDiaPage() {
                         </div>
                     </div>
 
-                    {/* Coluna direita - Card Assistente */}
-                    <Card className="p-4 border-orange-300 bg-gradient-to-br from-orange-400 to-orange-500 text-white">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="size-10 rounded-lg bg-white shadow-md flex items-center justify-center">
-                                    <Sparkles className="size-5 text-orange-600" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-base">Assistente</h3>
-                                    <p className="text-xs text-white/90">Análise de documentos e processos em andamento.</p>
-                                </div>
-                            </div>
-                            <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">Atualizado agora</Badge>
-                        </div>
-
-                        {/* Estatísticas e Ações lado a lado */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 rounded-lg border border-white/30 bg-white/10">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <BarChart3 className="size-3.5 text-white" />
-                                    <span className="text-xs font-semibold text-white">Estatísticas da semana</span>
-                                </div>
-                                <p className="text-xs text-white/90">
-                                    <span className="font-bold text-white">{overview?.total_documents || 0}</span> docs processados • <span className="font-bold text-white">{overview?.approval_rate || 0}%</span> aprovados de primeira
-                                </p>
-                            </div>
-
-                            {/* Ações rápidas */}
-                            <div className="p-3 rounded-lg border border-white/30 bg-white/10">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <AlertCircle className="size-3.5 text-white" />
-                                    <span className="text-xs font-semibold text-white">Ações rápidas</span>
-                                </div>
-                                <p className="text-xs text-white/90">
-                                    {pending.pending_signatures === 0 && pending.pending_approvals === 0
-                                        ? "Todos os documentos estão em dia. Continue o bom trabalho!"
-                                        : `${pending.pending_signatures + pending.pending_approvals} aç${pending.pending_signatures + pending.pending_approvals > 1 ? 'ões' : 'ão'} pendente${pending.pending_signatures + pending.pending_approvals > 1 ? 's' : ''}`
-                                    }
-                                </p>
-                            </div>
-                        </div>
-                    </Card>
+                    {/* Coluna direita - Assistente Ordoc Premium */}
+                    <div className="w-full">
+                        <AssistantWidget overview={overview} pending={pending} privacyMode={privacyMode} />
+                    </div>
                 </div>
 
                 {/* Métricas principais */}
@@ -400,12 +381,12 @@ export default function MeuDiaPage() {
                                             : 0}%
                                     </span>
                                 </div>
-                                <Progress 
+                                <Progress
                                     value={overview?.procedure_stats?.total
                                         ? ((overview.procedure_stats.completed || 0) / overview.procedure_stats.total) * 100
                                         : 0
-                                    } 
-                                    className="h-3" 
+                                    }
+                                    className="h-3"
                                 />
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <span>
@@ -416,7 +397,10 @@ export default function MeuDiaPage() {
                             </div>
                         </Card>
 
-                        {/* Documentos Recentes - Continuará no próximo arquivo devido ao tamanho */}
+                        {/* Continue de onde parou */}
+                        <ContinueWorkingWidget />
+
+                        {/* Documentos Recentes */}
                         <Card className="p-6 border-border/50 shadow-sm">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
@@ -427,9 +411,9 @@ export default function MeuDiaPage() {
                                     <p className="text-sm text-muted-foreground mt-1">Acesso rápido aos seus arquivos</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button 
-                                        variant={showDocsFilters ? "default" : "ghost"} 
-                                        size="sm" 
+                                    <Button
+                                        variant={showDocsFilters ? "default" : "ghost"}
+                                        size="sm"
                                         className="rounded-full gap-2"
                                         onClick={() => setShowDocsFilters(!showDocsFilters)}
                                     >
@@ -439,9 +423,21 @@ export default function MeuDiaPage() {
                                             <span className="ml-1 size-2 rounded-full bg-primary-foreground" />
                                         )}
                                     </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                    {documentRankings.length > 0 && (
+                                        <Button
+                                            variant={isRankingEnabled ? "default" : "outline"}
+                                            size="sm"
+                                            className="rounded-full gap-2"
+                                            onClick={() => toggleRanking()}
+                                        >
+                                            <Sparkles className="size-4" />
+                                            Ranking IA
+                                        </Button>
+                                    )}
+                                    <CardControls cardId="documents" cardTitle="Documentos Recentes" />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         className="rounded-full gap-2 text-primary"
                                         onClick={() => router.push('/documents')}
                                     >
@@ -557,85 +553,85 @@ export default function MeuDiaPage() {
 
                                     {/* Resultado da filtragem */}
                                     <div className="text-xs text-muted-foreground pt-2 border-t">
-                                        {filteredDocs.length} documento{filteredDocs.length !== 1 ? 's' : ''} encontrado{filteredDocs.length !== 1 ? 's' : ''}
+                                        {sortedDocs.length} documento{sortedDocs.length !== 1 ? 's' : ''} encontrado{sortedDocs.length !== 1 ? 's' : ''}
                                     </div>
                                 </div>
                             )}
 
                             <div className="space-y-0.5">
-                                {filteredDocs.length === 0 ? (
+                                {sortedDocs.length === 0 ? (
                                     <div className="text-center py-8 text-muted-foreground">
                                         <FileText className="size-12 mx-auto mb-2 opacity-50" />
                                         <p>{(docsFilters.search || docsFilters.dateRange !== 'all' || docsFilters.fileType !== 'all') ? 'Nenhum documento encontrado' : 'Nenhum documento recente'}</p>
                                     </div>
-                                ) : filteredDocs.slice((docsPage - 1) * docsPerPage, docsPage * docsPerPage).map((doc) => (
+                                ) : sortedDocs.slice((docsPage - 1) * docsPerPage, docsPage * docsPerPage).map((doc) => (
                                     <DocumentPreviewTooltip key={doc.id} document={doc}>
                                         <div
                                             onClick={() => router.push(`/documents/${doc.id}`)}
                                             className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-all group cursor-pointer border border-transparent hover:border-border/50"
                                         >
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="size-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                        >
-                                            {doc.is_starred ? <Star className="size-3.5 fill-warning text-warning" /> : <Star className="size-3.5" />}
-                                        </Button>
-                                        <div className="size-9 rounded-lg bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                            <FileText className="size-5 text-destructive" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                                                {doc.file_name || doc.title}
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                            >
+                                                {doc.is_starred ? <Star className="size-3.5 fill-warning text-warning" /> : <Star className="size-3.5" />}
+                                            </Button>
+                                            <div className="size-9 rounded-lg bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                <FileText className="size-5 text-destructive" />
                                             </div>
-                                            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
-                                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                                    {doc.file_name?.split('.').pop()?.toUpperCase() || 'PDF'}
-                                                </Badge>
-                                                <span>{(doc.file_size / 1024 / 1024).toFixed(1)} MB</span>
-                                                <span>•</span>
-                                                <span>
-                                                    {new Date(doc.created_at).toLocaleString('pt-BR', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </span>
-                                                {doc.relevance_score && (
-                                                    <>
-                                                        <span>•</span>
-                                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-success/10 text-success">
-                                                            {Math.round(doc.relevance_score * 100)}% relevância
-                                                        </Badge>
-                                                    </>
-                                                )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                                                    {doc.file_name || doc.title}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
+                                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                                        {doc.file_name?.split('.').pop()?.toUpperCase() || 'PDF'}
+                                                    </Badge>
+                                                    <span>{(doc.file_size / 1024 / 1024).toFixed(1)} MB</span>
+                                                    <span>•</span>
+                                                    <span>
+                                                        {new Date(doc.created_at).toLocaleString('pt-BR', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit'
+                                                        })}
+                                                    </span>
+                                                    {doc.relevance_score && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-success/10 text-success">
+                                                                {Math.round(doc.relevance_score * 100)}% relevância
+                                                            </Badge>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
-                                                <Eye className="size-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
-                                                <Download className="size-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
-                                                <Share2 className="size-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
-                                                <MoreVertical className="size-3.5" />
-                                            </Button>
-                                        </div>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
+                                                    <Eye className="size-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
+                                                    <Download className="size-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
+                                                    <Share2 className="size-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-secondary">
+                                                    <MoreVertical className="size-3.5" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </DocumentPreviewTooltip>
                                 ))}
                             </div>
 
                             {/* Paginação */}
-                            {filteredDocs.length > docsPerPage && (
+                            {sortedDocs.length > docsPerPage && (
                                 <div className="flex items-center justify-between mt-4 pt-4 border-t">
                                     <div className="text-sm text-muted-foreground">
-                                        Mostrando {((docsPage - 1) * docsPerPage) + 1} - {Math.min(docsPage * docsPerPage, filteredDocs.length)} de {filteredDocs.length}
+                                        Mostrando {((docsPage - 1) * docsPerPage) + 1} - {Math.min(docsPage * docsPerPage, sortedDocs.length)} de {sortedDocs.length}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Button
@@ -648,7 +644,7 @@ export default function MeuDiaPage() {
                                             Anterior
                                         </Button>
                                         <div className="flex items-center gap-1">
-                                            {Array.from({ length: Math.ceil(filteredDocs.length / docsPerPage) }, (_, i) => i + 1).map(page => (
+                                            {Array.from({ length: Math.ceil(sortedDocs.length / docsPerPage) }, (_, i) => i + 1).map(page => (
                                                 <Button
                                                     key={page}
                                                     variant={page === docsPage ? "default" : "ghost"}
@@ -663,8 +659,8 @@ export default function MeuDiaPage() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => setDocsPage(p => Math.min(Math.ceil(filteredDocs.length / docsPerPage), p + 1))}
-                                            disabled={docsPage === Math.ceil(filteredDocs.length / docsPerPage)}
+                                            onClick={() => setDocsPage(p => Math.min(Math.ceil(sortedDocs.length / docsPerPage), p + 1))}
+                                            disabled={docsPage === Math.ceil(sortedDocs.length / docsPerPage)}
                                             className="rounded-full"
                                         >
                                             Próximo
@@ -684,9 +680,9 @@ export default function MeuDiaPage() {
                                     </h3>
                                     <p className="text-sm text-muted-foreground mt-1">Processos com maior volume de documentos</p>
                                 </div>
-                                <Button 
-                                    variant={showWorkflowsFilters ? "default" : "ghost"} 
-                                    size="sm" 
+                                <Button
+                                    variant={showWorkflowsFilters ? "default" : "ghost"}
+                                    size="sm"
                                     className="rounded-full gap-2"
                                     onClick={() => setShowWorkflowsFilters(!showWorkflowsFilters)}
                                 >
@@ -760,18 +756,18 @@ export default function MeuDiaPage() {
 
                                     {/* Resultado da filtragem */}
                                     <div className="text-xs text-muted-foreground pt-2 border-t">
-                                        {filteredWorkflows.length} workflow{filteredWorkflows.length !== 1 ? 's' : ''} encontrado{filteredWorkflows.length !== 1 ? 's' : ''}
+                                        {sortedWorkflows.length} workflow{sortedWorkflows.length !== 1 ? 's' : ''} encontrado{sortedWorkflows.length !== 1 ? 's' : ''}
                                     </div>
                                 </div>
                             )}
 
                             <div className="space-y-4">
-                                {filteredWorkflows.length === 0 ? (
+                                {sortedWorkflows.length === 0 ? (
                                     <div className="text-center py-8 text-muted-foreground">
                                         <Workflow className="size-12 mx-auto mb-2 opacity-50" />
                                         <p>{(workflowsFilters.search || workflowsFilters.status !== 'all') ? 'Nenhum workflow encontrado' : 'Nenhum workflow ativo'}</p>
                                     </div>
-                                ) : filteredWorkflows.map((workflow) => (
+                                ) : sortedWorkflows.map((workflow) => (
                                     <div
                                         key={workflow.id}
                                         onClick={() => router.push(`/processes/${workflow.id}`)}
@@ -803,9 +799,9 @@ export default function MeuDiaPage() {
                                                 Tempo médio: {workflow.average_time_days} dia{workflow.average_time_days !== 1 ? 's' : ''}
                                             </div>
                                         </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
                                             className="rounded-full"
                                             onClick={(e) => {
                                                 e.stopPropagation()
@@ -824,80 +820,9 @@ export default function MeuDiaPage() {
                     <div className="lg:col-span-4 space-y-6">
                         {/* Tarefas Prioritárias */}
                         <PriorityTasksWidget />
-                        
+
                         {/* Alertas de IA */}
                         <AIAlertsWidget />
-
-                        {/* Assistente Inteligente */}
-                        <Card className="p-6 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background shadow-lg">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="size-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
-                                    <Sparkles className="size-6 text-primary-foreground" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg">Assistente Ordoc</h3>
-                                    <p className="text-xs text-muted-foreground">Powered by IA</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="text-sm">
-                                    <div className="flex items-baseline gap-2 mb-2">
-                                        <span className="text-2xl font-bold text-primary">{overview?.total_documents || 0}</span>
-                                        <span className="text-muted-foreground">docs processados hoje</span>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {overview?.approval_rate || 0}% aprovados de primeira
-                                    </div>
-                                </div>
-
-                                {pending.pending_signatures === 0 && pending.pending_approvals === 0 ? (
-                                    <div className="flex items-start gap-3 p-4 rounded-xl bg-success/10 border border-success/20">
-                                        <CheckCircle2 className="size-5 text-success mt-0.5 shrink-0" />
-                                        <div className="text-sm">
-                                            <p className="font-bold text-success-foreground">Tudo em dia!</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                Nenhuma ação pendente. Você está em dia com todas as tarefas.
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-start gap-3 p-4 rounded-xl bg-warning/10 border border-warning/20">
-                                        <AlertCircle className="size-5 text-warning mt-0.5 shrink-0" />
-                                        <div className="text-sm">
-                                            <p className="font-bold text-warning-foreground">Ações pendentes</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {pending.pending_signatures} assinatura{pending.pending_signatures !== 1 ? 's' : ''} e {pending.pending_approvals} aprovaç{pending.pending_approvals !== 1 ? 'ões' : 'ão'} pendente{pending.pending_approvals !== 1 ? 's' : ''}.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2">
-                                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                        Sugestões rápidas
-                                    </div>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="w-full justify-start gap-2 rounded-xl bg-transparent"
-                                        onClick={() => router.push('/documents?action=upload')}
-                                    >
-                                        <Upload className="size-4" />
-                                        Fazer upload de documento
-                                    </Button>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="w-full justify-start gap-2 rounded-xl bg-transparent"
-                                        onClick={() => router.push('/processes?action=create')}
-                                    >
-                                        <Workflow className="size-4" />
-                                        Criar novo processo
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
 
                         {/* Status do Sistema */}
                         <Card className="p-6 border-border/50 shadow-sm">
@@ -982,16 +907,13 @@ export default function MeuDiaPage() {
                                 </Button>
                             </div>
                         </Card>
+
+                        {/* Visão de Equipe */}
+                        <TeamViewWidget />
                     </div>
                 </div>
 
-                {/* Botão flutuante */}
-                <button 
-                    onClick={() => router.push('/documents?action=upload')}
-                    className="fixed bottom-8 right-8 size-14 rounded-full bg-orange-600 text-primary-foreground shadow-2xl hover:shadow-primary/20 hover:scale-110 transition-all flex items-center justify-center group z-30"
-                >
-                    <span className="text-2xl group-hover:rotate-90 transition-transform">+</span>
-                </button>
+
             </div>
         </div>
     )

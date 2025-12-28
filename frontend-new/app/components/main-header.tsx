@@ -29,9 +29,11 @@ import {
     ChevronLeft,
 } from "lucide-react"
 import { AppDrawer } from "./app-drawer"
-import { useNotifications } from "@/contexts/notification-context"
-import { useAlerts } from "@/contexts/alerts-context"
-import { useAuth } from "@/contexts/auth-context"
+import { useNotifications } from "@/hooks/use-notifications"
+import { useAlerts } from "@/hooks/use-alerts"
+import { useAppStore } from "@/stores/app-store"
+import { useLogout } from "@/hooks/queries/use-auth-query"
+import { UserPreferencesDialog } from "@/components/settings/user-preferences-dialog"
 
 interface MainHeaderProps {
     showSidebarToggle?: boolean
@@ -43,7 +45,13 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
     const pathname = usePathname()
     const [appDrawerOpen, setAppDrawerOpen] = useState(false)
     const [searchFocused, setSearchFocused] = useState(false)
-    const { user, logout, isAuthenticated } = useAuth()
+    const [isPreferencesOpen, setPreferencesOpen] = useState(false)
+
+    // Seletores granulares para evitar re-renderizações desnecessárias
+    const user = useAppStore((state) => state.user)
+    const isAuthenticated = useAppStore((state) => state.isAuthenticated)
+
+    const { mutate: logout } = useLogout()
     const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
     const { unreadCount: aiAlertsCount } = useAlerts()
 
@@ -120,7 +128,7 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                         />
                     </div>
 
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-secondary/50">
                                 <Bell className="size-5" />
@@ -236,7 +244,7 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                         <Grid3x3 className="size-5" />
                     </Button>
 
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="gap-3 rounded-full hover:bg-secondary/50 pl-2 pr-4">
                                 <Avatar className="size-8 ring-2 ring-primary/20">
@@ -262,13 +270,16 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="rounded-lg">
+                            <DropdownMenuItem
+                                className="rounded-lg cursor-pointer"
+                                onClick={() => setPreferencesOpen(true)}
+                            >
                                 <Settings className="mr-3 size-4" />
-                                Configurações
+                                Preferências
                             </DropdownMenuItem>
                             <DropdownMenuItem
                                 className="rounded-lg text-destructive cursor-pointer"
-                                onClick={logout}
+                                onClick={() => logout()}
                             >
                                 Sair
                             </DropdownMenuItem>
@@ -278,6 +289,7 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
             </header>
 
             <AppDrawer isOpen={appDrawerOpen} onClose={() => setAppDrawerOpen(false)} />
+            <UserPreferencesDialog open={isPreferencesOpen} onOpenChange={setPreferencesOpen} />
         </>
     )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import { useLogin } from "@/hooks/queries/use-auth-query"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,38 +19,19 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const { login } = useAuth()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
+  const { mutate: login, isPending } = useLogin()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-
-    try {
-      await login({ email, password })
-      toast({
-        title: "Login realizado com sucesso",
-        description: "Bem-vindo ao Ordoc-AI!",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Erro no login",
-        description: error.response?.data?.detail || "Credenciais inválidas. Tente novamente.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+    login({ email, password })
   }
 
   return (
@@ -97,7 +78,7 @@ export function LoginForm({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isPending}
                 />
               </Field>
               <Field>
@@ -116,12 +97,12 @@ export function LoginForm({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isPending}
                 />
               </Field>
               <Field>
-                <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isPending}>
+                  {isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
                   Entrar
                 </Button>
                 <FieldDescription className="text-center">

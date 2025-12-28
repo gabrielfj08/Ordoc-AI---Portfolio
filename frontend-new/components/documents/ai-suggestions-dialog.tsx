@@ -239,7 +239,7 @@ export function AISuggestionsDialog({
                                                 </span>
                                             </Label>
                                             <div className="flex flex-wrap gap-2">
-                                                {analysis.results.suggested_tags.map(tag => {
+                                                {analysis.results.suggested_tags.map((tag: string) => {
                                                     const isSelected = selectedSuggestions.tags?.includes(tag)
                                                     return (
                                                         <Badge

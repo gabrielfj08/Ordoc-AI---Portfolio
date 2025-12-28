@@ -2,15 +2,19 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/auth-context'
+import { useAppStore } from '@/stores/app-store'
+import { useMe } from '@/hooks/queries/use-auth-query'
 
 interface ProtectedRouteProps {
     children: React.ReactNode
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { isAuthenticated, isLoading } = useAuth()
+    const { isAuthenticated, isLoading } = useAppStore()
     const router = useRouter()
+
+    // Carrega dados do usuário se tiver token
+    useMe()
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
