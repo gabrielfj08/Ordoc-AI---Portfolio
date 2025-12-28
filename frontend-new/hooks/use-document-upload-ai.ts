@@ -80,11 +80,13 @@ export function useDocumentUploadAI() {
                     )
 
                     const document = await documentsApi.upload(
-                        file,
-                        directory,
-                        progressEvent => {
+                        {
+                            file,
+                            directory,
+                        },
+                        (progressEvent: { loaded: number; total: number; percentage: number }) => {
                             const progress = Math.round(
-                                (progressEvent.progress || 0) * 0.7 // 70% do progresso total
+                                (progressEvent.percentage || 0) * 0.7 // 70% do progresso total
                             )
                             setUploads(prev =>
                                 prev.map((u, i) =>
@@ -170,13 +172,6 @@ export function useDocumentUploadAI() {
                                 toast({
                                     title: '💡 Sugestões disponíveis',
                                     description: `IA sugere: ${aiAnalysis.classification} (${Math.round(aiAnalysis.confidence * 100)}% confiança)`,
-                                    action: {
-                                        label: 'Ver sugestões',
-                                        onClick: () => {
-                                            // Abrir modal com sugestões
-                                            console.log('Abrir modal de sugestões', aiAnalysis)
-                                        },
-                                    },
                                 })
                             }
                         } catch (aiError) {
@@ -230,7 +225,7 @@ export function useDocumentUploadAI() {
             })
 
             const results = await Promise.all(promises)
-            return results.filter((r): r is { document: Document; aiAnalysis?: AIAnalysis } => r !== null)
+            return results.filter((r): r is { document: Document; aiAnalysis: AIAnalysis | undefined } => r !== null)
         },
         [uploads.length, toast]
     )

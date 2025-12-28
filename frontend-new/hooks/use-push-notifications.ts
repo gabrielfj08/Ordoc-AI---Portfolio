@@ -12,7 +12,7 @@ export interface PushNotificationOptions {
     /** Solicitar permissão automaticamente ao montar */
     autoRequest?: boolean
     /** Callback quando receber notificação */
-    onNotification?: (notification: NotificationEvent) => void
+    onNotification?: (notification: Notification) => void
 }
 
 export function usePushNotifications(options: PushNotificationOptions = {}) {
@@ -184,7 +184,6 @@ export function usePushNotifications(options: PushNotificationOptions = {}) {
             badge: '/badge-72x72.png',
             tag: 'test-notification',
             requireInteraction: false,
-            timestamp: Date.now(),
             data: {
                 url: window.location.origin,
                 type: 'test',
