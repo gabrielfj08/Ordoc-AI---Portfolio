@@ -5,6 +5,8 @@ from django.utils import timezone
 from ordoc_air.models import Organization
 import uuid
 import pyotp
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 
 class OrdocUser(models.Model):
@@ -699,4 +701,144 @@ class RefreshToken(models.Model):
         count = expired_tokens.count()
         expired_tokens.delete()
         return count
+
+
+class Notification(models.Model):
+    """
+    Modelo para notificações do sistema.
+    Suporta notificações para qualquer objeto via GenericForeignKey.
+    """
+    
+    TYPE_CHOICES = [
+        ('info', 'Informação'),
+        ('success', 'Sucesso'),
+        ('warning', 'Aviso'),
+        ('error', 'Erro'),
+        ('task_assigned', 'Tarefa Atribuída'),
+        ('document_shared', 'Documento Compartilhado'),
+        ('signature_requested', 'Assinatura Solicitada'),
+        ('workflow_update', 'Atualização de Workflow'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Target User
+    user = models.ForeignKey(
+        OrdocUser,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        verbose_name='Usuário'
+    )
+    
+    # Notification Content
+    title = models.CharField(max_length=255, verbose_name='Título')
+    message = models.TextField(verbose_name='Mensagem')
+    link = models.CharField(max_length=500, blank=True, null=True, verbose_name='Link de Ação')
+    notification_type = models.CharField(
+        max_length=50,
+        choices=TYPE_CHOICES,
+        default='info',
+        verbose_name='Tipo'
+    )
+    
+    # Status
+    is_read = models.BooleanField(default=False, verbose_name='Lida')
+    read_at = models.DateTimeField(null=True, blank=True, verbose_name='Lida em')
+    
+    # Generic Relation (Source object)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    object_id = models.UUIDField(null=True, blank=True)
+    content_object = GenericForeignKey('content_type', 'object_id')
+    
+    # Metadata
+    metadata = models.JSONField(default=dict, blank=True, verbose_name='Metadados')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Notificação"
+        verbose_name_plural = "Notificações"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['created_at']),
+        ]
+        
+    def __str__(self):
+        return f"{self.title} - {self.user}"
+        
+    def mark_as_read(self):
+        self.is_read = True
+        self.read_at = timezone.now()
+        self.save()
+
+
+class Comment(models.Model):
+    """
+    Modelo para comentários e colaboração em qualquer objeto do sistema.
+    Suporta threads (respostas) e anexos.
+    """
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Author
+    user = models.ForeignKey(
+        OrdocUser,
+        on_delete=models.CASCADE,
+        related_name='comments',
+        verbose_name='Autor'
+    )
+    
+    # Content
+    content = models.TextField(verbose_name='Conteúdo')
+    
+    # Generic Relation (Target object - Document, Task, etc)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.UUIDField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+    
+    # Threading
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='replies',
+        verbose_name='Resposta para'
+    )
+    
+    # Attachment
+    attachment = models.FileField(
+        upload_to='comments/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        verbose_name='Anexo'
+    )
+    
+    # Status
+    is_internal = models.BooleanField(default=False, verbose_name='Comentário Interno')
+    edited_at = models.DateTimeField(null=True, blank=True, verbose_name='Editado em')
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Comentário"
+        verbose_name_plural = "Comentários"
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['user']),
+            models.Index(fields=['created_at']),
+        ]
+        
+    def __str__(self):
+        return f"Comentário de {self.user} em {self.content_object}"
+        
+    @property
+    def is_reply(self):
+        return self.parent is not None
+
 

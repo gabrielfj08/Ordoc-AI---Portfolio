@@ -933,6 +933,15 @@ class Task(models.Model):
         verbose_name='Responsável Individual'
     )
     
+    signature_request = models.OneToOneField(
+        'ordoc_sign.SignatureRequest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='task',
+        verbose_name='Solicitação de Assinatura'
+    )
+
     group_assignee = models.ForeignKey(
         GroupRequester,
         on_delete=models.SET_NULL,

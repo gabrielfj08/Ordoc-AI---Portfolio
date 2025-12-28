@@ -5,6 +5,8 @@ from django.db import models
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 import uuid
 
 
@@ -269,8 +271,10 @@ class ProactiveAlert(models.Model):
     )
     
     # Document reference (generic for flexibility)
+    document_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     document_id = models.UUIDField(db_index=True)
-    document_type = models.CharField(max_length=100, blank=True)
+    document_object = GenericForeignKey('document_content_type', 'document_id')
+    document_type_name = models.CharField(max_length=100, blank=True)  # Legacy/Backup
     
     # User response
     user_response = models.CharField(
@@ -331,8 +335,10 @@ class DocumentAnalysis(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
     # Document reference
-    document_id = models.UUIDField(db_index=True, unique=True)
-    document_type = models.CharField(max_length=100, blank=True)
+    document_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    document_id = models.UUIDField(db_index=True)
+    document_object = GenericForeignKey('document_content_type', 'document_id')
+    document_type_name = models.CharField(max_length=100, blank=True)  # Legacy/Backup
     
     # Analysis results
     extraction_result = models.JSONField(default=dict)

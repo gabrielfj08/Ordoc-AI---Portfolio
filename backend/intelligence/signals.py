@@ -345,26 +345,26 @@ def on_document_downloaded(sender, document, user, **kwargs):
 # TAGS E CATEGORIZAÇÃO
 # ========================================
 
-@receiver(m2m_changed, sender='ordoc_air.Document.tags.through')
-def on_document_tags_changed(sender, instance, action, **kwargs):
-    """
-    Quando tags de um documento mudam.
-
-    Aprende:
-    - Tags mais usadas por tipo de documento
-    - Padrões de categorização
-    """
-    from .tasks import learn_tagging_pattern
-
-    if action in ['post_add', 'post_remove']:
-        try:
-            learn_tagging_pattern.apply_async(
-                args=[str(instance.id)],
-                kwargs={'action': action},
-                countdown=1
-            )
-        except Exception as e:
-            logger.warning(f"Erro ao aprender padrão de tags do documento {instance.id}: {e}")
+# @receiver(m2m_changed, sender='ordoc_air.Document.tags.through')
+# def on_document_tags_changed(sender, instance, action, **kwargs):
+#     """
+#     Quando tags de um documento mudam.
+# 
+#     Aprende:
+#     - Tags mais usadas por tipo de documento
+#     - Padrões de categorização
+#     """
+#     from .tasks import learn_tagging_pattern
+# 
+#     if action in ['post_add', 'post_remove']:
+#         try:
+#             learn_tagging_pattern.apply_async(
+#                 args=[str(instance.id)],
+#                 kwargs={'action': action},
+#                 countdown=1
+#             )
+#         except Exception as e:
+#             logger.warning(f"Erro ao aprender padrão de tags do documento {instance.id}: {e}")
 
 
 # ========================================

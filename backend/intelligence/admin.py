@@ -108,7 +108,7 @@ class ProactiveAlertAdmin(admin.ModelAdmin):
             'fields': ['id', 'alert_type', 'severity', 'title', 'message', 'details']
         }),
         ('Documento', {
-            'fields': ['document_id', 'document_type', 'location']
+            'fields': ['document_id', 'document_type_name', 'location']
         }),
         ('Ações', {
             'fields': ['suggested_actions', 'source_pattern']
@@ -149,11 +149,11 @@ class DocumentAnalysisAdmin(admin.ModelAdmin):
     """Admin for DocumentAnalysis model."""
     
     list_display = [
-        'id_short', 'document_id_short', 'document_type',
+        'id_short', 'document_id_short', 'document_type_name',
         'status', 'processing_time', 'created_at'
     ]
     list_filter = ['status', 'analysis_depth', 'created_at']
-    search_fields = ['document_type']
+    search_fields = ['document_type_name']
     readonly_fields = ['id', 'created_at', 'completed_at', 'processing_time_ms']
     
     def id_short(self, obj):
