@@ -10,21 +10,21 @@ export const test = base.extend<{
   authenticatedPage: async ({ page }, use) => {
     // Navegar para a página de login
     await page.goto('/login')
-    
+
     // Preencher formulário de login
     // Nota: Ajuste as credenciais conforme necessário
-    await page.fill('input[name="username"]', process.env.TEST_USER || 'admin')
-    await page.fill('input[name="password"]', process.env.TEST_PASSWORD || 'admin')
-    
-    // Clicar no botão de login
-    await page.click('button[type="submit"]')
-    
-    // Aguardar redirect após login bem-sucedido
-    await page.waitForURL('/', { timeout: 10000 })
-    
+    await page.fill('#email', process.env.TEST_USER || 'admin@ordoc.ai')
+    await page.fill('#password', process.env.TEST_PASSWORD || 'admin123')
+
+    // Clicar no botão de login e aguardar redirect
+    await Promise.all([
+      page.waitForURL('/my-day', { timeout: 15000 }),
+      page.click('button[type="submit"]')
+    ])
+
     // Verificar que o login foi bem-sucedido
-    await expect(page).toHaveURL('/')
-    
+    await expect(page).toHaveURL('/my-day')
+
     // Usar a página autenticada nos testes
     await use(page)
   },
