@@ -92,7 +92,7 @@ export const myDayApi = {
                 },
             }
         )
-        
+
         // Transform to ActiveWorkflow format
         const workflows: ActiveWorkflow[] = response.data.results.map(proc => ({
             id: proc.id,
@@ -101,7 +101,7 @@ export const myDayApi = {
             average_time_days: proc.average_processing_time_days || 0,
             status: proc.status === 'running' || proc.status === 'started' ? 'active' : 'paused',
         }))
-        
+
         return workflows
     },
 
@@ -142,11 +142,23 @@ export const myDayApi = {
      */
     getUserInfo: async () => {
         const response = await apiClient.get<{
-            username: string
-            first_name: string
-            last_name: string
-            email: string
+            user: {
+                username: string
+                first_name: string
+                last_name: string
+                email: string
+                view_mode: 'personal' | 'team'
+                can_access_team_view: boolean
+            }
         }>('/api/auth/me/')
+        return response.data.user
+    },
+
+    /**
+     * Update user preferences
+     */
+    updateUserPreferences: async (data: { view_mode?: 'personal' | 'team' }) => {
+        const response = await apiClient.patch('/api/auth/me/', data)
         return response.data
     },
 }

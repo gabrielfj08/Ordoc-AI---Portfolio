@@ -14,7 +14,7 @@ const apiClient: AxiosInstance = axios.create({
 
 // Interceptor para adicionar token de autenticação
 apiClient.interceptors.request.use(
-    (config) => {
+    async (config) => {
         // Debug: log do request
         if (config.url?.includes('/login')) {
             console.log('[API Debug] Login request:', {
@@ -31,11 +31,14 @@ apiClient.interceptors.request.use(
             config.url?.includes('/auth/check-email')
 
         if (!isAuthEndpoint) {
-            // Verificar se há token no localStorage
-            const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+            // Verificar se há token no Zustand store
+            if (typeof window !== 'undefined') {
+                const { useAppStore } = await import('@/stores/app-store')
+                const token = useAppStore.getState().accessToken
 
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`
+                }
             }
         }
 
@@ -61,50 +64,48 @@ apiClient.interceptors.response.use(
             if (!originalRequest._retry && !isLoginEndpoint && !isRefreshEndpoint) {
                 originalRequest._retry = true
 
-                const refreshToken = typeof window !== 'undefined'
-                    ? localStorage.getItem('refresh_token')
-                    : null
+                if (typeof window !== 'undefined') {
+                    const { useAppStore } = await import('@/stores/app-store')
+                    const refreshToken = useAppStore.getState().refreshToken
 
-                if (refreshToken) {
-                    try {
-                        // Tentar refresh (importação dinâmica para evitar circular dependency)
-                        const { authApi } = await import('./auth-api')
-                        const response = await authApi.refreshToken(refreshToken)
+                    if (refreshToken) {
+                        try {
+                            // Tentar refresh
+                            const { authApi } = await import('./auth-api')
+                            const response = await authApi.refreshToken(refreshToken)
 
-                        // Salvar novos tokens
-                        if (typeof window !== 'undefined') {
-                            localStorage.setItem('auth_token', response.access_token)
-                            localStorage.setItem('refresh_token', response.refresh_token)
-                        }
+                            // Salvar novos tokens no Zustand
+                            useAppStore.getState().setTokens(
+                                response.access_token,
+                                response.refresh_token
+                            )
 
-                        console.log('[API] Token refreshed successfully after 401')
+                            console.log('[API] Token refreshed successfully after 401')
 
-                        // Retry request original com novo token
-                        originalRequest.headers.Authorization = `Bearer ${response.access_token}`
-                        return apiClient(originalRequest)
-                    } catch (refreshError) {
-                        console.error('[API] Token refresh failed, logging out')
-                        // Refresh falhou, limpar tokens e redirecionar
-                        if (typeof window !== 'undefined') {
-                            localStorage.removeItem('auth_token')
-                            localStorage.removeItem('refresh_token')
+                            // Retry request original com novo token
+                            originalRequest.headers.Authorization = `Bearer ${response.access_token}`
+                            return apiClient(originalRequest)
+                        } catch (refreshError) {
+                            console.error('[API] Token refresh failed, logging out')
+                            // Refresh falhou, limpar tokens
+                            useAppStore.getState().clearAll()
 
                             const currentPath = window.location.pathname
                             if (currentPath !== '/login') {
                                 window.location.href = '/login'
                             }
+                            return Promise.reject(refreshError)
                         }
-                        return Promise.reject(refreshError)
                     }
                 }
             }
 
             // Se não tem refresh token ou já tentou refresh, limpar e redirecionar
             if (typeof window !== 'undefined' && !isLoginEndpoint) {
-                const currentPath = window.location.pathname
-                localStorage.removeItem('auth_token')
-                localStorage.removeItem('refresh_token')
+                const { useAppStore } = await import('@/stores/app-store')
+                useAppStore.getState().clearAll()
 
+                const currentPath = window.location.pathname
                 if (currentPath !== '/login') {
                     window.location.href = '/login'
                 }

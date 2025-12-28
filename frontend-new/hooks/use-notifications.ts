@@ -1,92 +1,32 @@
-"use client"
+import { useAppStore } from '@/stores/app-store'
+import { wsClient } from '@/services/websocket-client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { notificationsApi } from '@/services/notifications-api'
-import type { NotificationLog } from '@/types/notifications'
+/**
+ * Hook para acessar notificações
+ * Usa Zustand store para estado global e WebSocket para real-time
+ */
+export function useNotifications() {
+  const {
+    notifications,
+    unreadNotificationsCount: unreadCount,
+    markNotificationAsRead: markAsReadStore,
+    markAllNotificationsAsRead: markAllAsReadStore
+  } = useAppStore()
 
-export function useNotifications(enabled: boolean = true) {
-    const [notifications, setNotifications] = useState<NotificationLog[]>([])
-    const [unreadCount, setUnreadCount] = useState(0)
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+  const markAsRead = (id: string) => {
+    wsClient.markAsRead(id)
+    markAsReadStore(id)
+  }
 
-    const fetchNotifications = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const data = await notificationsApi.list({ unread_only: false })
-            setNotifications(data.results)
-        } catch (err: any) {
-            // Silenciar erro 401 (não autenticado)
-            if (err.response?.status !== 401) {
-                setError(err.message || 'Erro ao carregar notificações')
-            }
-        } finally {
-            setLoading(false)
-        }
-    }, [])
+  const markAllAsRead = () => {
+    wsClient.markAllAsRead()
+    markAllAsReadStore()
+  }
 
-    const fetchUnreadCount = useCallback(async () => {
-        try {
-            const data = await notificationsApi.unreadCount()
-            setUnreadCount(data.count)
-        } catch (err: any) {
-            // Silenciar erro 401
-            if (err.response?.status !== 401) {
-                console.error('Erro ao buscar contagem:', err)
-            }
-        }
-    }, [])
-
-    const markAsRead = useCallback(async (id: string) => {
-        try {
-            await notificationsApi.markAsRead(id)
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, status: 'read' as const, read_at: new Date().toISOString() } : n))
-            )
-            setUnreadCount((prev) => Math.max(0, prev - 1))
-        } catch (err: any) {
-            console.error('Erro ao marcar como lida:', err)
-        }
-    }, [])
-
-    const markAllAsRead = useCallback(async () => {
-        try {
-            await notificationsApi.markAllAsRead()
-            setNotifications((prev) =>
-                prev.map((n) => ({ ...n, status: 'read' as const, read_at: new Date().toISOString() }))
-            )
-            setUnreadCount(0)
-        } catch (err: any) {
-            console.error('Erro ao marcar todas como lidas:', err)
-        }
-    }, [])
-
-    useEffect(() => {
-        // Só busca notificações se enabled for true
-        if (!enabled) {
-            return
-        }
-
-        fetchNotifications()
-        fetchUnreadCount()
-
-        // Atualizar a cada 30 segundos
-        const interval = setInterval(() => {
-            fetchNotifications()
-            fetchUnreadCount()
-        }, 30000)
-
-        return () => clearInterval(interval)
-    }, [enabled, fetchNotifications, fetchUnreadCount])
-
-    return {
-        notifications,
-        unreadCount,
-        loading,
-        error,
-        markAsRead,
-        markAllAsRead,
-        refresh: fetchNotifications,
-    }
+  return {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+  }
 }

@@ -43,7 +43,7 @@ export function useDocuments(options: UseDocumentsOptions = {}) {
             const response = await documentsApi.list({
                 directory: options.directory,
                 search: options.search,
-                tags: options.tags?.join(','),
+                tags: options.tags,
                 is_archived: options.is_archived,
             })
             setDocuments(response.results)
@@ -556,7 +556,7 @@ export function useDirectories() {
     const fetchDirectories = useCallback(async (parentId?: string) => {
         setLoading(true)
         try {
-            const response = await directoriesApi.list(parentId)
+            const response = await directoriesApi.list(parentId ? { parent: parentId } : undefined)
             setDirectories(response.results)
         } catch (err) {
             const error = err as Error

@@ -140,6 +140,16 @@ export const analysisApi = {
         )
         return response.data
     },
+
+    /**
+     * Obtém status da IA e privacidade
+     */
+    getStatus: async () => {
+        const response = await apiClient.get<any>(
+            `${BASE_URL}/status/`
+        )
+        return response.data
+    },
 }
 
 // ===========================

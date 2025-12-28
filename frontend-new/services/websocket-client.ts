@@ -1,3 +1,5 @@
+import { useAppStore } from '@/stores/app-store'
+
 class WebSocketClient {
     private ws: WebSocket | null = null
     private reconnectAttempts = 0
@@ -5,9 +7,17 @@ class WebSocketClient {
     private reconnectDelay = 1000
     private listeners: Map<string, Set<Function>> = new Map()
 
-    connect(token: string) {
+    connect(token?: string) {
+        // Se não passar token, tenta pegar do store
+        const effectiveToken = token || useAppStore.getState().accessToken
+
+        if (!effectiveToken) {
+            console.warn('[WebSocket] Cannot connect: No token available')
+            return
+        }
+
         const baseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
-        const wsUrl = `${baseUrl}/ws/notifications/?token=${token}`
+        const wsUrl = `${baseUrl}/ws/notifications/?token=${effectiveToken}`
 
         this.ws = new WebSocket(wsUrl)
 
@@ -34,12 +44,14 @@ class WebSocketClient {
         this.ws.onclose = () => {
             console.log('WebSocket disconnected')
             this.emit('disconnected', {})
-            this.attemptReconnect(token)
+            // Não passa token antigo, deixa o attemptReconnect pegar o novo do store
+            this.attemptReconnect()
         }
     }
 
     disconnect() {
         if (this.ws) {
+            this.ws.onclose = null // Remove listener to prevent reconnect
             this.ws.close()
             this.ws = null
         }
@@ -72,13 +84,22 @@ class WebSocketClient {
         }
     }
 
-    private attemptReconnect(token: string) {
+    private attemptReconnect() {
+        // Verificar se ainda temos um usuário autenticado antes de tentar reconectar
+        const token = useAppStore.getState().accessToken
+        if (!token) {
+            console.log('[WebSocket] No token found, checking refresh...')
+            // Se não tem access token, pode ser que esteja em refresh.
+            // O ideal é esperar, mas aqui vamos parar e deixar o login reconectar.
+            return
+        }
+
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++
             const delay = this.reconnectDelay * this.reconnectAttempts
 
             console.log(`Attempting to reconnect in ${delay}ms...`)
-            setTimeout(() => this.connect(token), delay)
+            setTimeout(() => this.connect(), delay)
         }
     }
 
@@ -99,3 +120,4 @@ class WebSocketClient {
 }
 
 export const wsClient = new WebSocketClient()
+
