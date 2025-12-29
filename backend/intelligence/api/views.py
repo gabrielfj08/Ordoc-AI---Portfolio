@@ -168,13 +168,26 @@ class AlertViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter alerts by user's organization."""
-        queryset = ProactiveAlert.objects.all()
-        
+        # Get user's organization from request
+        organization = getattr(self.request, 'current_organization', None)
+        if not organization and hasattr(self.request, 'user') and hasattr(self.request.user, 'ordoc_profile'):
+            # Try to get organization from user's profile
+            from ordoc_cloud.models import UserOrganizationRole
+            role = UserOrganizationRole.objects.filter(user=self.request.user.ordoc_profile).first()
+            if role:
+                organization = role.organization
+
+        # Filter by organization (or return all if no organization found)
+        if organization:
+            queryset = ProactiveAlert.objects.filter(organization=organization)
+        else:
+            queryset = ProactiveAlert.objects.all()
+
         # Filter by document_id if provided
         document_id = self.request.query_params.get('document_id')
         if document_id:
             queryset = queryset.filter(document_id=document_id)
-        
+
         # Filter by is_read (maps to user_response != 'pending')
         is_read = self.request.query_params.get('is_read')
         if is_read is not None:
@@ -184,12 +197,12 @@ class AlertViewSet(viewsets.ModelViewSet):
             elif is_read.lower() in ('false', '0'):
                 # Unread means pending
                 queryset = queryset.filter(user_response='pending')
-        
+
         # Filter by status (legacy support)
         response_status = self.request.query_params.get('status')
         if response_status and response_status != 'all':
             queryset = queryset.filter(user_response=response_status)
-        
+
         return queryset.order_by('-created_at')
     
     @action(detail=True, methods=['post'])
