@@ -326,6 +326,17 @@ def me(request):
             is_active=True
         ).exists()
         
+        # Get user roles
+        from ordoc_cloud.models import UserOrganizationRole
+        user_roles = []
+        if organization:
+            roles = UserOrganizationRole.objects.filter(
+                user=ordoc_user,
+                organization=organization,
+                is_active=True
+            ).values('role', 'id')
+            user_roles = [{'role': r['role'], 'id': str(r['id'])} for r in roles]
+
         # Return user data in the same format as login
         return Response({
             'user': {
@@ -345,6 +356,7 @@ def me(request):
                 'profile_complete': ordoc_user.profile_complete,
                 'view_mode': ordoc_user.view_mode,
                 'can_access_team_view': can_access_team_view,
+                'roles': user_roles,  # Lista de roles do usuário
                 'permissions': [],  # TODO: Implement permissions
             },
             'organization': {

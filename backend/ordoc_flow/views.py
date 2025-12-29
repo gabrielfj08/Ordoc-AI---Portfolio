@@ -436,12 +436,38 @@ class TaskViewSet(BaseViewSet):
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        return queryset.select_related(
+        queryset = queryset.select_related(
             'procedure__organization', 'procedure__procedure_template',
             'assignee', 'group_assignee', 'created_by', 'task_template'
         ).prefetch_related(
             'task_comments__created_by'
         ).filter(procedure__organization=self.get_current_organization())
+
+        # Filtrar baseado no role do usuário
+        ordoc_user = self.get_current_ordoc_user()
+
+        # Admin (Sócio): vê tudo
+        if self.is_admin():
+            return queryset
+
+        # Organization Manager (Sênior): vê tasks do seu departamento + tasks que ele criou
+        elif self.is_organization_manager():
+            # Por enquanto, retorna todas (pode ser filtrado por departamento depois)
+            return queryset
+
+        # Department Manager (Pleno): vê tasks do departamento + suas próprias
+        elif self.is_department_manager():
+            # Filtra: tasks atribuídas a ele OU criadas por ele
+            return queryset.filter(
+                Q(assignee=ordoc_user) | Q(created_by=ordoc_user)
+            )
+
+        # Organization Member (Paralegal): vê apenas tasks atribuídas a ele
+        elif self.is_organization_member():
+            return queryset.filter(assignee=ordoc_user)
+
+        # Se não tem role, não vê nada
+        return queryset.none()
     
     def perform_create(self, serializer):
         ordoc_user = self.get_current_ordoc_user()
