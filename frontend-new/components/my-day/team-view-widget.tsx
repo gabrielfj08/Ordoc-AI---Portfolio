@@ -6,14 +6,12 @@ import { Users } from "lucide-react"
 import { useMyDayStore } from "@/stores/my-day-store"
 
 export function TeamViewWidget() {
-    const { canAccessTeamView } = useMyDayStore()
+    const { canAccessTeamView, overview } = useMyDayStore()
 
     if (!canAccessTeamView) return null
 
-    const members = [
-        { name: "Ana Silva", status: "3 tarefas atrasadas", statusColor: "text-orange-600" },
-        { name: "João Mendes", status: "Tudo em dia", statusColor: "text-success" }
-    ]
+    // Use API data or fallback to empty
+    const members = overview?.team_stats || []
 
     return (
         <Card className="p-6 border-border/50 shadow-sm">
@@ -24,7 +22,7 @@ export function TeamViewWidget() {
             <p className="text-xs text-muted-foreground mb-4">Resumo rápido dos membros</p>
 
             <div className="space-y-4">
-                {members.map((member, i) => (
+                {members.map((member: any, i: number) => (
                     <div key={i} className="flex items-center justify-between text-sm">
                         <span className="font-medium">{member.name}</span>
                         <span className={`font-semibold ${member.statusColor}`}>{member.status}</span>

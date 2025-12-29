@@ -387,6 +387,12 @@ class DocumentViewSet(BaseViewSet):
         
         # Exclude documents hidden for this user
         queryset = queryset.exclude(hidden_for_users=user)
+
+        # CRITICAL: Filter by current organization
+        # Document doesn't have a direct 'organization' field, so BaseViewSet filtering doesn't apply automatically
+        organization = self.get_current_organization()
+        if organization:
+            queryset = queryset.filter(department__organization=organization)
         
         # Apply view-specific filters
         if view_type == 'inbox' or view_type == 'files':

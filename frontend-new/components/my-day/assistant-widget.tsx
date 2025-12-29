@@ -58,26 +58,30 @@ export function AssistantWidget({ overview, pending, privacyMode }: AssistantWid
                                 <Upload className="size-4 text-white" />
                             </div>
                             <div className="flex flex-col min-w-0">
-                                <span className="text-[11px] font-bold text-white truncate">Upload Relatório Mensal</span>
-                                <span className="text-[9px] text-orange-50/70 truncate">Lembrete do dia 27</span>
+                                <span className="text-[11px] font-bold text-white truncate">Upload de Documentos</span>
+                                <span className="text-[9px] text-orange-50/70 truncate">Arraste para enviar</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/10 border border-white/5 hover:bg-white/20 transition-all group/item">
+                        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/10 border border-white/5 hover:bg-white/20 transition-all group/item cursor-pointer" onClick={() => router.push('/signatures')}>
                             <div className="size-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 shadow-sm">
                                 <PenTool className="size-4 text-white" />
                             </div>
                             <div className="flex flex-col min-w-0">
-                                <span className="text-[11px] font-bold text-white truncate">Assinar 2 Contratos</span>
-                                <span className="text-[9px] text-orange-50/70 truncate">Fornecedores recorrentes</span>
+                                <span className="text-[11px] font-bold text-white truncate">
+                                    {pending.pending_signatures === 1 ? '1 Assinatura' : `${pending.pending_signatures} Assinaturas`}
+                                </span>
+                                <span className="text-[9px] text-orange-50/70 truncate">Aguardando você</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/10 border border-white/5 hover:bg-white/20 transition-all group/item">
+                        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/10 border border-white/5 hover:bg-white/20 transition-all group/item cursor-pointer" onClick={() => router.push('/processes')}>
                             <div className="size-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 shadow-sm">
                                 <Workflow className="size-4 text-white" />
                             </div>
                             <div className="flex flex-col min-w-0">
-                                <span className="text-[11px] font-bold text-white truncate">Aprovar Orçamentos TI</span>
-                                <span className="text-[9px] text-orange-50/70 truncate">Padrão de sexta-feira</span>
+                                <span className="text-[11px] font-bold text-white truncate">
+                                    {pending.pending_approvals === 1 ? '1 Aprovação' : `${pending.pending_approvals} Aprovações`}
+                                </span>
+                                <span className="text-[9px] text-orange-50/70 truncate">Tarefas pendentes</span>
                             </div>
                         </div>
                     </div>

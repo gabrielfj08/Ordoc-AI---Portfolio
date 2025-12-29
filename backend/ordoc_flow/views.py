@@ -619,17 +619,31 @@ class WorkflowDashboardViewSet(BaseViewSet):
         # Estatísticas de tarefas
         task_stats = Task.count_by_status(organization=organization)
         
-        # Aprovações pendentes
-        pending_approvals = ApprovalInstance.objects.filter(
+        from ordoc_flow.models import GroupRequesterMember
+        from ordoc_flow.approval_models import ApprovalStepInstance
+
+        # Helper to get user's groups
+        ordoc_user = self.get_current_ordoc_user()
+        user_groups_ids = GroupRequesterMember.objects.filter(user=ordoc_user).values_list('group_id', flat=True) if ordoc_user else []
+
+        # Aprovações pendentes (assigned to user or their groups)
+        # Using ApprovalStepInstance directly as it holds the assignment info
+        pending_approvals = ApprovalStepInstance.objects.filter(
             status='pending',
-            workflow__organization=organization
+            approval_instance__workflow__organization=organization
+        ).filter(
+            Q(assigned_to=ordoc_user) | 
+            Q(approval_step__approver_group_id__in=user_groups_ids, assigned_to__isnull=True)
         ).count()
         
-        # Tarefas em atraso
+        # Tarefas em atraso (assigned to user or their groups)
+        # Note: Internal users are assigned via group_assignee or created_by
         overdue_tasks = Task.objects.filter(
             procedure__organization=organization,
             deadline__lt=timezone.now().date(),
             status__in=['running', 'started']
+        ).filter(
+            Q(group_assignee_id__in=user_groups_ids) | Q(created_by=ordoc_user)
         ).count()
         
         # Atividades recentes (últimos 10 procedimentos criados)
@@ -651,12 +665,45 @@ class WorkflowDashboardViewSet(BaseViewSet):
                 'status': proc.status
             })
         
+        # Team Stats for Widget
+        team_stats = []
+        if ordoc_user:
+            # Get users in same organization
+            from ordoc_cloud.models import UserOrganizationRole
+            org_users = UserOrganizationRole.objects.filter(
+                organization=organization,
+                role__in=['admin', 'manager', 'member'] # Filter relevant roles
+            ).select_related('user__user')[:5] # Limit to 5 for widget
+
+            for role_entry in org_users:
+                 u = role_entry.user
+                 # Count overdue approvals
+                 overdue_count = ApprovalStepInstance.objects.filter(
+                    assigned_to=u,
+                    status='pending',
+                    due_date__lt=timezone.now()
+                 ).count()
+                 
+                 status_text = "Tudo em dia"
+                 status_color = "text-success"
+                 if overdue_count > 0:
+                     status_text = f"{overdue_count} tarefas atrasadas"
+                     status_color = "text-destructive"
+                
+                 team_stats.append({
+                     'name': u.user.get_full_name() or u.user.username,
+                     'status': status_text,
+                     'statusColor': status_color,
+                     'avatar': u.avatar.url if u.avatar else None
+                 })
+
         dashboard_data = {
             'procedure_stats': procedure_stats,
             'task_stats': task_stats,
             'pending_approvals': pending_approvals,
             'overdue_tasks': overdue_tasks,
-            'recent_activities': recent_activities
+            'recent_activities': recent_activities,
+            'team_stats': team_stats # Add this
         }
         
         serializer = WorkflowDashboardSerializer(dashboard_data)

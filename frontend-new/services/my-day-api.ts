@@ -25,6 +25,12 @@ export interface DashboardOverview {
         completed: number
         total: number
     }
+    team_stats: Array<{
+        name: string
+        status: string
+        statusColor: string
+        avatar: string | null
+    }>
 }
 
 export interface RecentDocument {

@@ -231,6 +231,192 @@ def seed_public_sector():
             object_id=proc.id
         )
 
+def seed_legal_playbook():
+    print("\n⚖️  Seeding Legal Playbook (Moura & Associados)...")
+    
+    # 1. Organization
+    org, _ = Organization.objects.get_or_create(
+        subdomain="moura-law",
+        defaults={
+            "corporate_name": "Moura & Associados - Inteligência Jurídica", 
+            "cnpj": fake_cnpj(),
+            "email": "contato@moura.law",
+            "prn": "org:private:moura"
+        }
+    )
+
+    # 2. Users (The 'Squad')
+    # Sócio (Admin/View All)
+    socio = create_ordoc_user("Dr. Ricardo Moura", "admin", org)
+    
+    # Advogado Sênior (Gestão)
+    senior = create_ordoc_user("Dra. Patrícia (Sênior)", "organization_manager", org)
+    
+    # Advogado Pleno (Operacional)
+    pleno = create_ordoc_user("Dr. Carlos (Pleno)", "organization_member", org)
+    
+    # Paralegal (Triagem/Suporte)
+    paralegal = create_ordoc_user("Julia (Paralegal)", "organization_member", org)
+
+    # 3. Structure
+    dept_contratos, _ = Department.objects.get_or_create(
+        organization=org, 
+        name="Contratos e Compliance",
+        defaults={"prn": f"dept:{org.subdomain}:compliance"}
+    )
+    
+    dir_entradas, _ = Directory.objects.get_or_create(
+        department=dept_contratos, 
+        name="Entradas Recentes", 
+        path="/",
+        defaults={"prn": f"dir:{dept_contratos.prn}:entradas"}
+    )
+    
+    dir_arquivo, _ = Directory.objects.get_or_create(
+        department=dept_contratos, 
+        name="Arquivo Morto", 
+        path="/",
+        defaults={"prn": f"dir:{dept_contratos.prn}:arquivo"}
+    )
+
+    # 4. Scenario: "Controle de Validades e Revisão"
+    
+    # Groups for Assignment
+    g_squad, _ = GroupRequester.objects.get_or_create(organization=org, name="Squad Jurídico")
+    GroupRequesterMember.objects.get_or_create(group=g_squad, user=pleno, role='member')
+    GroupRequesterMember.objects.get_or_create(group=g_squad, user=paralegal, role='member')
+
+    # Dummy Procedure for "Avulso" tasks (My Day)
+    dummy_req_legal, _ = ExternalRequester.objects.get_or_create(
+        organization=org, email="interno@moura.law", defaults={"name": "Interno"}
+    )
+    pt_general, _ = ProcedureTemplate.objects.get_or_create(
+        organization=org, name="Revisão Geral", defaults={"status": "active"}
+    )
+    proc_general = Procedure.objects.create(
+        procedure_template=pt_general,
+        organization=org,
+        created_by=senior,
+        requester=dummy_req_legal,
+        status='running',
+        responsible_group=g_squad,
+        payload={"tipo": "fluxo_interno"}
+    )
+
+    # Document 1: Contrato Prestação de Serviços (Vencendo em 5 dias)
+    doc_vencendo, created = Document.objects.get_or_create(
+        prn=f"doc:{org.subdomain}:vencendo01",
+        defaults={
+            "directory": dir_entradas,
+            "name": "Contrato_TechSolutions_Servicos.pdf",
+            "mime_type": "application/pdf",
+            "created_by": pleno.user, # Document uses Django User
+            "status": "active",
+            "starred": True
+        }
+    )
+    if created:
+        doc_vencendo.file.save("contrato_vencendo.pdf", ContentFile("Conteúdo do contrato vencendo..."))
+
+    # Alert for "Meu Dia" (Notification)
+    Notification.objects.get_or_create(
+        user=senior, # Notification uses OrdocUser (Correct)
+        title="⚠️ AVISO DE VENCIMENTO",
+        content_type=ContentType.objects.get_for_model(doc_vencendo),
+        object_id=doc_vencendo.id,
+        defaults={
+            "message": "O contrato 'TechSolutions' vence em 5 dias. Renovação automática em risco.",
+            "notification_type": 'warning'
+        }
+    )
+    
+    # Task linked to this document
+    task_renovacao, _ = Task.objects.get_or_create(
+        procedure=proc_general, # Linked to Law Firm procedure
+        name="Avaliar Renovação TechSolutions",
+        defaults={
+            "description": "Verificar se atingiram SLA antes de renovar.",
+            "status": 'running',
+            "priority": 'high',
+            "group_assignee": g_squad, # Assigned to Group
+            "deadline": date.today() + timedelta(days=2), # Urgent deadline
+            "created_by": senior # Task uses OrdocUser (Corrected)
+        }
+    )
+
+    # Link doc to task via Attachment (conceptual link)
+    TaskAttachment.objects.get_or_create(
+        task=task_renovacao,
+        name=doc_vencendo.name,
+        defaults={
+            "attachment_type": 'document',
+            "file_name": "copy_contrato.pdf",
+            "uploaded_by": senior,
+            "file": doc_vencendo.file # Reusing file
+        }
+    )
+
+    # Document 2: Contrato Fornecedor (Categorização IA)
+    doc_ia, created = Document.objects.get_or_create(
+        prn=f"doc:{org.subdomain}:ia02",
+        defaults={
+            "directory": dir_entradas,
+            "name": "Minuta_Fornecedor_ABC.pdf",
+            "mime_type": "application/pdf",
+            "created_by": paralegal.user,
+            "status": "processing" # Simulating AI processing
+        }
+    )
+    if created:
+        doc_ia.file.save("minuta_abc.pdf", ContentFile("Cláusula de rescisão..."))
+
+    # Comment from IA (Simulation)
+    Comment.objects.get_or_create(
+        user=socio, # Simulation: Partner saw it or IA flagged
+        content="IA Suggestion: Este contrato parece ser do tipo 'Fornecedor'. Categorizar automaticamente?",
+        content_type=ContentType.objects.get_for_model(doc_ia),
+        object_id=doc_ia.id
+    )
+
+    # Task for Paralegal
+    Task.objects.get_or_create(
+        procedure=proc_general,
+        name="Validar Categorização IA",
+        defaults={
+            "status": 'running',
+            "priority": 'medium',
+            "group_assignee": g_squad, # Assign to Squad (Paralegal is member)
+            "created_by": senior,
+            "deadline": date.today() + timedelta(days=7)
+        }
+    )
+
+    # 5. Bulk Documents (filling the view)
+    clients = ["Retail_Group", "Logistica_Express", "Banco_Invest", "Startup_X", "Construtora_Y"]
+    for i, client in enumerate(clients):
+        d, created = Document.objects.get_or_create(
+            prn=f"doc:{org.subdomain}:nda{i}",
+            defaults={
+                "directory": dir_entradas,
+                "name": f"NDA_{client}_v{i}.pdf",
+                "mime_type": "application/pdf",
+                "created_by": pleno.user
+            }
+        )
+        if created:
+            d.file.save(f"nda_{i}.pdf", ContentFile(f"NDA Content for {client}"))
+        
+        # Shared context: Comment
+        if i % 2 == 0:
+            Comment.objects.get_or_create(
+                user=senior,
+                content=f"@{pleno.user.first_name} favor verificar a cláusula de confidencialidade deste NDA.",
+                content_type=ContentType.objects.get_for_model(d),
+                object_id=d.id
+            )
+
+    print(f"  - Created {len(clients) + 2} documents and assigned tasks for {org.corporate_name}")
+
 def seed_private_legal():
     print("\n⚖️  Seeding Private Sector (Advocacia)...")
     org, _ = Organization.objects.get_or_create(
@@ -336,10 +522,12 @@ def seed_framework_tables():
     )
     # Task
     pt, _ = PeriodicTask.objects.get_or_create(
-        interval=interval,
         name="Update Search Index (Every 10 min)",
-        task="ordoc_ai.tasks.update_search_index",
-        defaults={"enabled": True}
+        defaults={
+            "interval": interval,
+            "task": "ordoc_ai.tasks.update_search_index",
+            "enabled": True
+        }
     )
     print(f"  - Created Periodic Task: {pt.name}")
     
@@ -359,10 +547,12 @@ def seed_framework_tables():
         clocked_time=timezone.now() + timezone.timedelta(days=30)
     )
     pt_clocked, _ = PeriodicTask.objects.get_or_create(
-        clocked=clocked,
         name="Scheduled Maintenance (One-off)",
-        task="ordoc_ai.tasks.maintenance_task",
-        defaults={"one_off": True}
+        defaults={
+            "clocked": clocked,
+            "task": "ordoc_ai.tasks.maintenance_task",
+            "one_off": True
+        }
     )
     print(f"  - Created Clocked Schedule Task: {pt_clocked.name}")
 
@@ -390,6 +580,7 @@ def run():
     print("🚀 Starting Production Data Population...")
     try:
         seed_framework_tables()
+        seed_legal_playbook() # New scenario!
         seed_public_sector()
         seed_private_legal()
         seed_private_industry()
