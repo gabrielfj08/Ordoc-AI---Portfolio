@@ -59,7 +59,76 @@ class BaseViewSet(viewsets.ModelViewSet):
         Check if current user is an internal user
         """
         return isinstance(self.get_current_user(), User)
-    
+
+    def get_user_roles(self) -> list:
+        """
+        Get all roles of the current user in the current organization
+        Returns: list of role codes (e.g., ['admin', 'organization_manager'])
+        """
+        ordoc_user = self.get_current_ordoc_user()
+        organization = self.get_current_organization()
+
+        if not ordoc_user or not organization:
+            return []
+
+        from ordoc_cloud.models import UserOrganizationRole
+
+        roles = UserOrganizationRole.objects.filter(
+            user=ordoc_user,
+            organization=organization,
+            is_active=True
+        ).values_list('role', flat=True)
+
+        return list(roles)
+
+    def is_admin(self) -> bool:
+        """
+        Check if current user has admin role
+        """
+        return 'admin' in self.get_user_roles()
+
+    def is_organization_manager(self) -> bool:
+        """
+        Check if current user has organization_manager role
+        """
+        return 'organization_manager' in self.get_user_roles()
+
+    def is_department_manager(self) -> bool:
+        """
+        Check if current user has department_manager role
+        """
+        return 'department_manager' in self.get_user_roles()
+
+    def is_organization_member(self) -> bool:
+        """
+        Check if current user has organization_member role (lowest permission)
+        """
+        return 'organization_member' in self.get_user_roles()
+
+    def get_user_department(self):
+        """
+        Get the department of the current user
+        Returns the first department found in user's roles
+        """
+        ordoc_user = self.get_current_ordoc_user()
+        organization = self.get_current_organization()
+
+        if not ordoc_user or not organization:
+            return None
+
+        # Try to get department from tasks assigned to user
+        from ordoc_flow.models import Task
+        task_with_dept = Task.objects.filter(
+            assignee=ordoc_user,
+            procedure__organization=organization
+        ).exclude(
+            procedure__requester__isnull=True
+        ).first()
+
+        # For now, return None as department is not directly linked to user
+        # This can be enhanced later
+        return None
+
     def get_queryset(self):
         """
         Override to filter by organization if available

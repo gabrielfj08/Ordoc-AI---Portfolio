@@ -377,14 +377,41 @@ class DocumentViewSet(BaseViewSet):
         return context
     
     def get_queryset(self):
-        """Override to filter documents based on view type (Gmail-style)"""
+        """Override to filter documents based on view type (Gmail-style) and user role"""
         from datetime import timedelta
         from django.utils import timezone
-        
+
         queryset = super().get_queryset()
         user = self.request.user
+        ordoc_user = self.get_current_ordoc_user()
         view_type = self.request.query_params.get('view', 'inbox')
-        
+
+        # Filtrar baseado no role do usuário
+        # Admin (Sócio): vê todos os documentos
+        if self.is_admin():
+            pass  # Vê tudo
+
+        # Organization Manager (Sênior): vê documentos do seu departamento + compartilhados
+        elif self.is_organization_manager():
+            # Por enquanto vê tudo, pode ser filtrado por departamento depois
+            pass
+
+        # Department Manager (Pleno): vê apenas documentos do seu departamento
+        elif self.is_department_manager():
+            # Filtra: documentos enviados por ele OU do seu departamento
+            queryset = queryset.filter(
+                Q(uploaded_by=user) | Q(department__isnull=True)
+            )
+
+        # Organization Member (Paralegal): vê apenas documentos que ele enviou
+        elif self.is_organization_member():
+            queryset = queryset.filter(uploaded_by=user)
+
+        # Se não tem role, não vê nada
+        else:
+            if not self.is_admin() and not self.is_organization_manager() and not self.is_department_manager() and not self.is_organization_member():
+                queryset = queryset.none()
+
         # Exclude documents hidden for this user
         queryset = queryset.exclude(hidden_for_users=user)
         
