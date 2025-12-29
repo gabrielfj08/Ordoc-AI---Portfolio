@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd"
-import { Plus } from "lucide-react"
+import { Plus, Loader2 } from "lucide-react"
 import Column from "./kanban-column"
 import TaskDetailSidebar from "./kanban-task-detail"
 import AutomationRules from "./kanban-automation-rules"
@@ -14,200 +14,38 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import type { Task, Column as ColumnType, Rule } from "@/types/kanban"
 import { generateId } from "@/lib/utils"
+import { tasksApi } from "@/app/processes/api"
 
-// Mock data for initial tasks
-const generateMockTasks = (): { [key: string]: Task[] } => {
-  // Helper to create a date string (past or future)
-  const createDate = (daysFromNow: number): string => {
-    const date = new Date()
-    date.setDate(date.getDate() + daysFromNow)
-    return date.toISOString()
-  }
+// Mapeamento de status do backend para colunas do Kanban
+const statusToColumn: { [key: string]: string } = {
+  'draft': 'To Do',
+  'running': 'To Do',
+  'started': 'In Progress',
+  'finished': 'Completed',
+  'refused': 'Blocked',
+}
 
-  // To Do tasks
-  const todoTasks: Task[] = [
-    {
-      id: `task-${generateId()}`,
-      title: "Research competitor products",
-      description: "Analyze top 5 competitor products and create a comparison report",
-      status: "To Do",
-      dueDate: createDate(5),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Identify top competitors", completed: false },
-        { id: `subtask-${generateId()}`, title: "Create comparison criteria", completed: false },
-        { id: `subtask-${generateId()}`, title: "Gather product information", completed: false },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "High" },
-        { id: `field-${generateId()}`, name: "Estimated Hours", value: "8" },
-      ],
-      createdAt: createDate(-2),
-    },
-    {
-      id: `task-${generateId()}`,
-      title: "Design new landing page",
-      description: "Create wireframes and mockups for the new product landing page",
-      status: "To Do",
-      dueDate: createDate(7),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Research design trends", completed: false },
-        { id: `subtask-${generateId()}`, title: "Create wireframes", completed: false },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "Medium" },
-        { id: `field-${generateId()}`, name: "Assigned To", value: "Sarah" },
-      ],
-      createdAt: createDate(-1),
-    },
-    {
-      id: `task-${generateId()}`,
-      title: "Update documentation",
-      description: "Update the user documentation with the latest features",
-      status: "To Do",
-      dueDate: createDate(3),
-      subtasks: [],
-      customFields: [{ id: `field-${generateId()}`, name: "Priority", value: "Low" }],
-      createdAt: createDate(-3),
-    },
-  ]
+const columnToStatus: { [key: string]: string } = {
+  'To Do': 'running',
+  'In Progress': 'started',
+  'Completed': 'finished',
+  'Blocked': 'refused',
+}
 
-  // In Progress tasks
-  const inProgressTasks: Task[] = [
-    {
-      id: `task-${generateId()}`,
-      title: "Implement authentication flow",
-      description: "Create login, registration, and password reset functionality",
-      status: "In Progress",
-      dueDate: createDate(2),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Design authentication screens", completed: true },
-        { id: `subtask-${generateId()}`, title: "Implement login functionality", completed: true },
-        { id: `subtask-${generateId()}`, title: "Implement registration", completed: false },
-        { id: `subtask-${generateId()}`, title: "Implement password reset", completed: false },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "High" },
-        { id: `field-${generateId()}`, name: "Assigned To", value: "Michael" },
-        { id: `field-${generateId()}`, name: "Story Points", value: "8" },
-      ],
-      createdAt: createDate(-5),
-    },
-    {
-      id: `task-${generateId()}`,
-      title: "Optimize database queries",
-      description: "Improve performance of slow database queries on the dashboard",
-      status: "In Progress",
-      dueDate: createDate(1),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Identify slow queries", completed: true },
-        { id: `subtask-${generateId()}`, title: "Add indexes", completed: false },
-        { id: `subtask-${generateId()}`, title: "Rewrite complex queries", completed: false },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "High" },
-        { id: `field-${generateId()}`, name: "Estimated Hours", value: "6" },
-      ],
-      createdAt: createDate(-4),
-    },
-  ]
-
-  // Blocked tasks
-  const blockedTasks: Task[] = [
-    {
-      id: `task-${generateId()}`,
-      title: "Fix payment integration",
-      description: "Resolve issues with the Stripe payment integration",
-      status: "Blocked",
-      dueDate: createDate(-1), // Overdue
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Investigate error logs", completed: true },
-        { id: `subtask-${generateId()}`, title: "Contact Stripe support", completed: true },
-        { id: `subtask-${generateId()}`, title: "Update API integration", completed: false },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "Critical" },
-        { id: `field-${generateId()}`, name: "Blocker", value: "Waiting for API documentation" },
-      ],
-      createdAt: createDate(-7),
-    },
-    {
-      id: `task-${generateId()}`,
-      title: "Finalize third-party integrations",
-      description: "Complete integration with analytics and marketing tools",
-      status: "Blocked",
-      dueDate: createDate(-2), // Overdue
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Set up Google Analytics", completed: true },
-        { id: `subtask-${generateId()}`, title: "Integrate Mailchimp", completed: false },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "Medium" },
-        { id: `field-${generateId()}`, name: "Blocker", value: "Waiting for API keys" },
-      ],
-      createdAt: createDate(-6),
-    },
-  ]
-
-  // Completed tasks
-  const completedTasks: Task[] = [
-    {
-      id: `task-${generateId()}`,
-      title: "Create project proposal",
-      description: "Draft and finalize the project proposal document",
-      status: "Completed",
-      dueDate: createDate(-5),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Research market needs", completed: true },
-        { id: `subtask-${generateId()}`, title: "Define project scope", completed: true },
-        { id: `subtask-${generateId()}`, title: "Create budget estimate", completed: true },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "High" },
-        { id: `field-${generateId()}`, name: "Completed On", value: createDate(-6).split("T")[0] },
-      ],
-      createdAt: createDate(-10),
-    },
-    {
-      id: `task-${generateId()}`,
-      title: "Set up development environment",
-      description: "Configure development, staging, and production environments",
-      status: "Completed",
-      dueDate: createDate(-8),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Set up local environment", completed: true },
-        { id: `subtask-${generateId()}`, title: "Configure staging server", completed: true },
-        { id: `subtask-${generateId()}`, title: "Set up CI/CD pipeline", completed: true },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "Medium" },
-        { id: `field-${generateId()}`, name: "Completed By", value: "David" },
-      ],
-      createdAt: createDate(-12),
-    },
-    {
-      id: `task-${generateId()}`,
-      title: "Initial user research",
-      description: "Conduct interviews and surveys with potential users",
-      status: "Completed",
-      dueDate: createDate(-15),
-      subtasks: [
-        { id: `subtask-${generateId()}`, title: "Create research questions", completed: true },
-        { id: `subtask-${generateId()}`, title: "Recruit participants", completed: true },
-        { id: `subtask-${generateId()}`, title: "Analyze results", completed: true },
-      ],
-      customFields: [
-        { id: `field-${generateId()}`, name: "Priority", value: "High" },
-        { id: `field-${generateId()}`, name: "Participants", value: "12" },
-      ],
-      createdAt: createDate(-20),
-    },
-  ]
-
+// Função auxiliar para converter Task do backend para Task do Kanban
+const convertBackendTask = (backendTask: any): Task => {
   return {
-    "To Do": todoTasks,
-    "In Progress": inProgressTasks,
-    Blocked: blockedTasks,
-    Completed: completedTasks,
+    id: backendTask.id || `task-${generateId()}`,
+    title: backendTask.name || backendTask.title || "Sem título",
+    description: backendTask.description || "",
+    status: statusToColumn[backendTask.status] || 'To Do',
+    dueDate: backendTask.due_date || backendTask.deadline || undefined,
+    subtasks: [],
+    customFields: [
+      { id: `field-priority-${backendTask.id}`, name: "Priority", value: backendTask.priority || "medium" },
+      { id: `field-assignee-${backendTask.id}`, name: "Assigned To", value: backendTask.assignee_name || "Não atribuído" },
+    ],
+    createdAt: backendTask.created_at || new Date().toISOString(),
   }
 }
 
@@ -219,34 +57,81 @@ export default function KanbanBoard() {
   const [isAddingColumn, setIsAddingColumn] = useState(false)
   const [rules, setRules] = useState<Rule[]>([])
   const [activeTab, setActiveTab] = useState("board")
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Initialize with default columns and mock data
+  // Buscar tarefas reais da API
+  const loadTasks = async () => {
+    try {
+      setIsLoading(true)
+      const response = await tasksApi.list()
+      const tasks = response.results || []
+
+      // Agrupar tasks por status
+      const tasksByStatus: { [key: string]: Task[] } = {
+        'To Do': [],
+        'In Progress': [],
+        'Blocked': [],
+        'Completed': [],
+      }
+
+      tasks.forEach((backendTask: any) => {
+        const task = convertBackendTask(backendTask)
+        const columnKey = task.status
+        if (tasksByStatus[columnKey]) {
+          tasksByStatus[columnKey].push(task)
+        }
+      })
+
+      const initialColumns: ColumnType[] = [
+        {
+          id: "column-1",
+          title: "To Do",
+          tasks: tasksByStatus["To Do"],
+        },
+        {
+          id: "column-2",
+          title: "In Progress",
+          tasks: tasksByStatus["In Progress"],
+        },
+        {
+          id: "column-3",
+          title: "Blocked",
+          tasks: tasksByStatus["Blocked"],
+        },
+        {
+          id: "column-4",
+          title: "Completed",
+          tasks: tasksByStatus["Completed"],
+        },
+      ]
+      setColumns(initialColumns)
+    } catch (error) {
+      console.error('Erro ao carregar tasks:', error)
+      toast({
+        title: "Erro ao carregar tarefas",
+        description: "Não foi possível carregar as tarefas do servidor.",
+        variant: "destructive",
+      })
+      // Inicializar com colunas vazias
+      setColumns([
+        { id: "column-1", title: "To Do", tasks: [] },
+        { id: "column-2", title: "In Progress", tasks: [] },
+        { id: "column-3", title: "Blocked", tasks: [] },
+        { id: "column-4", title: "Completed", tasks: [] },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Initialize with real data from API
   useEffect(() => {
-    const mockTasks = generateMockTasks()
+    loadTasks()
 
-    const initialColumns: ColumnType[] = [
-      {
-        id: "column-1",
-        title: "To Do",
-        tasks: mockTasks["To Do"],
-      },
-      {
-        id: "column-2",
-        title: "In Progress",
-        tasks: mockTasks["In Progress"],
-      },
-      {
-        id: "column-3",
-        title: "Blocked",
-        tasks: mockTasks["Blocked"],
-      },
-      {
-        id: "column-4",
-        title: "Completed",
-        tasks: mockTasks["Completed"],
-      },
-    ]
-    setColumns(initialColumns)
+    // Polling: atualizar tasks a cada 30 segundos
+    const interval = setInterval(() => {
+      loadTasks()
+    }, 30000)
 
     // Add a sample automation rule
     setRules([
@@ -277,6 +162,8 @@ export default function KanbanBoard() {
         enabled: true,
       },
     ])
+
+    return () => clearInterval(interval)
   }, [])
 
   // Process automation rules
@@ -373,7 +260,7 @@ export default function KanbanBoard() {
     }
   }, [columns, rules, selectedTask, toast])
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result
 
     // If there's no destination or the item is dropped in the same place
@@ -413,6 +300,7 @@ export default function KanbanBoard() {
       ],
     }
 
+    // Atualizar estado local imediatamente (optimistic update)
     setColumns(newColumns)
 
     // Update selected task if it's the one being moved
@@ -420,10 +308,25 @@ export default function KanbanBoard() {
       setSelectedTask(updatedTask)
     }
 
-    toast({
-      title: "Task moved",
-      description: `"${task.title}" moved to ${destColumn.title}`,
-    })
+    // Persistir mudança no backend
+    try {
+      const newStatus = columnToStatus[destColumn.title]
+      await tasksApi.partialUpdate(draggableId, { status: newStatus })
+
+      toast({
+        title: "Tarefa movida",
+        description: `"${task.title}" movida para ${destColumn.title}`,
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar task:', error)
+      // Reverter mudança em caso de erro
+      setColumns(columns)
+      toast({
+        title: "Erro ao mover tarefa",
+        description: "Não foi possível salvar a mudança. Tente novamente.",
+        variant: "destructive",
+      })
+    }
   }
 
   const addTask = (columnId: string, task: Task) => {
@@ -633,6 +536,16 @@ export default function KanbanBoard() {
       />
     </div>
   )
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Carregando tarefas...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full ">
