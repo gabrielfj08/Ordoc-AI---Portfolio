@@ -518,8 +518,8 @@ function VisaoGeralAnalytics({ timeRange }: AnalyticsProps) {
                         key={hourIndex}
                         className="flex-1 h-6 rounded transition-all hover:scale-125 hover:z-10 cursor-pointer"
                         style={{
-                          backgroundColor: count > 0 
-                            ? `rgb(234 88 12 / ${intensity * 0.8 + 0.2})` 
+                          backgroundColor: count > 0
+                            ? `rgb(234 88 12 / ${intensity * 0.8 + 0.2})`
                             : 'rgb(var(--muted) / 0.3)',
                         }}
                         title={`${dayData.day} ${hourIndex}:00 - ${count} docs`}
@@ -614,12 +614,12 @@ function InteligenciaAnalytics() {
               Análises preditivas impulsionadas por IA para otimizar processos e antecipar demandas
             </p>
             <div className="flex items-center gap-3">
-            <Badge className="bg-success/10 text-success border-success/20 px-4 py-1.5">
-              <div className="size-2 rounded-full bg-success mr-2 animate-pulse" />
-              IA Ativa
-            </Badge>
-            <Badge variant="secondary">{alerts.length} alertas ativos</Badge>
-            <Badge variant="secondary">{patterns.length} padrões aprendidos</Badge>
+              <Badge className="bg-success/10 text-success border-success/20 px-4 py-1.5">
+                <div className="size-2 rounded-full bg-success mr-2 animate-pulse" />
+                IA Ativa
+              </Badge>
+              <Badge variant="secondary">{alerts.length} alertas ativos</Badge>
+              <Badge variant="secondary">{patterns.length} padrões aprendidos</Badge>
             </div>
           </div>
         </div>
@@ -641,23 +641,21 @@ function InteligenciaAnalytics() {
             ) : alerts.slice(0, 3).map((alert, i) => (
               <div
                 key={alert.id}
-                className={`p-3 rounded-xl border-2 ${
-                  alert.severity === "high"
+                className={`p-3 rounded-xl border-2 ${alert.severity === "high"
                     ? "border-destructive/20 bg-destructive/5"
                     : alert.severity === "medium"
-                    ? "border-warning/20 bg-warning/5"
-                    : "border-primary/20 bg-orange-600/5"
-                } hover:shadow-md transition-all cursor-pointer group`}
+                      ? "border-warning/20 bg-warning/5"
+                      : "border-primary/20 bg-orange-600/5"
+                  } hover:shadow-md transition-all cursor-pointer group`}
               >
                 <div className="flex items-start gap-3">
                   <div
-                    className={`size-2 rounded-full mt-1 ${
-                      alert.severity === "high"
+                    className={`size-2 rounded-full mt-1 ${alert.severity === "high"
                         ? "bg-destructive"
                         : alert.severity === "medium"
-                        ? "bg-warning"
-                        : "bg-orange-600"
-                    } animate-pulse`}
+                          ? "bg-warning"
+                          : "bg-orange-600"
+                      } animate-pulse`}
                   />
                   <div className="flex-1">
                     <div className="font-semibold mb-0.5 group-hover:text-primary transition-colors text-sm">
@@ -885,15 +883,24 @@ function RelatoriosAnalytics() {
         start_date: new Date(startDate).toISOString(),
         end_date: new Date(endDate).toISOString()
       })
-      
+
       const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `relatorio_${reportType}_${startDate}_${endDate}.${format}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+
+      // Para PDF (que é HTML), abrir em nova aba
+      if (format === 'pdf') {
+        window.open(url, '_blank')
+        // Limpar URL após um delay para dar tempo de abrir
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+      } else {
+        // Para CSV e Excel, fazer download normal
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `relatorio_${reportType}_${startDate}_${endDate}.${format === 'excel' ? 'xls' : format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }
     } catch (error) {
       console.error('Erro ao gerar relatório:', error)
       alert('Erro ao gerar relatório. Verifique os parâmetros e tente novamente.')
@@ -919,11 +926,10 @@ function RelatoriosAnalytics() {
                   <Button
                     key={type.id}
                     variant={reportType === type.id ? 'default' : 'outline'}
-                    className={`rounded-xl ${
-                      reportType === type.id
+                    className={`rounded-xl ${reportType === type.id
                         ? 'bg-orange-600 hover:bg-orange-600/90'
                         : 'hover:bg-orange-600/5 hover:border-primary/30 bg-transparent'
-                    }`}
+                      }`}
                     onClick={() => setReportType(type.id as any)}
                   >
                     {type.label}
@@ -960,11 +966,10 @@ function RelatoriosAnalytics() {
                     key={fmt.id}
                     variant={format === fmt.id ? 'default' : 'outline'}
                     size="sm"
-                    className={`rounded-full ${
-                      format === fmt.id
+                    className={`rounded-full ${format === fmt.id
                         ? 'bg-orange-600 hover:bg-orange-600/90'
                         : 'hover:bg-orange-600/5 hover:border-primary/30 bg-transparent'
-                    }`}
+                      }`}
                     onClick={() => setFormat(fmt.id as any)}
                   >
                     {fmt.label}
@@ -1102,7 +1107,7 @@ function AuditoriaAnalytics() {
   const [totalCount, setTotalCount] = useState(0)
   const [aiSummary, setAiSummary] = useState<any>(null)
   const [showFilters, setShowFilters] = useState(false)
-  
+
   // Filtros
   const [filterType, setFilterType] = useState<string>('')
   const [filterAction, setFilterAction] = useState<string>('')
@@ -1115,13 +1120,13 @@ function AuditoriaAnalytics() {
     try {
       setLoading(true)
       const params: any = { limit: 20, offset: 0 }
-      
+
       if (filterType) params.type = filterType
       if (filterAction) params.action = filterAction
       if (filterSearch) params.search = filterSearch
       if (filterStartDate) params.start_date = new Date(filterStartDate).toISOString()
       if (filterEndDate) params.end_date = new Date(filterEndDate).toISOString()
-      
+
       const data = await analysesApi.getAuditLogs(params.limit, params.offset, params)
       setLogs(data.results)
       setTotalCount(data.count)
@@ -1154,22 +1159,19 @@ function AuditoriaAnalytics() {
     <div className="space-y-6">
       {/* Insights de IA */}
       {aiSummary && (
-        <Card className={`p-5 border-2 ${
-          aiSummary.status === 'critical' ? 'border-destructive/30 bg-destructive/5' :
-          aiSummary.status === 'warning' ? 'border-warning/30 bg-warning/5' :
-          'border-success/30 bg-success/5'
-        }`}>
+        <Card className={`p-5 border-2 ${aiSummary.status === 'critical' ? 'border-destructive/30 bg-destructive/5' :
+            aiSummary.status === 'warning' ? 'border-warning/30 bg-warning/5' :
+              'border-success/30 bg-success/5'
+          }`}>
           <div className="flex items-start gap-4">
-            <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${
-              aiSummary.status === 'critical' ? 'bg-destructive/20' :
-              aiSummary.status === 'warning' ? 'bg-warning/20' :
-              'bg-success/20'
-            }`}>
-              <Sparkles className={`size-6 ${
-                aiSummary.status === 'critical' ? 'text-destructive' :
-                aiSummary.status === 'warning' ? 'text-warning' :
-                'text-success'
-              }`} />
+            <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${aiSummary.status === 'critical' ? 'bg-destructive/20' :
+                aiSummary.status === 'warning' ? 'bg-warning/20' :
+                  'bg-success/20'
+              }`}>
+              <Sparkles className={`size-6 ${aiSummary.status === 'critical' ? 'text-destructive' :
+                  aiSummary.status === 'warning' ? 'text-warning' :
+                    'text-success'
+                }`} />
             </div>
             <div className="flex-1">
               <h4 className="font-bold mb-1">Análise de IA - Segurança do Sistema</h4>
@@ -1331,15 +1333,14 @@ function AuditoriaAnalytics() {
               className="flex items-center gap-4 p-4 rounded-xl hover:bg-secondary/30 transition-all cursor-pointer border border-transparent hover:border-border/50"
             >
               <div
-                className={`size-2 rounded-full ${
-                  log.type === "success" 
-                    ? "bg-success" 
-                    : log.type === "warning" 
-                    ? "bg-warning" 
-                    : log.type === "error"
-                    ? "bg-destructive"
-                    : "bg-orange-600"
-                } shrink-0`}
+                className={`size-2 rounded-full ${log.type === "success"
+                    ? "bg-success"
+                    : log.type === "warning"
+                      ? "bg-warning"
+                      : log.type === "error"
+                        ? "bg-destructive"
+                        : "bg-orange-600"
+                  } shrink-0`}
               />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-sm mb-1">{log.action}</div>
