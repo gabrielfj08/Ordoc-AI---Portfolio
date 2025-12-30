@@ -13,9 +13,11 @@ django.setup()
 from django.contrib.auth.models import User
 from ordoc_cloud.models import OrdocUser, UserOrganizationRole
 from ordoc_air.models import Organization, Department, Document
-from ordoc_flow.models import Procedure, Task, ProcedureTemplate
+from ordoc_flow.models import Procedure, Task, ProcedureTemplate, ExternalRequester, GroupRequester
 from django.utils import timezone
 import random
+import uuid
+import uuid
 
 def create_persona_1_advogado():
     """
@@ -93,6 +95,10 @@ def create_persona_1_advogado():
         defaults={'is_active': True, 'is_primary': True}
     )
     print(f"✅ Usuária criada: {user.email} (Admin/Sócia)")
+    
+    # Criar dependencias obrigatórias para Procedure
+    group_req, _ = GroupRequester.objects.get_or_create(organization=org, name='Equipe Jurídica', defaults={'description': 'Equipe'})
+    client_req, _ = ExternalRequester.objects.get_or_create(organization=org, name='Cliente Padrão', email='cli@ex.com')
 
     # Criar documentos jurídicos
     doc_types = [
@@ -107,20 +113,20 @@ def create_persona_1_advogado():
 
     for title, desc in doc_types:
         Document.objects.create(
-            organization=org,
-            uploaded_by=user,
+            created_by=user,
             department=dept_trabalhista if 'Trabalhista' in title or 'Reclamação' in title else dept_contratos,
-            file_name=f"{title.replace(' ', '_')}.pdf",
-            title=title,
-            description=desc,
+            name=f"{title.replace(' ', '_')}.pdf",
+            description=f"{title} - {desc}",
             file_size=random.randint(500000, 5000000),
-            file_type='application/pdf',
-            status='active',
+            mime_type='application/pdf',
+            document_status='active',
+            prn=f"DOC-{org.prn}-{uuid.uuid4()}",
         )
     print(f"✅ Criados {len(doc_types)} documentos jurídicos")
 
     # Criar procedures e tasks
     template, _ = ProcedureTemplate.objects.get_or_create(
+        organization=org,
         name='Processo Judicial Trabalhista',
         defaults={'description': 'Template para processos trabalhistas', 'status': 'active'}
     )
@@ -134,12 +140,13 @@ def create_persona_1_advogado():
     for proc_name, priority, num_tasks in procedures_data:
         proc = Procedure.objects.create(
             organization=org,
-            name=proc_name,
-            description=f'Caso trabalhista em andamento',
+            procedure_template_name=proc_name,
             status='running',
             priority=priority,
             procedure_template=template,
-            requester=ordoc_user,
+            requester=client_req,
+            responsible_group=group_req,
+            created_by=ordoc_user,
         )
 
         task_names = [
@@ -155,10 +162,10 @@ def create_persona_1_advogado():
             Task.objects.create(
                 procedure=proc,
                 name=task_names[i % len(task_names)],
-                description=f'Atividade relacionada ao caso: {proc_name}',
+                description=f'Atividade relacionado ao caso: {proc_name}',
                 status=random.choice(['running', 'started']),
                 priority=priority,
-                assignee=ordoc_user,
+                created_by=ordoc_user,
                 deadline=timezone.now() + timedelta(days=random.randint(3, 30)),
             )
 
@@ -240,6 +247,10 @@ def create_persona_2_medico():
     )
     print(f"✅ Usuário criado: {user.email} (Admin/Dono)")
 
+    # Criar dependencias obrigatórias para Procedure
+    group_req, _ = GroupRequester.objects.get_or_create(organization=org, name='Equipe Médica', defaults={'description': 'Equipe'})
+    client_req, _ = ExternalRequester.objects.get_or_create(organization=org, name='Paciente Padrão', email='pac@ex.com')
+
     # Criar documentos médicos
     doc_types = [
         ('Prontuário Médico - Paciente João Silva', 'Histórico de consultas cardiológicas'),
@@ -255,20 +266,20 @@ def create_persona_2_medico():
 
     for title, desc in doc_types:
         Document.objects.create(
-            organization=org,
-            uploaded_by=user,
+            created_by=user,
             department=dept_cardio,
-            file_name=f"{title.replace(' ', '_')}.pdf",
-            title=title,
-            description=desc,
+            name=f"{title.replace(' ', '_')}.pdf",
+            description=f"{title} - {desc}",
             file_size=random.randint(200000, 2000000),
-            file_type='application/pdf',
-            status='active',
+            mime_type='application/pdf',
+            document_status='active',
+            prn=f"DOC-{org.prn}-{uuid.uuid4()}",
         )
     print(f"✅ Criados {len(doc_types)} documentos médicos")
 
     # Criar procedures (atendimentos/acompanhamentos)
     template, _ = ProcedureTemplate.objects.get_or_create(
+        organization=org,
         name='Acompanhamento Cardiológico',
         defaults={'description': 'Template para acompanhamento de pacientes', 'status': 'active'}
     )
@@ -283,12 +294,13 @@ def create_persona_2_medico():
     for proc_name, priority, num_tasks in procedures_data:
         proc = Procedure.objects.create(
             organization=org,
-            name=proc_name,
-            description='Acompanhamento médico continuado',
+            procedure_template_name=proc_name,
             status='running',
             priority=priority,
             procedure_template=template,
-            requester=ordoc_user,
+            requester=client_req,
+            responsible_group=group_req,
+            created_by=ordoc_user,
         )
 
         task_names = [
@@ -306,7 +318,7 @@ def create_persona_2_medico():
                 description=f'Atividade do acompanhamento: {proc_name}',
                 status=random.choice(['running', 'started', 'finished']),
                 priority=priority,
-                assignee=ordoc_user,
+                created_by=ordoc_user,
                 deadline=timezone.now() + timedelta(days=random.randint(7, 60)),
             )
 
@@ -397,6 +409,10 @@ def create_persona_3_servidor_publico():
     )
     print(f"✅ Usuário criado: {user.email} (Gerente de Departamento)")
 
+    # Criar dependencias obrigatórias para Procedure
+    group_req, _ = GroupRequester.objects.get_or_create(organization=org, name='Equipe Obras', defaults={'description': 'Equipe'})
+    client_req, _ = ExternalRequester.objects.get_or_create(organization=org, name='Contribuinte Padrão', email='cidadao@ex.com')
+
     # Criar documentos públicos
     doc_types = [
         ('Edital de Licitação - Pavimentação Avenida Principal', 'Pregão eletrônico para obra de pavimentação'),
@@ -412,20 +428,20 @@ def create_persona_3_servidor_publico():
 
     for title, desc in doc_types:
         Document.objects.create(
-            organization=org,
-            uploaded_by=user,
+            created_by=user,
             department=dept_licitacoes if 'Licitação' in title or 'Edital' in title else dept_fiscalizacao,
-            file_name=f"{title.replace(' ', '_')}.pdf",
-            title=title,
-            description=desc,
+            name=f"{title.replace(' ', '_')}.pdf",
+            description=f"{title} - {desc}",
             file_size=random.randint(1000000, 8000000),
-            file_type='application/pdf',
-            status='active',
+            mime_type='application/pdf',
+            document_status='active',
+            prn=f"DOC-{org.prn}-{uuid.uuid4()}",
         )
     print(f"✅ Criados {len(doc_types)} documentos públicos")
 
     # Criar procedures (processos administrativos)
     template, _ = ProcedureTemplate.objects.get_or_create(
+        organization=org,
         name='Processo Licitatório',
         defaults={'description': 'Template para licitações públicas', 'status': 'active'}
     )
@@ -439,12 +455,13 @@ def create_persona_3_servidor_publico():
     for proc_name, priority, num_tasks in procedures_data:
         proc = Procedure.objects.create(
             organization=org,
-            name=proc_name,
-            description='Processo administrativo em andamento',
+            procedure_template_name=proc_name,
             status='running',
             priority=priority,
             procedure_template=template,
-            requester=ordoc_user,
+            requester=client_req,
+            responsible_group=group_req,
+            created_by=ordoc_user,
         )
 
         task_names = [
@@ -465,7 +482,7 @@ def create_persona_3_servidor_publico():
                 description=f'Etapa do processo: {proc_name}',
                 status=random.choice(['running', 'started', 'finished']),
                 priority=priority,
-                assignee=ordoc_user,
+                created_by=ordoc_user,
                 deadline=timezone.now() + timedelta(days=random.randint(10, 90)),
             )
 
@@ -549,6 +566,10 @@ def create_persona_4_freelancer():
     )
     print(f"✅ Usuária criada: {user.email} (Freelancer/MEI)")
 
+    # Criar dependencias obrigatórias para Procedure
+    group_req, _ = GroupRequester.objects.get_or_create(organization=org, name='Eu Mesma', defaults={'description': 'Equipe'})
+    client_req, _ = ExternalRequester.objects.get_or_create(organization=org, name='Cliente Freelancer', email='cli_free@ex.com')
+
     # Criar documentos de design
     doc_types = [
         ('Proposta Comercial - Identidade Visual Restaurante XYZ', 'Proposta de criação de logo e materiais'),
@@ -565,20 +586,20 @@ def create_persona_4_freelancer():
 
     for title, desc in doc_types:
         Document.objects.create(
-            organization=org,
-            uploaded_by=user,
+            created_by=user,
             department=dept_projetos,
-            file_name=f"{title.replace(' ', '_')}.pdf",
-            title=title,
-            description=desc,
+            name=f"{title.replace(' ', '_')}.pdf",
+            description=f"{title} - {desc}",
             file_size=random.randint(500000, 10000000),
-            file_type='application/pdf',
-            status='active',
+            mime_type='application/pdf',
+            document_status='active',
+            prn=f"DOC-{org.prn}-{uuid.uuid4()}",
         )
     print(f"✅ Criados {len(doc_types)} documentos de design")
 
     # Criar procedures (projetos de clientes)
     template, _ = ProcedureTemplate.objects.get_or_create(
+        organization=org,
         name='Projeto de Design',
         defaults={'description': 'Template para projetos de design gráfico', 'status': 'active'}
     )
@@ -593,12 +614,13 @@ def create_persona_4_freelancer():
     for proc_name, priority, num_tasks in procedures_data:
         proc = Procedure.objects.create(
             organization=org,
-            name=proc_name,
-            description='Projeto de design para cliente',
+            procedure_template_name=proc_name,
             status='running',
             priority=priority,
             procedure_template=template,
-            requester=ordoc_user,
+            requester=client_req,
+            responsible_group=group_req,
+            created_by=ordoc_user,
         )
 
         task_names = [
@@ -619,7 +641,6 @@ def create_persona_4_freelancer():
                 description=f'Etapa do projeto: {proc_name}',
                 status=random.choice(['running', 'started', 'finished']),
                 priority=priority,
-                assignee=ordoc_user,
                 created_by=ordoc_user,
                 deadline=timezone.now() + timedelta(days=random.randint(3, 45)),
             )

@@ -23,13 +23,23 @@ export interface ExtractedData {
     }
 }
 
+export interface SuggestedAction {
+    action_type: string
+    label: string
+    description?: string
+    auto_applicable: boolean
+    payload?: Record<string, any>
+}
+
 export interface Alert {
     id: string
     title: string
     message: string
+    details?: Record<string, any>
     severity: 'info' | 'warning' | 'error' | 'critical'
     source: string
     is_read: boolean
+    suggested_actions?: SuggestedAction[]
     created_at: string
 }
 

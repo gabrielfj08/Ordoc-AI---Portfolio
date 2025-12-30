@@ -11,6 +11,8 @@ import { AIAlertsWidget } from "@/components/intelligence/ai-alerts-widget"
 import { PriorityTasksWidget } from "@/components/tasks/priority-tasks-widget"
 import { ContinueWorkingWidget } from "@/components/my-day/continue-working-widget"
 import { TeamViewWidget } from "@/components/my-day/team-view-widget"
+import { SmartAgendaWidget } from "@/components/my-day/smart-agenda-widget"
+import { StorageWidget } from "@/components/my-day/storage-widget"
 import dynamic from 'next/dynamic'
 
 const AssistantWidget = dynamic(() => import("@/components/my-day/assistant-widget").then(mod => ({ default: mod.AssistantWidget })), { ssr: false })
@@ -67,6 +69,7 @@ export default function MeuDiaPage() {
         fetchDashboardData,
         toggleRanking,
         privacyMode,
+        aiStats,
     } = useMyDayStore()
 
     // Local UI state (filters, pagination)
@@ -247,40 +250,40 @@ export default function MeuDiaPage() {
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                     {[
                         {
-                            label: "Total de Documentos",
-                            value: overview?.total_documents?.toString() || "0",
-                            change: overview?.documents_change || "+0%",
-                            trend: (overview?.documents_change || "+0%").startsWith("-") ? "down" : "up",
+                            label: "Documentos Processados",
+                            value: aiStats?.analysisCount?.toString() || "0",
+                            change: "+12%",
+                            trend: "up",
                             icon: FileText,
                             color: "primary",
-                            target: "200",
+                            target: "Meta: 500",
                         },
                         {
-                            label: "Usuários Ativos",
-                            value: overview?.active_users?.toString() || "0",
-                            change: overview?.users_change || "+0%",
-                            trend: (overview?.users_change || "+0%").startsWith("-") ? "down" : "up",
-                            icon: Users,
-                            color: "chart-2",
-                            target: "10",
-                        },
-                        {
-                            label: "Taxa de Aprovação",
-                            value: `${overview?.approval_rate || 89}%`,
-                            change: "-2%",
-                            trend: "down",
-                            icon: Target,
-                            color: "chart-4",
-                            target: "95%",
-                        },
-                        {
-                            label: "Tempo Médio",
-                            value: "1.3h",
-                            change: "-15%",
+                            label: "Alertas de Inteligência",
+                            value: aiStats?.alertsCount?.toString() || "0",
+                            change: "+5%",
                             trend: "up",
-                            icon: Clock,
+                            icon: AlertCircle,
+                            color: "chart-2",
+                            target: "Críticos: 0",
+                        },
+                        {
+                            label: "Status da Plataforma",
+                            value: aiStats?.systemStatus === 'online' ? "Online" : "Ativo",
+                            change: "100%",
+                            trend: "up",
+                            icon: Activity,
+                            color: "success",
+                            target: "Uptime: 99.9%",
+                        },
+                        {
+                            label: "Padrões Identificados",
+                            value: aiStats?.patternsCount?.toString() || "0",
+                            change: "+3",
+                            trend: "up",
+                            icon: Sparkles,
                             color: "chart-3",
-                            target: "1h",
+                            target: "Novos: 2",
                         },
                     ].map((stat) => (
                         <Card
@@ -400,15 +403,15 @@ export default function MeuDiaPage() {
                         {/* Continue de onde parou */}
                         <ContinueWorkingWidget />
 
-                        {/* Documentos Recentes */}
+                        {/* Documentos em Destaque */}
                         <Card className="p-6 border-border/50 shadow-sm">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
                                     <h3 className="text-xl font-bold flex items-center gap-2">
                                         <FileText className="size-5 text-primary" />
-                                        Documentos Recentes
+                                        Documentos em Destaque
                                     </h3>
-                                    <p className="text-sm text-muted-foreground mt-1">Acesso rápido aos seus arquivos</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Seleção inteligente baseada em suas tarefas e prioridades</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button
@@ -434,7 +437,7 @@ export default function MeuDiaPage() {
                                             Ranking IA
                                         </Button>
                                     )}
-                                    <CardControls cardId="documents" cardTitle="Documentos Recentes" />
+                                    <CardControls cardId="documents" cardTitle="Documentos em Destaque" />
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -581,8 +584,19 @@ export default function MeuDiaPage() {
                                                 <FileText className="size-5 text-destructive" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
-                                                    {doc.file_name || doc.title}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                                                        {doc.file_name || doc.title}
+                                                    </div>
+                                                    {doc.recommendation_reason && (
+                                                        <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 h-4 border-0 
+                                                            ${doc.recommendation_reason === 'Tarefa Crítica' ? 'bg-destructive/10 text-destructive' :
+                                                                doc.recommendation_reason === 'Próximo Vencimento' ? 'bg-warning/10 text-warning-foreground' :
+                                                                    doc.recommendation_reason === 'Favorito' ? 'bg-yellow-500/10 text-yellow-600' :
+                                                                        'bg-secondary text-secondary-foreground'}`}>
+                                                            {doc.recommendation_reason}
+                                                        </Badge>
+                                                    )}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
                                                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -855,58 +869,12 @@ export default function MeuDiaPage() {
                             </div>
                         </Card>
 
+
                         {/* Agenda Inteligente */}
-                        <Card className="p-6 border-border/50 shadow-sm">
-                            <h3 className="font-bold mb-5 flex items-center gap-2">
-                                <Calendar className="size-5 text-chart-4" />
-                                Agenda Inteligente
-                            </h3>
-                            <div className="space-y-3">
-                                <div className="text-center p-6 rounded-xl bg-muted/30 border border-dashed border-border">
-                                    <Calendar className="size-8 text-muted-foreground mx-auto mb-2" />
-                                    <p className="text-sm text-muted-foreground">Nenhum evento próximo</p>
-                                    <Button variant="link" size="sm" className="mt-2">
-                                        Adicionar evento
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
+                        <SmartAgendaWidget />
 
                         {/* Armazenamento */}
-                        <Card className="p-6 border-border/50 shadow-sm">
-                            <h3 className="font-bold mb-5 flex items-center gap-2">
-                                <Database className="size-5 text-chart-5" />
-                                Armazenamento
-                            </h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="flex items-baseline gap-2 mb-3">
-                                        <span className="text-2xl font-bold">17.3 MB</span>
-                                        <span className="text-sm text-muted-foreground">de 100 GB</span>
-                                    </div>
-                                    <Progress value={0.02} className="h-2" />
-                                </div>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="size-3 rounded-sm bg-orange-600" />
-                                            <span>Documentos</span>
-                                        </div>
-                                        <span className="font-medium">17.3 MB</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-muted-foreground">
-                                        <div className="flex items-center gap-2">
-                                            <div className="size-3 rounded-sm bg-chart-2" />
-                                            <span>Arquivos temporários</span>
-                                        </div>
-                                        <span>0 MB</span>
-                                    </div>
-                                </div>
-                                <Button variant="outline" size="sm" className="w-full rounded-full bg-transparent">
-                                    Gerenciar armazenamento
-                                </Button>
-                            </div>
-                        </Card>
+                        <StorageWidget />
 
                         {/* Visão de Equipe */}
                         <TeamViewWidget />

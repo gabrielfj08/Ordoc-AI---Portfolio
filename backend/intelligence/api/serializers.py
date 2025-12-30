@@ -55,7 +55,7 @@ class ProactiveAlertSerializer(serializers.ModelSerializer):
         model = ProactiveAlert
         fields = [
             'id', 'alert_type', 'severity', 'title', 'message', 'details',
-            'location', 'suggested_actions', 'document_id', 'document_type',
+            'location', 'suggested_actions', 'document_id', 'document_type_name',
             'user_response', 'is_read', 'created_at'
         ]
         read_only_fields = ['id', 'created_at', 'is_read']
@@ -75,6 +75,8 @@ class AlertResponseSerializer(serializers.Serializer):
 class DocumentAnalysisSerializer(serializers.ModelSerializer):
     """Serializer for document analysis results."""
     
+    document_type = serializers.CharField(source='document_type_name', read_only=True)
+
     class Meta:
         model = DocumentAnalysis
         fields = [

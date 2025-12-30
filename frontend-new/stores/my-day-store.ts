@@ -3,7 +3,7 @@ import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { produce } from 'immer'
 import { myDayApi, type DashboardOverview, type RecentDocument, type ActiveWorkflow, type PendingSummary } from '@/services/my-day-api'
 import { rankingApi, type RankedEntity } from '@/services/ranking-api'
-import { analysisApi } from '@/services/intelligence-api'
+import { analysisApi, alertsApi, patternsApi } from '@/services/intelligence-api'
 
 // --- Data Types ---
 
@@ -20,6 +20,16 @@ export interface MyDayData {
         compliant: boolean
         lgpd_ready: boolean
         data_residency: string
+    } | null
+    continueWorkingItems: {
+        lastTask: any | null
+        lastDocument: RecentDocument | null
+    } | null
+    aiStats: {
+        analysisCount: number
+        alertsCount: number
+        patternsCount: number
+        systemStatus: string
     } | null
 }
 
@@ -85,6 +95,8 @@ const initialState: MyDayData & RankingState & { isLoading: boolean; error: stri
     viewMode: 'personal',
     canAccessTeamView: false,
     privacyMode: null,
+    continueWorkingItems: null,
+    aiStats: null,
 
     // Ranking data
     documentRankings: [],
@@ -122,14 +134,26 @@ export const useMyDayStore = create<MyDayState>()(
             fetchDashboardData: async () => {
                 set({ isLoading: true, error: null })
                 try {
-                    const [overview, documents, workflows, pending, userInfo, privacyInfo] = await Promise.all([
+                    const [overview, documents, workflows, pending, userInfo, privacyInfo, analysisRes, alertsRes, patternsRes, continueWorkingRes] = await Promise.all([
                         myDayApi.getDashboardOverview(),
                         myDayApi.getRecentDocuments(30),
                         myDayApi.getActiveWorkflows(10),
                         myDayApi.getPendingSummary(),
                         myDayApi.getUserInfo(),
                         analysisApi.getStatus().catch(() => null),
+                        // Fetch counts for AI stats
+                        analysisApi.list({}).catch(() => ({ count: 0 })),
+                        alertsApi.list({}).catch(() => ({ count: 0 })),
+                        patternsApi.list({}).catch(() => ({ count: 0 })),
+                        myDayApi.getContinueWorkingItems().catch(() => null),
                     ])
+
+                    const aiStats = {
+                        analysisCount: (analysisRes as any)?.count || 0,
+                        alertsCount: (alertsRes as any)?.count || 0,
+                        patternsCount: (patternsRes as any)?.count || 0,
+                        systemStatus: (privacyInfo as any)?.status || 'Online'
+                    }
 
                     set({
                         overview,
@@ -139,7 +163,9 @@ export const useMyDayStore = create<MyDayState>()(
                         userName: userInfo.first_name || userInfo.username || '',
                         viewMode: userInfo.view_mode || 'personal',
                         canAccessTeamView: userInfo.can_access_team_view || false,
-                        privacyMode: privacyInfo ? privacyInfo.privacy : null,
+                        privacyMode: privacyInfo ? (privacyInfo as any).privacy : null,
+                        continueWorkingItems: continueWorkingRes,
+                        aiStats,
                         isLoading: false,
                     })
 
@@ -337,3 +363,4 @@ export const selectIsLoading = (state: MyDayState) => state.isLoading
 export const selectViewMode = (state: MyDayState) => state.viewMode
 export const selectCanAccessTeamView = (state: MyDayState) => state.canAccessTeamView
 export const selectPrivacyMode = (state: MyDayState) => state.privacyMode
+export const selectAiStats = (state: MyDayState) => state.aiStats

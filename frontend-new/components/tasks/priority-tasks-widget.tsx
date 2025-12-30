@@ -26,10 +26,10 @@ export function PriorityTasksWidget() {
         const fetchTasks = async () => {
             try {
                 setLoading(true)
-                // Buscar tarefas ativas (não finalizadas/recusadas)
-                const response = await tasksApi.list({
+                setLoading(true)
+                // Buscar tarefas do usuário (não finalizadas/recusadas já filtradas pelo status)
+                const response = await tasksApi.myTasks({
                     status: 'running,started,draft',
-                    ordering: '-created_at',
                 })
                 setTasks(response.results)
             } catch (error) {
@@ -126,13 +126,12 @@ export function PriorityTasksWidget() {
                                         <div className="flex items-start gap-3">
                                             {/* Ranking */}
                                             <div
-                                                className={`size-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-sm ${
-                                                    index === 0
+                                                className={`size-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-sm ${index === 0
                                                         ? 'bg-destructive text-destructive-foreground'
                                                         : index === 1
-                                                        ? 'bg-warning text-warning-foreground'
-                                                        : 'bg-muted text-muted-foreground'
-                                                }`}
+                                                            ? 'bg-warning text-warning-foreground'
+                                                            : 'bg-muted text-muted-foreground'
+                                                    }`}
                                             >
                                                 {index + 1}
                                             </div>

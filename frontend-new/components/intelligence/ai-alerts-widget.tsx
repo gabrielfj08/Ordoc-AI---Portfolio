@@ -17,7 +17,7 @@ import {
     X,
     Sparkles
 } from 'lucide-react'
-import { alertsApi, type Alert } from '@/services/intelligence-api'
+import { alertsApi, type Alert, type SuggestedAction } from '@/services/intelligence-api'
 import { useToast } from '@/hooks/use-toast'
 
 import { useMyDayStore } from '@/stores/my-day-store'
@@ -84,6 +84,26 @@ export function AIAlertsWidget() {
         }
     }
 
+    const handleAction = async (alertId: string, action: SuggestedAction) => {
+        try {
+            // TODO: Implementar chamada de API para executar ação
+            console.log('Executando ação:', action.action_type, action.payload)
+
+            toast({
+                description: `Aplicando: ${action.label}`,
+            })
+
+            // Se for "Ignorar" ou "Aplicar", marcar como lido/resolvido
+            await handleMarkAsRead(alertId)
+
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                description: 'Erro ao executar ação',
+            })
+        }
+    }
+
     const getAlertIcon = (severity: Alert['severity']) => {
         switch (severity) {
             case 'critical':
@@ -112,27 +132,6 @@ export function AIAlertsWidget() {
         }
     }
 
-    const getSeverityBadge = (severity: Alert['severity']) => {
-        const labels = {
-            critical: 'Crítico',
-            error: 'Erro',
-            warning: 'Aviso',
-            info: 'Info'
-        }
-        const variants = {
-            critical: 'destructive',
-            error: 'destructive',
-            warning: 'secondary',
-            info: 'default'
-        } as const
-
-        return (
-            <Badge variant={variants[severity]} className="text-xs">
-                {labels[severity]}
-            </Badge>
-        )
-    }
-
     if (loading) {
         return (
             <Card className="p-6 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 via-background to-background dark:from-purple-950/20">
@@ -147,6 +146,10 @@ export function AIAlertsWidget() {
             </Card>
         )
     }
+
+    // Filtrar alertas com ações (destaques) vs alertas informativos
+    const actionableAlerts = alerts.filter(a => a.suggested_actions && a.suggested_actions.length > 0)
+    const infoAlerts = alerts.filter(a => !a.suggested_actions || a.suggested_actions.length === 0)
 
     return (
         <Card className="p-6 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 via-background to-background dark:from-purple-950/20 shadow-lg">
@@ -174,11 +177,11 @@ export function AIAlertsWidget() {
                 </div>
             </div>
 
-            {/* Nova Recomendação Fixa/Exemplo */}
-            {showExample && (
-                <div className="mb-6 p-4 rounded-xl bg-white/50 dark:bg-purple-900/10 border border-purple-200/50 dark:border-purple-800/50 relative group/rec">
+            {/* Alertas com Ações (Destaque) */}
+            {actionableAlerts.map(alert => (
+                <div key={alert.id} className="mb-6 p-4 rounded-xl bg-white/50 dark:bg-purple-900/10 border border-purple-200/50 dark:border-purple-800/50 relative group/rec">
                     <button
-                        onClick={() => setShowExample(false)}
+                        onClick={() => handleMarkAsRead(alert.id)}
                         className="absolute top-2 right-2 size-6 rounded-full flex items-center justify-center opacity-0 group-hover/rec:opacity-100 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-400 transition-all"
                     >
                         <X className="size-3.5" />
@@ -186,88 +189,104 @@ export function AIAlertsWidget() {
 
                     <h4 className="font-bold text-purple-700 dark:text-purple-400 text-sm mb-2 flex items-center gap-2">
                         <Sparkles className="size-4" />
-                        Padrão detectado
+                        {alert.title}
                     </h4>
                     <p className="text-sm text-purple-600 dark:text-purple-300 mb-4 leading-relaxed">
-                        80% dos documentos como <span className="font-semibold italic">"Contrato_*.pdf"</span> são categorizados como <span className="font-semibold text-purple-800 dark:text-purple-200">"Fornecedores"</span>. Quer aplicar automaticamente?
+                        {alert.message}
                     </p>
-                    <div className="flex gap-2">
-                        <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex-1">
-                            Aplicar sempre
-                        </Button>
-                        <Button variant="outline" size="sm" className="border-purple-300 text-purple-600 hover:bg-purple-50 rounded-lg flex-1">
-                            Só desta vez
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg"
-                            onClick={() => setShowExample(false)}
-                        >
-                            Ignorar
-                        </Button>
-                    </div>
-                </div>
-            )}
 
-            {alerts.length > 0 && (
-                <>
-                    <ScrollArea className="h-[200px] pr-4">
-                        <div className="space-y-3">
-                            {alerts.map(alert => (
-                                <div
-                                    key={alert.id}
-                                    className={`p-4 rounded-xl border transition-all hover:shadow-md ${getAlertColor(alert.severity)}`}
+                    {alert.suggested_actions && (
+                        <div className="flex gap-2 flex-wrap">
+                            {alert.suggested_actions.map((action, idx) => (
+                                <Button
+                                    key={idx}
+                                    size="sm"
+                                    variant={action.action_type === 'ignore' ? 'ghost' : action.action_type === 'apply_once' ? 'outline' : 'default'}
+                                    className={
+                                        action.action_type === 'apply_always'
+                                            ? "bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex-1"
+                                            : action.action_type === 'apply_once'
+                                                ? "border-purple-300 text-purple-600 hover:bg-purple-50 rounded-lg flex-1"
+                                                : "text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg"
+                                    }
+                                    onClick={() => handleAction(alert.id, action)}
                                 >
-                                    <div className="flex items-start gap-3">
-                                        <div className="mt-0.5 shrink-0">
-                                            {getAlertIcon(alert.severity)}
+                                    {action.label}
+                                </Button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            ))}
+
+            {/* Lista de Alertas Informativos */}
+            {infoAlerts.length > 0 && (
+                <ScrollArea className="h-[200px] pr-4">
+                    <div className="space-y-3">
+                        {infoAlerts.map(alert => (
+                            <div
+                                key={alert.id}
+                                className={`p-4 rounded-xl border transition-all hover:shadow-md ${getAlertColor(alert.severity)}`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-0.5 shrink-0">
+                                        {getAlertIcon(alert.severity)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                            <h4 className="font-semibold text-sm line-clamp-1">
+                                                {alert.title}
+                                            </h4>
+                                            <Badge variant={alert.severity === 'critical' || alert.severity === 'error' ? 'destructive' : 'secondary'} className="text-xs">
+                                                {alert.severity}
+                                            </Badge>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between gap-2 mb-1">
-                                                <h4 className="font-semibold text-sm line-clamp-1">
-                                                    {alert.title}
-                                                </h4>
-                                                {getSeverityBadge(alert.severity)}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                                                {alert.message}
-                                            </p>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs text-muted-foreground">
-                                                    {new Date(alert.created_at).toLocaleString('pt-BR', {
-                                                        day: '2-digit',
-                                                        month: 'short',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </span>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="size-7 rounded-full"
-                                                    onClick={() => handleMarkAsRead(alert.id)}
-                                                >
-                                                    <X className="size-3.5" />
-                                                </Button>
-                                            </div>
+                                        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                            {alert.message}
+                                        </p>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-muted-foreground">
+                                                {new Date(alert.created_at).toLocaleString('pt-BR', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </span>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="size-7 rounded-full"
+                                                onClick={() => handleMarkAsRead(alert.id)}
+                                            >
+                                                <X className="size-3.5" />
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </ScrollArea>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+            )}
 
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full mt-4 rounded-full gap-2 text-purple-600"
-                        onClick={() => router.push('/intelligence/alerts')}
-                    >
-                        Ver todos os alertas
-                        <ChevronRight className="size-4" />
-                    </Button>
-                </>
+            {(alerts.length > 0 || actionableAlerts.length > 0) && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-4 rounded-full gap-2 text-purple-600"
+                    onClick={() => router.push('/intelligence/alerts')}
+                >
+                    Ver todos os alertas
+                    <ChevronRight className="size-4" />
+                </Button>
+            )}
+
+            {alerts.length === 0 && actionableAlerts.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                    <Sparkles className="size-8 mx-auto mb-2 text-purple-200" />
+                    Nenhuma recomendação no momento
+                </div>
             )}
         </Card>
     )

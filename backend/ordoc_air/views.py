@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 from django.http import Http404
 from guardian.shortcuts import assign_perm, remove_perm
 from ordoc_ai.base_viewset import BaseViewSet
@@ -814,7 +814,144 @@ class DocumentViewSet(BaseViewSet):
         if not tag_ids:
             return Response({'error': 'tag_ids is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        tags = Tag.objects.filter(id__in=tag_ids)
+    @action(detail=False, methods=['get'])
+    def recommended(self, request):
+        """
+        Retorna documentos recomendados unificando:
+        1. Anexos de Workflow (TaskAttachment, ProcedureDocument) ligados a tarefas críticas/próximas.
+        2. Documentos DMS (ordoc_air.Document) favoritos e recentes.
+        """
+        from ordoc_flow.models import Task, TaskAttachment, ProcedureDocument, GroupRequesterMember
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        user = self.get_current_user()
+        ordoc_user = self.get_current_ordoc_user()
+        organization = self.get_current_organization()
+        
+        scored_items = {} # {uuid: {'score': int, 'reasons': set(), 'data': dict}}
+        
+        def normalize_doc(obj, source_type, score, reason):
+            """Normaliza objetos para formato compatível com DocumentSerializer"""
+            doc_id = str(obj.id)
+            if doc_id in scored_items:
+                scored_items[doc_id]['score'] += score
+                scored_items[doc_id]['reasons'].add(reason)
+                return
+
+            # Mapeamento de campos
+            if source_type == 'dms':
+                # DMS Document - usar serializer
+                data = DocumentSerializer(obj, context=self.get_serializer_context()).data
+            else:
+                # Workflow Document (TaskAttachment/ProcedureDocument)
+                # Construir representação manual similar ao DocumentSerializer
+                data = {
+                    'id': str(obj.id),
+                    'name': obj.name or obj.file_name,
+                    'file_name': obj.file_name,
+                    'description': getattr(obj, 'description', ''),
+                    'file': request.build_absolute_uri(obj.file.url) if obj.file else None,
+                    'file_size': obj.file_size,
+                    'mime_type': getattr(obj, 'file_type', None) or getattr(obj, 'mime_type', None),
+                    'created_at': obj.created_at,
+                    'status': 'active',
+                    'is_starred': False, # Workflow docs não têm favorito direto no Air ainda
+                    'document_type': 'workflow_attachment'
+                }
+            
+            scored_items[doc_id] = {
+                'score': score,
+                'reasons': {reason},
+                'data': data
+            }
+
+        # 1. TAREFAS (Critical & Agenda)
+        active_group_ids = []
+        if ordoc_user:
+            active_group_ids = GroupRequesterMember.objects.filter(
+                user=ordoc_user,
+                is_active=True
+            ).values_list('group_id', flat=True)
+            
+        tasks = Task.objects.filter(
+            procedure__organization=organization,
+            status__in=['running', 'started']
+        ).filter(
+            Q(assignee=user.external_requester) if hasattr(user, 'external_requester') else
+            (Q(group_assignee_id__in=active_group_ids) | Q(created_by=ordoc_user))
+        )
+        
+        today = timezone.now().date()
+        critical_tasks = tasks.filter(Q(priority='high') | Q(deadline__lt=today))
+        upcoming_tasks = tasks.filter(deadline__gte=today, deadline__lte=today + timedelta(days=3))
+        
+        # Helper para processar queryset de tarefas
+        def process_tasks(task_qs, score, reason):
+            if not task_qs.exists():
+                return
+                
+            # TaskAttachments
+            attachments = TaskAttachment.objects.filter(task__in=task_qs, deleted_at__isnull=True)
+            for att in attachments:
+                normalize_doc(att, 'workflow', score, reason)
+                
+            # ProcedureDocuments
+            proc_ids = task_qs.values_list('procedure_id', flat=True)
+            proc_docs = ProcedureDocument.objects.filter(
+                procedure_id__in=proc_ids, 
+                deleted_at__isnull=True
+            ).exclude(file='') # Ignorar sem arquivo
+            for pd in proc_docs:
+                normalize_doc(pd, 'workflow', score, reason)
+                
+        process_tasks(critical_tasks, 50, 'Tarefa Crítica')
+        process_tasks(upcoming_tasks, 30, 'Próximo Vencimento')
+
+        # 2. FAVORITOS (DMS)
+        fav_docs = self.get_queryset().filter(favorited_by=user)
+        for doc in fav_docs:
+            normalize_doc(doc, 'dms', 20, 'Favorito')
+
+        # 3. RECENTES (DMS + Histórico)
+        # Buscar RecentDocument que aponta para DMS Document
+        recents = RecentDocument.objects.filter(user=user).select_related('document').order_by('-accessed_at')[:10]
+        for rd in recents:
+            doc = rd.document
+            if not doc or doc.deleted_at:
+                continue
+            # Se já pontuado por outro motivo, adiciona +10
+            # Se for novo, adiciona com score 10
+            normalize_doc(doc, 'dms', 10, 'Recente')
+
+        # FINALIZAR
+        results = []
+        for item in scored_items.values():
+            data = item['data']
+            reasons = item['reasons']
+            
+            # Prioridade de badge
+            primary_reason = 'Recente'
+            if 'Tarefa Crítica' in reasons:
+                primary_reason = 'Tarefa Crítica'
+            elif 'Próximo Vencimento' in reasons:
+                primary_reason = 'Próximo Vencimento'
+            elif 'Favorito' in reasons:
+                primary_reason = 'Favorito'
+            
+            data['recommendation_reason'] = primary_reason
+            data['relevance_score'] = item['score']
+            results.append(data)
+            
+        results.sort(key=lambda x: x['relevance_score'], reverse=True)
+        
+        # Paginação manual já que é uma lista heterogênea
+        page = self.paginate_queryset(results)
+        if page is not None:
+             return self.get_paginated_response(page)
+             
+        return Response(results[:10])
+
         document.tags.remove(*tags)
 
         return Response({
@@ -852,6 +989,57 @@ class DocumentViewSet(BaseViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def storage_stats(self, request):
+        """Get storage usage statistics for the organization"""
+        org = self.get_current_organization()
+        if not org:
+             return Response({'error': 'Organization not found'}, status=404)
+        
+        # Base query for org documents
+        base_qs = Document.objects.filter(department__organization=org)
+        
+        # Calculate active documents size
+        active_stats = base_qs.filter(deleted_at__isnull=True).aggregate(
+            total_size=Sum('file_size'),
+            count=Count('id')
+        )
+        active_size = active_stats['total_size'] or 0
+        active_count = active_stats['count'] or 0
+        
+        # Calculate trash size
+        trash_stats = base_qs.filter(deleted_at__isnull=False).aggregate(
+            total_size=Sum('file_size'),
+            count=Count('id')
+        )
+        trash_size = trash_stats['total_size'] or 0
+        trash_count = trash_stats['count'] or 0
+        
+        total_used = active_size + trash_size
+        
+        # Mock limit (100 GB in bytes)
+        limit = 100 * 1024 * 1024 * 1024
+        
+        return Response({
+            'total_used_bytes': total_used,
+            'limit_bytes': limit,
+            'usage_percentage': (total_used / limit) if limit > 0 else 0,
+            'breakdown': {
+                'active_documents': {
+                    'bytes': active_size,
+                    'count': active_count
+                },
+                'trash': {
+                    'bytes': trash_size,
+                    'count': trash_count
+                },
+                'temp_files': {
+                    'bytes': 0, # Placeholder
+                    'count': 0
+                }
+            }
+        })
 
 
 class TagViewSet(BaseViewSet):

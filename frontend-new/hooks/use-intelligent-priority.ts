@@ -32,11 +32,14 @@ export function calculateIntelligentPriority(task: Task): IntelligentPriority {
     }
     const recommendations: string[] = []
 
+    // Variáveis auxiliares de tempo
+    const now = new Date()
+    let daysUntilDeadline = 999 // Default alto se não tiver deadline
+
     // FATOR 1: Deadline (0-30 pontos)
     if (task.deadline) {
-        const now = new Date()
         const deadline = new Date(task.deadline)
-        const daysUntilDeadline = Math.ceil(
+        daysUntilDeadline = Math.ceil(
             (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         )
 
@@ -73,6 +76,7 @@ export function calculateIntelligentPriority(task: Task): IntelligentPriority {
     }
 
     // FATOR 2: Prioridade Manual (0-25 pontos)
+    // FATOR 2: Prioridade Manual (0-25 pontos) - Lógica de pontuação mantida, recomendação movida para baixo
     if (task.priority === 'high') {
         factors.manualPriority = 25
     } else {
@@ -80,45 +84,90 @@ export function calculateIntelligentPriority(task: Task): IntelligentPriority {
     }
 
     // FATOR 3: Status (0-20 pontos)
+    // FATOR 3: Status (0-20 pontos)
+    // Refined logic: prioritize actionability over just stating status
     switch (task.status) {
         case 'started':
             factors.status = 20
-            recommendations.push('🚀 Tarefa iniciada - mantenha o ritmo')
+            // Only add recommendation if no urgent deadline issues
+            if (daysUntilDeadline > 3) {
+                recommendations.push('🚀 Tarefa iniciada - mantenha o ritmo')
+            }
             break
         case 'running':
             factors.status = 15
             break
         case 'draft':
             factors.status = 5
-            recommendations.push('📝 Tarefa em rascunho - inicie o trabalho')
+            recommendations.push('📝 Finalize o rascunho para iniciar')
             break
         case 'refused':
             factors.status = 0
-            recommendations.push('❌ Tarefa recusada')
+            recommendations.push('❌ Tarefa recusada - verifique motivo')
             break
         case 'finished':
             factors.status = 0
-            recommendations.push('✅ Tarefa concluída')
             break
     }
 
     // FATOR 4: Idade da tarefa (0-25 pontos)
     const createdAt = new Date(task.created_at)
-    const now = new Date()
+    // now is already defined above
     const daysOld = Math.ceil((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
 
     if (daysOld > 30) {
         factors.age = 25
-        recommendations.push('⏳ Tarefa pendente há mais de 30 dias')
+        recommendations.push('⏳ Pendente há +30 dias - requer atenção')
     } else if (daysOld > 14) {
         factors.age = 18
-        recommendations.push('⏳ Tarefa pendente há mais de 2 semanas')
+        if (task.priority !== 'high') {
+            recommendations.push('⏳ Pendente há 2 semanas')
+        }
     } else if (daysOld > 7) {
         factors.age = 12
     } else if (daysOld > 3) {
         factors.age = 6
     } else {
         factors.age = 2
+    }
+
+    // FATOR 5: Análise Semântica (Simulação de IA)
+    const nameLower = task.name.toLowerCase()
+
+    // Regras de negócio específicas para o domínio jurídico
+    if (nameLower.includes('petição') || nameLower.includes('liminar') || nameLower.includes('mandado')) {
+        factors.status += 10 // Aumenta score
+        recommendations.unshift('⚖️ Petição urgente - atividade crítica')
+    } else if (nameLower.includes('audiência')) {
+        if (nameLower.includes('preparação')) {
+            recommendations.push('🔍 Contexto da atividade requer revisão dos anexos')
+        } else {
+            recommendations.unshift('👨‍⚖️ Audiência próxima - verificar pauta')
+        }
+    } else if (nameLower.includes('bancário') || nameLower.includes('contrato')) {
+        recommendations.push('💰 Análise financeira requerida')
+    } else if (nameLower.includes('sentença')) {
+        recommendations.unshift('gabinete Prioridade de fluxo pós-sentença')
+    }
+
+    // FATOR 2 (Moved down to prioritize Manual Priority recommendation if no deadline issue)
+    if (task.priority === 'high') {
+        factors.manualPriority = 25
+        // Add recommendation only if not already swamped with deadline warnings
+        // E se não tivermos insights semânticos mais fortes
+        const hasSemanticInsight = recommendations.some(r =>
+            r.includes('Petição') ||
+            r.includes('Audiência') ||
+            r.includes('Sentença') ||
+            r.includes('Contexto') ||
+            r.includes('financeira')
+        )
+
+        if (!recommendations.some(r => r.includes('Atrasada') || r.includes('Vence')) && !hasSemanticInsight) {
+            recommendations.unshift('⚡ Alta prioridade definida manualmente')
+        }
+    } else {
+        factors.manualPriority = 10
     }
 
     // Calcular score total (0-100)

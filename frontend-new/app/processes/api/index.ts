@@ -250,6 +250,8 @@ export const tasksApi = {
         status?: string
         priority?: string
         search?: string
+        ordering?: string
+        page_size?: number
     }) => {
         const response = await apiClient.get<PaginatedResponse<Task>>(
             `${BASE_URL}/tasks/my_tasks/`,

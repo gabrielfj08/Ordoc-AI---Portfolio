@@ -70,11 +70,41 @@ export interface UploadProgress {
     percentage: number
 }
 
+export interface StorageStats {
+    total_used_bytes: number
+    limit_bytes: number
+    usage_percentage: number
+    breakdown: {
+        active_documents: {
+            bytes: number
+            count: number
+        }
+        trash: {
+            bytes: number
+            count: number
+        }
+        temp_files: {
+            bytes: number
+            count: number
+        }
+    }
+}
+
 // ===========================
 // DOCUMENTS API
 // ===========================
 
 export const documentsApi = {
+    /**
+     * Get storage usage statistics
+     */
+    getStorageStats: async () => {
+        const response = await apiClient.get<StorageStats>(
+            `${BASE_URL}/documents/storage_stats/`
+        )
+        return response.data
+    },
+
     /**
      * Lista documentos com filtros
      */

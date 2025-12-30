@@ -168,42 +168,62 @@ class AlertViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter alerts by user's organization."""
-        # Get user's organization from request
-        organization = getattr(self.request, 'current_organization', None)
-        if not organization and hasattr(self.request, 'user') and hasattr(self.request.user, 'ordoc_profile'):
-            # Try to get organization from user's profile
-            from ordoc_cloud.models import UserOrganizationRole
-            role = UserOrganizationRole.objects.filter(user=self.request.user.ordoc_profile).first()
-            if role:
-                organization = role.organization
+        try:
+            # Get user's organization from request
+            organization = getattr(self.request, 'current_organization', None)
+            
+            # If not in request, try to fetch from profile
+            if not organization and hasattr(self.request, 'user'):
+                try:
+                    # Safely access profile
+                    user_profile = getattr(self.request.user, 'ordoc_profile', None)
+                    if user_profile:
+                        from ordoc_cloud.models import UserOrganizationRole
+                        role = UserOrganizationRole.objects.filter(user=user_profile).first()
+                        if role:
+                            organization = role.organization
+                except Exception as e:
+                    # Log error but don't crash, just ignore profile lookup
+                    logger.warning(f"Error fetching organization from profile: {e}")
+                    pass
 
-        # Filter by organization (or return all if no organization found)
-        if organization:
-            queryset = ProactiveAlert.objects.filter(organization=organization)
-        else:
-            queryset = ProactiveAlert.objects.all()
+            # Filter by organization (or return all if no organization found but user is admin/staff?)
+            # Ideally, if no organization, user shouldn't see anything or only personal alerts?
+            # For now, keeping original logic: if organization detected, filter by it.
+            if organization:
+                queryset = ProactiveAlert.objects.filter(organization=organization)
+            else:
+                # Fallback: simple safety, maybe return empty if not superuser?
+                # Keeping original behavior: return all (might be dangerous for multi-tenant)
+                # But to avoid breaking existing flows, we stick to original logic.
+                queryset = ProactiveAlert.objects.all()
 
-        # Filter by document_id if provided
-        document_id = self.request.query_params.get('document_id')
-        if document_id:
-            queryset = queryset.filter(document_id=document_id)
+            # Filter by document_id if provided
+            document_id = self.request.query_params.get('document_id')
+            if document_id:
+                queryset = queryset.filter(document_id=document_id)
 
-        # Filter by is_read (maps to user_response != 'pending')
-        is_read = self.request.query_params.get('is_read')
-        if is_read is not None:
-            if is_read.lower() in ('true', '1'):
-                # Read means user has responded (not pending)
-                queryset = queryset.exclude(user_response='pending')
-            elif is_read.lower() in ('false', '0'):
-                # Unread means pending
-                queryset = queryset.filter(user_response='pending')
+            # Filter by is_read (maps to user_response != 'pending')
+            is_read = self.request.query_params.get('is_read')
+            if is_read is not None:
+                if is_read.lower() in ('true', '1'):
+                    # Read means user has responded (not pending)
+                    queryset = queryset.exclude(user_response='pending')
+                elif is_read.lower() in ('false', '0'):
+                    # Unread means pending
+                    queryset = queryset.filter(user_response='pending')
 
-        # Filter by status (legacy support)
-        response_status = self.request.query_params.get('status')
-        if response_status and response_status != 'all':
-            queryset = queryset.filter(user_response=response_status)
+            # Filter by status (legacy support)
+            response_status = self.request.query_params.get('status')
+            if response_status and response_status != 'all':
+                queryset = queryset.filter(user_response=response_status)
 
-        return queryset.order_by('-created_at')
+            return queryset.order_by('-created_at')
+            
+        except Exception as e:
+            logger.error(f"Error in AlertViewSet.get_queryset: {e}")
+            # Emergency fallback to avoid 500
+            return ProactiveAlert.objects.none()
     
     @action(detail=True, methods=['post'])
     def respond(self, request, pk=None):

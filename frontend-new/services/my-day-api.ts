@@ -40,6 +40,7 @@ export interface RecentDocument {
     file_size: number
     created_at: string
     relevance_score?: number
+    recommendation_reason?: string
     is_starred?: boolean
     document_type?: string
 }
@@ -69,19 +70,27 @@ export const myDayApi = {
     },
 
     /**
-     * Get recent documents
+     * Get smart recommended documents (previously just recent)
      */
     getRecentDocuments: async (limit = 5) => {
         const response = await apiClient.get<{ results: RecentDocument[] }>(
-            `${ORDOC_AIR_BASE}/documents/`,
+            `${ORDOC_AIR_BASE}/documents/recommended/`,
             {
                 params: {
-                    ordering: '-created_at',
                     page_size: limit,
                 },
             }
         )
-        return response.data.results
+        // If the backend returns a paginated response structure (count, next, results), use .results
+        // If it returns a plain list (Response(results[:5])), use .data directly (or cast).
+        // My backend code handles pagination: 
+        // if page is not None: return self.get_paginated_response(page) -> { count, results: [...] }
+        // else: return Response(results[:5]) -> [...]
+        // Frontend apiClient.get usually returns AxiosResponse.
+        // If paginated, data has 'results'. If not, data IS the list.
+        // Let's assume pagination is applied or consistent wrapper.
+        // The implementation uses paginate_queryset, so it returns paginated response.
+        return response.data.results || (Array.isArray(response.data) ? response.data : [])
     },
 
     /**
@@ -140,6 +149,39 @@ export const myDayApi = {
         return {
             pending_signatures: signaturesResponse.data.count,
             pending_approvals: approvalsResponse.data.count,
+        }
+    },
+
+    /**
+     * Get items for 'Continue Working' widget (last active task and document)
+     */
+    getContinueWorkingItems: async () => {
+        // Get last modified active task
+        const tasksResponse = await apiClient.get<{ results: any[] }>(
+            `${ORDOC_FLOW_BASE}/tasks/my_tasks/`,
+            {
+                params: {
+                    status: 'running,started',
+                    ordering: '-updated_at',
+                    page_size: 1,
+                },
+            }
+        )
+
+        // Get last modified document
+        const docsResponse = await apiClient.get<{ results: RecentDocument[] }>(
+            `${ORDOC_AIR_BASE}/documents/`,
+            {
+                params: {
+                    ordering: '-updated_at',
+                    page_size: 1,
+                },
+            }
+        )
+
+        return {
+            lastTask: tasksResponse.data.results[0] || null,
+            lastDocument: docsResponse.data.results[0] || null,
         }
     },
 
