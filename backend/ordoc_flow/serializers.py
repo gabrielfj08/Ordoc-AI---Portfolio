@@ -167,7 +167,9 @@ class TaskCommentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_created_by_name(self, obj):
-        return obj.created_by.name if obj.created_by else None
+        if not obj.created_by:
+            return None
+        return obj.created_by.user.get_full_name() or obj.created_by.user.username
 
 
 class TaskFieldSerializer(serializers.ModelSerializer):
@@ -491,33 +493,56 @@ class ProcedureStatsSerializer(serializers.Serializer):
     """Serializer para estatísticas de procedimentos"""
     
     total = serializers.IntegerField()
-    draft = serializers.IntegerField()
-    running = serializers.IntegerField()
-    started = serializers.IntegerField()
-    finished = serializers.IntegerField()
-    archived = serializers.IntegerField()
+    draft = serializers.IntegerField(required=False, default=0)
+    running = serializers.IntegerField(required=False, default=0)
+    started = serializers.IntegerField(required=False, default=0)
+    finished = serializers.IntegerField(required=False, default=0)
+    archived = serializers.IntegerField(required=False, default=0)
+    
+    # Derivados
+    urgent = serializers.IntegerField(required=False, default=0)
+    normal = serializers.IntegerField(required=False, default=0)
+    completed = serializers.IntegerField(required=False, default=0)
 
 
 class TaskStatsSerializer(serializers.Serializer):
     """Serializer para estatísticas de tarefas"""
     
     total = serializers.IntegerField()
-    draft = serializers.IntegerField()
-    running = serializers.IntegerField()
-    started = serializers.IntegerField()
-    finished = serializers.IntegerField()
-    refused = serializers.IntegerField()
-    returned = serializers.IntegerField(required=False)
+    draft = serializers.IntegerField(required=False, default=0)
+    running = serializers.IntegerField(required=False, default=0)
+    started = serializers.IntegerField(required=False, default=0)
+    finished = serializers.IntegerField(required=False, default=0)
+    refused = serializers.IntegerField(required=False, default=0)
+    returned = serializers.IntegerField(required=False, default=0)
+    
+    # Derivados
+    urgent = serializers.IntegerField(required=False, default=0)
+    normal = serializers.IntegerField(required=False, default=0)
+    completed = serializers.IntegerField(required=False, default=0)
 
 
 class WorkflowDashboardSerializer(serializers.Serializer):
     """Serializer para dashboard do workflow"""
     
+    # Global Stats
+    total_documents = serializers.IntegerField()
+    active_users = serializers.IntegerField()
+    approval_rate = serializers.FloatField()
+    
+    # Trends / Changes
+    documents_change = serializers.CharField()
+    users_change = serializers.CharField()
+    procedures_change = serializers.CharField()
+    approval_rate_change = serializers.CharField()
+    
+    # Detailed Stats
     procedure_stats = ProcedureStatsSerializer()
     task_stats = TaskStatsSerializer()
     pending_approvals = serializers.IntegerField()
     overdue_tasks = serializers.IntegerField()
     recent_activities = serializers.ListField(child=serializers.DictField())
+    team_stats = serializers.ListField(child=serializers.DictField())
 
 
 # Serializers para Batch Operations

@@ -247,10 +247,10 @@ class AnalyticsSummaryViewSet(viewsets.ViewSet):
                 tasks_qs = tasks_qs.filter(created_at__gte=start_date)
             
             # Contar por status
-            active_procedures = procedures_qs.filter(state='running').count()
-            pending_tasks = tasks_qs.filter(state='draft').count()
-            running_tasks = tasks_qs.filter(state='started').count()
-            finished_tasks = tasks_qs.filter(state='finished').count()
+            active_procedures = procedures_qs.filter(status='running').count()
+            pending_tasks = tasks_qs.filter(status='draft').count()
+            running_tasks = tasks_qs.filter(status='started').count()
+            finished_tasks = tasks_qs.filter(status='finished').count()
             
             return Response({
                 'active_procedures': active_procedures,
@@ -691,9 +691,9 @@ class AnalyticsSummaryViewSet(viewsets.ViewSet):
         if format_type == 'csv':
             return self._export_csv(data, report_type, start_date, end_date)
         elif format_type == 'pdf':
-            return Response({'message': 'PDF será implementado em breve', 'data': data})
+            return self._export_pdf(data, report_type, start_date, end_date)
         elif format_type == 'excel':
-            return Response({'message': 'Excel será implementado em breve', 'data': data})
+            return self._export_excel(data, report_type, start_date, end_date)
         else:
             return Response({'error': 'Formato não suportado'}, status=400)
     
@@ -740,8 +740,8 @@ class AnalyticsSummaryViewSet(viewsets.ViewSet):
                     procedures_qs = procedures_qs.filter(organization=request.user.organization)
             
             total = procedures_qs.count()
-            completed = procedures_qs.filter(state='finished').count()
-            running = procedures_qs.filter(state='running').count()
+            completed = procedures_qs.filter(status='finished').count()
+            running = procedures_qs.filter(status='running').count()
             
             return {
                 'headers': ['Métrica', 'Valor'],
@@ -814,6 +814,77 @@ class AnalyticsSummaryViewSet(viewsets.ViewSet):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         writer = csv.writer(response)
+        writer.writerow(data['headers'])
+        for row in data['rows']:
+            writer.writerow(row)
+        
+        return response
+    
+    def _export_pdf(self, data, report_type, start_date, end_date):
+        """Exporta dados em formato PDF (implementação básica com HTML para impressão)."""
+        from django.http import HttpResponse
+        
+        # Gerar HTML simples para o PDF
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                h1 {{ color: #333; border-bottom: 2px solid #f97316; padding-bottom: 10px; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+                th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+                th {{ background-color: #f97316; color: white; }}
+                tr:nth-child(even) {{ background-color: #f9f9f9; }}
+                .footer {{ margin-top: 30px; text-align: center; color: #666; font-size: 12px; }}
+            </style>
+        </head>
+        <body>
+            <h1>Relatório de {report_type.title()}</h1>
+            <p><strong>Período:</strong> {start_date.date()} a {end_date.date()}</p>
+            <p><strong>Gerado em:</strong> {timezone.now().strftime('%d/%m/%Y %H:%M')}</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        {''.join(f'<th>{header}</th>' for header in data['headers'])}
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join('<tr>' + ''.join(f'<td>{cell}</td>' for cell in row) + '</tr>' for row in data['rows'])}
+                </tbody>
+            </table>
+            
+            <div class="footer">
+                <p>Relatório gerado automaticamente pelo Sistema OrdocAI</p>
+                <p><em>Nota: Para melhor visualização, imprima este documento ou salve como PDF através do navegador (Ctrl+P)</em></p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Retornar como HTML para o navegador abrir e o usuário poder imprimir/salvar como PDF
+        response = HttpResponse(content_type='text/html; charset=utf-8')
+        filename = f"relatorio_{report_type}_{start_date.date()}_{end_date.date()}.html"
+        # Usar inline ao invés de attachment para abrir no navegador
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        response.write(html_content)
+        
+        return response
+    
+    def _export_excel(self, data, report_type, start_date, end_date):
+        """Exporta dados em formato Excel (usando CSV com extensão .xls)."""
+        from django.http import HttpResponse
+        import csv
+        
+        # Por enquanto, exportar como CSV mas com extensão .xls
+        # Para Excel real, seria necessário instalar openpyxl ou xlsxwriter
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = f"relatorio_{report_type}_{start_date.date()}_{end_date.date()}.xls"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        writer = csv.writer(response, delimiter='\t')  # Tab-delimited para melhor compatibilidade com Excel
         writer.writerow(data['headers'])
         for row in data['rows']:
             writer.writerow(row)
