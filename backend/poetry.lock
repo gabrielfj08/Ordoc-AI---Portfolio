@@ -1029,14 +1029,14 @@ drf = ["djangorestframework"]
 
 [[package]]
 name = "django-fsm"
-version = "3.0.0"
+version = "3.0.1"
 description = "Django friendly finite state machine support."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "django-fsm-3.0.0.tar.gz", hash = "sha256:0112bcac573ad14051cf8ebe73bf296b6d5409f093e5f1677eb16e2196e263b3"},
-    {file = "django_fsm-3.0.0-py2.py3-none-any.whl", hash = "sha256:fa28f84f47eae7ce9247585ac6c1895e4ada08efff93fb243a59e9ff77b2d4ec"},
+    {file = "django-fsm-3.0.1.tar.gz", hash = "sha256:d6436f5931e09d76e9a434781548627deab80c74cd6726adce95b31b5ddd4d1e"},
+    {file = "django_fsm-3.0.1-py2.py3-none-any.whl", hash = "sha256:ea07be2da221efa5cb8743cc94e0bb64fd962adff594f82269040eb4708c30c6"},
 ]
 
 [[package]]
@@ -4459,4 +4459,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "32ff3e2380abe2c9032a82e53d1f5c1308d2d3e1c48e36e7e28b8b115c5297c5"
+content-hash = "6d5d295efa01590702e19b3c122207d3083df832cdb799595a9a61a8209822f2"
