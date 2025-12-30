@@ -37,46 +37,35 @@ export const logger = pino({
   // Browser mode
   browser: isBrowser
     ? {
-        asObject: true, // Logs como objetos (não strings)
-        write: {
-          // Custom write para enviar logs para backend em produção
-          error: (o: any) => {
-            console.error(o)
-            if (isProduction) {
-              sendLogToBackend('error', o)
-            }
-          },
-          warn: (o: any) => {
-            console.warn(o)
-            if (isProduction) {
-              sendLogToBackend('warn', o)
-            }
-          },
-          info: (o: any) => {
-            if (isDevelopment) {
-              console.info(o)
-            }
-          },
-          debug: (o: any) => {
-            if (isDevelopment) {
-              console.debug(o)
-            }
-          },
+      asObject: true, // Logs como objetos (não strings)
+      write: {
+        // Custom write para enviar logs para backend em produção
+        error: (o: any) => {
+          console.error(o)
+          if (isProduction) {
+            sendLogToBackend('error', o)
+          }
         },
-      }
+        warn: (o: any) => {
+          console.warn(o)
+          if (isProduction) {
+            sendLogToBackend('warn', o)
+          }
+        },
+        info: (o: any) => {
+          if (isDevelopment) {
+            console.info(o)
+          }
+        },
+        debug: (o: any) => {
+          if (isDevelopment) {
+            console.debug(o)
+          }
+        },
+      },
+    }
     : undefined,
 
-  // Formato pretty apenas em desenvolvimento
-  transport: !isBrowser && isDevelopment
-    ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        },
-      }
-    : undefined,
 
   // Base fields
   base: {

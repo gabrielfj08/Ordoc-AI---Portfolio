@@ -63,7 +63,10 @@ import {
   Menu,
   ChevronLeft,
   HardDrive,
+  Info,
 } from "lucide-react"
+import { DocumentFilters } from "./components/DocumentFilters"
+import { DocumentDetailsPanel } from "./components/DocumentDetailsPanel"
 
 export default function DocumentsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -77,6 +80,21 @@ export default function DocumentsPage() {
 function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [selectedCategory, setSelectedCategory] = useState("meu-drive")
+  const [detailsPanelOpen, setDetailsPanelOpen] = useState(false)
+  const [selectedDocument, setSelectedDocument] = useState<any>(null)
+  const [selectedFolder, setSelectedFolder] = useState<any>(null)
+
+  const handleDocumentClick = (doc: any) => {
+    setSelectedDocument(doc)
+    setSelectedFolder(null)
+    setDetailsPanelOpen(true)
+  }
+
+  const handleFolderClick = (folder: any) => {
+    setSelectedFolder(folder)
+    setSelectedDocument(null)
+    setDetailsPanelOpen(true)
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -174,18 +192,9 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
         {/* Área principal de documentos */}
         <div className="flex-1 min-w-0">
           <Card className="p-6 border-border/50">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between mb-6 pb-6 border-b border-border">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-2 rounded-full bg-transparent">
-                  <Filter className="size-4" />
-                  Filtrar
-                </Button>
-                <Button variant="outline" size="sm" className="gap-2 rounded-full bg-transparent">
-                  <ArrowUpDown className="size-4" />
-                  Ordenar
-                </Button>
-              </div>
+            {/* Toolbar com filtros estratégicos */}
+            <div className="flex items-center justify-between mb-6 pb-6 border-b border-border flex-wrap gap-4">
+              <DocumentFilters selectedSection={selectedCategory} />
               <div className="flex items-center gap-2">
                 <Button
                   variant={viewMode === "grid" ? "secondary" : "ghost"}
@@ -203,10 +212,20 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
                 >
                   <List className="size-4" />
                 </Button>
+                <div className="h-6 w-px bg-border mx-1" />
+                <Button
+                  variant={detailsPanelOpen ? "secondary" : "ghost"}
+                  size="icon"
+                  className="rounded-full"
+                  onClick={() => setDetailsPanelOpen(!detailsPanelOpen)}
+                  title="Mostrar detalhes"
+                >
+                  <Info className="size-4" />
+                </Button>
               </div>
             </div>
 
-            {/* Seção "Minhas Pastas" */}
+            {/* Seção "Minhas Pastas" - Simplificada */}
             {selectedCategory === "meu-drive" && (
               <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
@@ -215,33 +234,25 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
                 </h3>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {[
-                    { name: "Pasta Atenção", docs: "20 documentos", icon: AlertCircle, color: "destructive" },
-                    { name: "Pasta Crítica", docs: "20 documentos", icon: AlertCircle, color: "warning" },
-                    { name: "Pasta Saudável", docs: "10 documentos", icon: CheckCircle2, color: "success" },
+                    { id: "1", name: "Pasta Atenção", docs: 20, icon: Folder, color: "text-red-500", owner: "Você", createdAt: "10 de dez. de 2024", modifiedAt: "Há 2 dias", location: "Meu Drive" },
+                    { id: "2", name: "Pasta Crítica", docs: 20, icon: Folder, color: "text-yellow-500", owner: "Você", createdAt: "15 de dez. de 2024", modifiedAt: "Há 1 dia", location: "Meu Drive" },
+                    { id: "3", name: "Pasta Saudável", docs: 10, icon: Folder, color: "text-green-500", owner: "Você", createdAt: "20 de dez. de 2024", modifiedAt: "Hoje", location: "Meu Drive" },
                   ].map((folder) => (
                     <div
                       key={folder.name}
-                      className="group p-5 rounded-2xl border-2 border-border hover:border-primary/30 hover:shadow-lg transition-all cursor-pointer bg-gradient-to-br from-background to-secondary/20"
+                      className="group p-5 rounded-2xl border border-border hover:border-primary/30 hover:shadow-md transition-all cursor-pointer bg-background"
+                      onClick={() => handleFolderClick({ ...folder, itemCount: folder.docs })}
                     >
-                      <div className="flex items-start justify-between mb-4">
-                        <div
-                          className={`size-12 rounded-xl bg-${folder.color}/10 flex items-center justify-center group-hover:scale-110 transition-transform`}
-                        >
-                          <Folder className={`size-6 text-${folder.color}`} />
+                      <div className="flex items-start gap-4">
+                        <div className="size-12 rounded-xl bg-secondary/50 flex items-center justify-center group-hover:scale-105 transition-transform">
+                          <folder.icon className={`size-6 ${folder.color}`} />
                         </div>
-                        <folder.icon className={`size-5 text-${folder.color}`} />
-                      </div>
-                      <div>
-                        <div className="font-bold text-base mb-1 group-hover:text-primary transition-colors">
-                          {folder.name}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-base mb-1 group-hover:text-primary transition-colors truncate">
+                            {folder.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{folder.docs} documentos</div>
                         </div>
-                        <div className="text-sm text-muted-foreground">{folder.docs}</div>
-                      </div>
-                      <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="secondary" className="text-[10px]">
-                          Atenção
-                        </Badge>
-                        <span>20 documentos sem categoria</span>
                       </div>
                     </div>
                   ))}
@@ -249,7 +260,7 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
               </div>
             )}
 
-            {/* Seção "Recentes" ou "Outros Arquivos" */}
+            {/* Seção "Recentes" ou "Outros Arquivos" - Simplificada */}
             <div>
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <Clock className="size-5 text-chart-2" />
@@ -259,15 +270,20 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
               {viewMode === "list" ? (
                 <div className="space-y-1">
                   {Array.from({ length: 12 }, (_, i) => ({
+                    id: `doc-${i}`,
                     name: `Documento_Untagged_${28 - i}.pdf`,
+                    type: "PDF",
                     size: "2 MB",
                     time: `Há ${i < 4 ? 19 : 14} horas`,
-                    relevance: "92%",
-                    suggested: i < 4,
+                    owner: "Você",
+                    createdAt: `${20 - i} de dez. de 2024`,
+                    modifiedAt: `Há ${i < 4 ? 19 : 14} horas`,
+                    location: "Meu Drive",
                   })).map((doc, i) => (
                     <div
                       key={i}
                       className="flex items-center gap-4 p-4 rounded-xl hover:bg-secondary/30 transition-all group cursor-pointer border border-transparent hover:border-border/50"
+                      onClick={() => handleDocumentClick(doc)}
                     >
                       <Button
                         variant="ghost"
@@ -276,29 +292,19 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
                       >
                         <Star className="size-4" />
                       </Button>
-                      <div className="size-12 rounded-xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <FileText className="size-6 text-destructive" />
+                      <div className="size-12 rounded-xl bg-gradient-to-br from-red-500/20 to-red-500/10 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <FileText className="size-6 text-red-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors flex items-center gap-2">
+                        <div className="font-medium text-sm truncate group-hover:text-primary transition-colors">
                           {doc.name}
-                          {doc.suggested && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-orange-600/10 text-primary">
-                              Sugerido
-                            </Badge>
-                          )}
                         </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                            PDF
-                          </Badge>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                          <span>PDF</span>
+                          <span>•</span>
                           <span>{doc.size}</span>
                           <span>•</span>
                           <span>{doc.time}</span>
-                          <span>•</span>
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-success/10 text-success">
-                            {doc.relevance} relevância
-                          </Badge>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -327,13 +333,13 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
                   })).map((doc, i) => (
                     <div
                       key={i}
-                      className="group p-4 rounded-2xl border-2 border-border hover:border-primary/30 hover:shadow-lg transition-all cursor-pointer bg-background"
+                      className="group p-4 rounded-2xl border border-border hover:border-primary/30 hover:shadow-md transition-all cursor-pointer bg-background"
                     >
-                      <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-destructive/20 to-destructive/5 flex items-center justify-center mb-3 group-hover:scale-[1.02] transition-transform">
-                        <FileText className="size-16 text-destructive" />
+                      <div className="aspect-[3/4] rounded-xl bg-gradient-to-br from-red-500/20 to-red-500/5 flex items-center justify-center mb-3 group-hover:scale-[1.02] transition-transform">
+                        <FileText className="size-16 text-red-500" />
                       </div>
                       <div>
-                        <div className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                        <div className="font-medium text-sm truncate group-hover:text-primary transition-colors">
                           {doc.name}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -359,7 +365,14 @@ function DocumentosView({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
           </Card>
         </div>
       </div>
+
+      {/* Painel de Detalhes */}
+      <DocumentDetailsPanel
+        isOpen={detailsPanelOpen}
+        onClose={() => setDetailsPanelOpen(false)}
+        selectedDocument={selectedDocument}
+        selectedFolder={selectedFolder}
+      />
     </div>
   )
 }
-
