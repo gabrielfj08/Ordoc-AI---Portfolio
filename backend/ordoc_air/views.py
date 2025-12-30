@@ -11,6 +11,7 @@ from django.db.models import Q, Count, Sum
 from django.http import Http404
 from guardian.shortcuts import assign_perm, remove_perm
 from ordoc_ai.base_viewset import BaseViewSet
+from ordoc_ai.query_optimizations import TreeQueryOptimizationMixin
 from .models import (
     Organization,
     Department,
@@ -95,10 +96,13 @@ class OrganizationViewSet(BaseViewSet):
         return Response({'message': 'Organization deactivated successfully'})
 
 
-class DepartmentViewSet(BaseViewSet):
+class DepartmentViewSet(TreeQueryOptimizationMixin, BaseViewSet):
     """
     ViewSet for Department management
     Equivalent to Rails DepartmentsController
+
+    Optimized with TreeQueryOptimizationMixin to prevent N+1 queries
+    when building tree structures.
     """
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
@@ -106,7 +110,22 @@ class DepartmentViewSet(BaseViewSet):
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
-    
+
+    # Tree optimization configuration
+    tree_parent_field = 'parent'
+    tree_children_field = 'children'
+
+    def get_queryset(self):
+        """
+        Optimized queryset with select_related for tree operations.
+        Reduces queries from O(n) to O(1) for tree traversal.
+        """
+        queryset = super().get_queryset()
+        return queryset.select_related(
+            'organization',
+            'parent'
+        ).prefetch_related('children')
+
     @action(detail=True, methods=['get'])
     def children(self, request, pk=None):
         """Get department children"""
@@ -114,39 +133,45 @@ class DepartmentViewSet(BaseViewSet):
         children = department.children.filter(deleted_at__isnull=True)
         serializer = self.get_serializer(children, many=True)
         return Response(serializer.data)
-    
+
     @action(detail=False, methods=['get'])
     def tree(self, request):
-        """Get department tree structure"""
+        """
+        Get department tree structure.
+
+        Optimized to prevent N+1 queries using prefetch_related.
+        Previous: 1 + N queries (one per node)
+        Current: 1 query total
+        """
         organization = self.get_current_organization()
         if not organization:
             return Response({'error': 'Organization not found'}, status=404)
-        
-        # Get root departments (no parent)
-        root_departments = Department.objects.filter(
+
+        # Get all departments at once with prefetched children
+        all_departments = self.get_queryset().filter(
             organization=organization,
-            parent__isnull=True,
             deleted_at__isnull=True
         )
-        
-        def build_tree(departments):
-            result = []
-            for dept in departments:
-                dept_data = self.get_serializer(dept).data
-                children = dept.children.filter(deleted_at__isnull=True)
-                if children.exists():
-                    dept_data['children'] = build_tree(children)
-                result.append(dept_data)
-            return result
-        
-        tree_data = build_tree(root_departments)
+
+        # Filter root departments from prefetched data
+        root_departments = [d for d in all_departments if d.parent_id is None]
+
+        # Build tree using the optimized mixin method
+        tree_data = self.build_tree_response(
+            all_departments.filter(parent__isnull=True),
+            serialize=True
+        )
+
         return Response(tree_data)
 
 
-class DirectoryViewSet(BaseViewSet):
+class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
     """
     ViewSet for Directory management
     Equivalent to Rails DirectoriesController
+
+    Optimized with TreeQueryOptimizationMixin to prevent N+1 queries
+    when building tree structures.
     """
     queryset = Directory.objects.all()
     serializer_class = DirectorySerializer
@@ -154,6 +179,22 @@ class DirectoryViewSet(BaseViewSet):
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
+
+    # Tree optimization configuration
+    tree_parent_field = 'parent_directory'
+    tree_children_field = 'children'
+
+    def get_queryset(self):
+        """
+        Optimized queryset with select_related for tree operations.
+        Reduces queries from O(n) to O(1) for tree traversal.
+        """
+        queryset = super().get_queryset()
+        return queryset.select_related(
+            'organization',
+            'department',
+            'parent_directory'
+        ).prefetch_related('children', 'documents')
     
     def perform_create(self, serializer):
         """Override to set automatic fields on directory creation"""
@@ -224,28 +265,30 @@ class DirectoryViewSet(BaseViewSet):
     
     @action(detail=False, methods=['get'])
     def tree(self, request):
-        """Get directory tree structure"""
+        """
+        Get directory tree structure.
+
+        Optimized to prevent N+1 queries using prefetch_related.
+        Previous: 1 + N queries (one per node)
+        Current: 1 query total
+        """
         organization = self.get_current_organization()
         department_id = request.query_params.get('department')
-        
-        queryset = Directory.objects.filter(organization=organization, deleted_at__isnull=True)
+
+        # Get all directories at once with prefetched children
+        queryset = self.get_queryset().filter(
+            organization=organization,
+            deleted_at__isnull=True
+        )
         if department_id:
             queryset = queryset.filter(department_id=department_id)
-        
-        # Get root directories (no parent)
-        root_directories = queryset.filter(parent__isnull=True)
-        
-        def build_tree(directories):
-            result = []
-            for directory in directories:
-                dir_data = self.get_serializer(directory).data
-                children = directory.children.filter(deleted_at__isnull=True)
-                if children.exists():
-                    dir_data['children'] = build_tree(children)
-                result.append(dir_data)
-            return result
-        
-        tree_data = build_tree(root_directories)
+
+        # Build tree using the optimized mixin method
+        tree_data = self.build_tree_response(
+            queryset.filter(parent_directory__isnull=True),
+            serialize=True
+        )
+
         return Response(tree_data)
     
     @action(detail=True, methods=['get'])
