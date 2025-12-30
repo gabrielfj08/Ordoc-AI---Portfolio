@@ -37,12 +37,18 @@ class WebSocketClient {
         }
 
         this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error)
+            // WebSocket errors are expected if backend WS is not configured
+            // Only log in development mode
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('[WebSocket] Connection error (this is expected if WebSocket server is not running)')
+            }
             this.emit('error', error)
         }
 
         this.ws.onclose = () => {
-            console.log('WebSocket disconnected')
+            if (process.env.NODE_ENV === 'development') {
+                console.log('[WebSocket] Connection closed')
+            }
             this.emit('disconnected', {})
             // Não passa token antigo, deixa o attemptReconnect pegar o novo do store
             this.attemptReconnect()
@@ -88,9 +94,9 @@ class WebSocketClient {
         // Verificar se ainda temos um usuário autenticado antes de tentar reconectar
         const token = useAppStore.getState().accessToken
         if (!token) {
-            console.log('[WebSocket] No token found, checking refresh...')
-            // Se não tem access token, pode ser que esteja em refresh.
-            // O ideal é esperar, mas aqui vamos parar e deixar o login reconectar.
+            if (process.env.NODE_ENV === 'development') {
+                console.log('[WebSocket] No token found, skipping reconnection')
+            }
             return
         }
 
@@ -98,8 +104,14 @@ class WebSocketClient {
             this.reconnectAttempts++
             const delay = this.reconnectDelay * this.reconnectAttempts
 
-            console.log(`Attempting to reconnect in ${delay}ms...`)
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`[WebSocket] Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`)
+            }
             setTimeout(() => this.connect(), delay)
+        } else {
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('[WebSocket] Max reconnection attempts reached. WebSocket features will be unavailable.')
+            }
         }
     }
 
