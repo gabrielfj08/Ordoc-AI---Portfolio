@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios'
+import { logApiCall, logError } from '@/utils/logger'
 
 // Configuração base do cliente HTTP
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -15,15 +16,8 @@ const apiClient: AxiosInstance = axios.create({
 // Interceptor para adicionar token de autenticação
 apiClient.interceptors.request.use(
     async (config) => {
-        // Debug: log do request
-        if (config.url?.includes('/login')) {
-            console.log('[API Debug] Login request:', {
-                url: config.url,
-                method: config.method,
-                data: config.data,
-                headers: config.headers
-            })
-        }
+        // Timestamp de início para calcular duração
+        config.metadata = { startTime: Date.now() }
 
         // Não enviar token para endpoints de autenticação
         const isAuthEndpoint = config.url?.includes('/auth/login') ||
@@ -45,13 +39,28 @@ apiClient.interceptors.request.use(
         return config
     },
     (error) => {
+        logError(error, 'API request interceptor error')
         return Promise.reject(error)
     }
 )
 
 // Interceptor para tratamento de erros e auto-refresh
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Log de API call bem-sucedida
+        const duration = response.config.metadata?.startTime
+            ? Date.now() - response.config.metadata.startTime
+            : undefined
+
+        logApiCall({
+            method: response.config.method?.toUpperCase() || 'GET',
+            url: response.config.url || '',
+            status: response.status,
+            duration,
+        })
+
+        return response
+    },
     async (error) => {
         const originalRequest = error.config
 
@@ -80,13 +89,18 @@ apiClient.interceptors.response.use(
                                 response.refresh_token
                             )
 
-                            console.log('[API] Token refreshed successfully after 401')
+                            logApiCall({
+                                method: 'POST',
+                                url: '/auth/refresh',
+                                status: 200,
+                            })
 
                             // Retry request original com novo token
                             originalRequest.headers.Authorization = `Bearer ${response.access_token}`
                             return apiClient(originalRequest)
                         } catch (refreshError) {
-                            console.error('[API] Token refresh failed, logging out')
+                            logError(refreshError as Error, 'Token refresh failed, logging out')
+
                             // Refresh falhou, limpar tokens
                             useAppStore.getState().clearAll()
 
@@ -114,7 +128,31 @@ apiClient.interceptors.response.use(
 
         // Tratamento de erro 403 (sem permissão)
         if (error.response?.status === 403) {
-            console.error('Acesso negado:', error.response.data)
+            logError(error, 'Access denied (403)', {
+                url: originalRequest?.url,
+                method: originalRequest?.method,
+            })
+        }
+
+        // Log de erros 4xx/5xx
+        const duration = error.config?.metadata?.startTime
+            ? Date.now() - error.config.metadata.startTime
+            : undefined
+
+        if (error.response) {
+            logApiCall({
+                method: error.config?.method?.toUpperCase() || 'UNKNOWN',
+                url: error.config?.url || 'unknown',
+                status: error.response.status,
+                duration,
+                error: error,
+            })
+        } else {
+            // Erro de rede ou timeout
+            logError(error, 'Network error or timeout', {
+                url: error.config?.url,
+                method: error.config?.method,
+            })
         }
 
         return Promise.reject(error)
