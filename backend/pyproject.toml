@@ -38,6 +38,8 @@ pyhanko = {extras = ["crypto"], version = "^0.32.0"}
 channels = "^4.0.0"
 channels-redis = "^4.1.0"
 daphne = "^4.0.0"
+# Structured logging
+python-json-logger = "^2.0.7"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -67,7 +67,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    # 'ordoc_ai.middleware.rate_limiting.RateLimitMiddleware',  # Rate limiting for security
+    'ordoc_ai.middleware.logging_middleware.RequestLoggingMiddleware',  # Structured logging
+    'ordoc_ai.middleware.rate_limiting.RateLimitMiddleware',  # Rate limiting for security
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -268,3 +269,165 @@ SOLR_PASSWORD = config('SOLR_PASSWORD', default=None)
 
 # Frontend URL for notifications
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
+# ==============================================================================
+# LOGGING CONFIGURATION (Structured JSON Logging)
+# ==============================================================================
+
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(name)s %(levelname)s %(message)s %(pathname)s %(lineno)d',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
+            'rename_fields': {
+                'asctime': 'timestamp',
+                'name': 'logger',
+                'levelname': 'level',
+                'pathname': 'file',
+                'lineno': 'line',
+            },
+        },
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} - {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose' if DEBUG else 'json',
+        },
+        'file_requests': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'requests.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 30,  # Manter 30 dias de logs
+            'formatter': 'json',
+            'encoding': 'utf-8',
+        },
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'errors.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 90,  # Manter 90 dias de erros
+            'formatter': 'json',
+            'encoding': 'utf-8',
+        },
+        'file_security': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'security.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 180,  # Manter 180 dias (auditoria)
+            'formatter': 'json',
+            'encoding': 'utf-8',
+        },
+        'file_celery': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGS_DIR, 'celery.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'backupCount': 7,  # Manter 7 dias
+            'formatter': 'json',
+            'encoding': 'utf-8',
+        },
+    },
+    'loggers': {
+        # Logger principal do Django
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Requests HTTP (middleware)
+        'ordoc_ai.requests': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Erros e exceções
+        'django.request': {
+            'handlers': ['console', 'file_errors'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Segurança e autenticação
+        'ordoc_ai.security': {
+            'handlers': ['console', 'file_security'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Celery tasks
+        'celery': {
+            'handlers': ['console', 'file_celery'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Módulos Ordoc-AI
+        'ordoc_air': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ordoc_flow': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ordoc_cloud': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ordoc_sign': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ordoc_reports': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'ordoc_integrations': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'intelligence': {
+            'handlers': ['console', 'file_requests'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
