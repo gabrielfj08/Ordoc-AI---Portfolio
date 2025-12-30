@@ -21,17 +21,44 @@ class RateLimitMiddleware(MiddlewareMixin):
     
     # Rate limit configurations
     RATE_LIMITS = {
-        # Login endpoint - development-friendly limits
+        # Authentication endpoints - stricter limits
         '/api/auth/login/': {
-            'requests': 20,     # 20 attempts (increased for dev)
-            'window': 300,      # per 5 minutes
-            'block_duration': 60,   # block for 1 minute only
+            'requests': 5,      # 5 login attempts
+            'window': 60,       # per minute
+            'block_duration': 300,  # block for 5 minutes
+        },
+        '/api/auth/register/': {
+            'requests': 3,      # 3 registration attempts
+            'window': 3600,     # per hour
+            'block_duration': 300,
+        },
+        '/api/auth/refresh/': {
+            'requests': 10,     # 10 refresh attempts
+            'window': 60,       # per minute
+            'block_duration': 60,
+        },
+        # Upload endpoints - prevent spam
+        '/api/v1/ordoc-air/documents/': {
+            'requests': 50,     # 50 uploads
+            'window': 3600,     # per hour
+            'block_duration': 300,
+        },
+        # Write operations - moderate limits
+        '/api/v1/ordoc-flow/procedures/': {
+            'requests': 100,    # 100 procedures
+            'window': 3600,     # per hour
+            'block_duration': 60,
+        },
+        '/api/v1/ordoc-flow/tasks/': {
+            'requests': 200,    # 200 tasks
+            'window': 3600,     # per hour
+            'block_duration': 60,
         },
         # General API endpoints
         '/api/': {
-            'requests': 100,    # 100 requests
-            'window': 60,       # per minute
-            'block_duration': 60,   # block for 1 minute
+            'requests': 1000,   # 1000 requests
+            'window': 3600,     # per hour
+            'block_duration': 60,
         },
     }
     
@@ -123,10 +150,35 @@ class RateLimitMiddleware(MiddlewareMixin):
         # Skip rate limiting in debug mode if configured
         if getattr(settings, 'DEBUG', False) and getattr(settings, 'DISABLE_RATE_LIMITING_IN_DEBUG', False):
             return None
-        
+
         is_limited, error_response = self.is_rate_limited(request)
-        
+
         if is_limited:
-            return JsonResponse(error_response, status=error_response['status'])
-        
+            response = JsonResponse(error_response, status=error_response['status'])
+            # Add rate limit headers
+            response['Retry-After'] = str(error_response.get('retry_after', 60))
+            response['X-RateLimit-Limit'] = '0'
+            response['X-RateLimit-Remaining'] = '0'
+            return response
+
         return None
+
+    def process_response(self, request, response):
+        """Add rate limit headers to response"""
+        path = request.path_info
+        config = self.get_rate_limit_config(path)
+
+        if config:
+            client_ip = self.get_client_ip(request)
+            rate_key = f"rate_limit:{client_ip}:{path}:{request.method}"
+
+            current_requests = cache.get(rate_key, 0)
+            limit = config['requests']
+            remaining = max(0, limit - current_requests)
+
+            # Add informative headers
+            response['X-RateLimit-Limit'] = str(limit)
+            response['X-RateLimit-Remaining'] = str(remaining)
+            response['X-RateLimit-Reset'] = str(int(time.time()) + config['window'])
+
+        return response
