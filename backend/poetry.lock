@@ -1041,18 +1041,19 @@ files = [
 
 [[package]]
 name = "django-guardian"
-version = "3.0.3"
+version = "3.2.0"
 description = "Per object permissions for Django"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "django_guardian-3.0.3-py3-none-any.whl", hash = "sha256:d2164cea9f03c369d7ade21802710f3ab23ca6734bcc7dfcfb385906783916c7"},
-    {file = "django_guardian-3.0.3.tar.gz", hash = "sha256:4e59eab4d836da5a027cf0c176d14bc2a4e22cbbdf753159a03946c08c8a196d"},
+    {file = "django_guardian-3.2.0-py3-none-any.whl", hash = "sha256:0768565a057988a93fc4a1d93649c4a794abfd7473a8408a079cfbf83c559d77"},
+    {file = "django_guardian-3.2.0.tar.gz", hash = "sha256:9e18ecd2e211b665972690c2d03d27bce0ea4932b5efac24a4bb9d526950a69e"},
 ]
 
 [package.dependencies]
 django = ">=3.2"
+typing_extensions = {version = ">=4.12.0", markers = "python_version < \"3.13\""}
 
 [[package]]
 name = "django-storages"
@@ -4458,4 +4459,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "1f0a07a420b1a2a83d4c0b4e9edcd1ba0e86b40095962ade659f2d71ee0aaf9b"
+content-hash = "32ff3e2380abe2c9032a82e53d1f5c1308d2d3e1c48e36e7e28b8b115c5297c5"
