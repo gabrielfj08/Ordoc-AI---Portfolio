@@ -16,7 +16,7 @@ interface Document {
   created_at: string
   file_size?: number
   created_by?: string
-  tags?: string[]
+  tags?: (string | { id: string; name: string; slug: string; color?: string })[]
   description?: string
   relevance_score?: number
 }
@@ -123,10 +123,10 @@ export function DocumentPreviewTooltip({
                 <div className="flex flex-wrap gap-1.5">
                   {document.tags.map((tag, index) => (
                     <span
-                      key={index}
+                      key={typeof tag === 'string' ? index : tag.id}
                       className="px-2 py-0.5 bg-orange-600/5 text-primary rounded-md text-[10px] font-bold border border-primary/5"
                     >
-                      {tag}
+                      {typeof tag === 'string' ? tag : tag.name}
                     </span>
                   ))}
                 </div>
