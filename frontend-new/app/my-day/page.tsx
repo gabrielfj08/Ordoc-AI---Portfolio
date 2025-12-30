@@ -50,6 +50,8 @@ import { myDayApi, type DashboardOverview, type RecentDocument, type ActiveWorkf
 import { rankingApi, type RankedEntity } from "@/services/ranking-api"
 import { useMyDayStore, selectSortedDocuments, selectIsRankingEnabled, selectDocumentRankings } from "@/stores/my-day-store"
 import { CardControls } from "@/components/my-day/card-controls"
+import { CardsSkeleton } from "@/components/ui/skeletons"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function MeuDiaPage() {
     const router = useRouter()
@@ -187,12 +189,8 @@ export default function MeuDiaPage() {
         return (
             <div className="container mx-auto p-6 max-w-[1600px]">
                 <div className="space-y-8">
-                    <div className="h-32 bg-muted animate-pulse rounded-lg" />
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="h-40 bg-muted animate-pulse rounded-lg" />
-                        ))}
-                    </div>
+                    <Skeleton className="h-32 rounded-lg" />
+                    <CardsSkeleton count={4} />
                 </div>
             </div>
         )
