@@ -107,13 +107,13 @@ def task_field_post_save(sender, instance, created, **kwargs):
     """
     Reindexa o objeto relacionado quando um campo customizado é modificado.
     """
-    if getattr(settings, 'SOLR_ENABLED', True) and instance.content_object:
+    if getattr(settings, 'SOLR_ENABLED', True) and hasattr(instance, 'fieldable') and instance.fieldable:
         try:
-            if isinstance(instance.content_object, Task):
-                workflow_solr_service.index_task(instance.content_object)
+            if isinstance(instance.fieldable, Task):
+                workflow_solr_service.index_task(instance.fieldable)
                 logger.info(f"Tarefa reindexada após modificação de campo")
-            elif isinstance(instance.content_object, Procedure):
-                workflow_solr_service.index_procedure(instance.content_object)
+            elif isinstance(instance.fieldable, Procedure):
+                workflow_solr_service.index_procedure(instance.fieldable)
                 logger.info(f"Procedimento reindexado após modificação de campo")
         except Exception as e:
             logger.error(f"Erro ao reindexar após modificação de campo: {str(e)}")
@@ -203,7 +203,8 @@ def notify_approval_requested(sender, instance, created, **kwargs):
     """
     Notifica quando uma aprovação é solicitada
     """
-    if created and instance.approver:
+    approver = getattr(instance, 'approver', None)
+    if created and approver:
         try:
             from ordoc_flow.notification_service import NotificationService
             NotificationService.notify_approval_requested(

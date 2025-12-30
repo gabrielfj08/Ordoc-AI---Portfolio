@@ -44,7 +44,7 @@ class WorkflowSolrService:
                 'created_at': procedure.created_at.isoformat(),
                 'updated_at': procedure.updated_at.isoformat(),
                 'deadline': procedure.deadline.isoformat() if procedure.deadline else None,
-                'created_by': procedure.created_by.name if procedure.created_by else '',
+                'created_by': (procedure.created_by.user.get_full_name() or procedure.created_by.user.username) if procedure.created_by else '',
                 'requester_name': procedure.requester.name if procedure.requester else '',
                 'responsible_group': procedure.responsible_group.name if procedure.responsible_group else '',
                 'template_name': procedure.procedure_template.name if procedure.procedure_template else '',
@@ -81,7 +81,7 @@ class WorkflowSolrService:
                 'created_at': task.created_at.isoformat(),
                 'updated_at': task.updated_at.isoformat(),
                 'deadline': task.deadline.isoformat() if task.deadline else None,
-                'created_by': task.created_by.name if task.created_by else '',
+                'created_by': (task.created_by.user.get_full_name() or task.created_by.user.username) if task.created_by else '',
                 'assignee_name': task.assignee.name if task.assignee else '',
                 'group_assignee': task.group_assignee.name if task.group_assignee else '',
                 'procedure_id': str(task.procedure.id),
@@ -345,14 +345,9 @@ class WorkflowSolrService:
     
     def _extract_task_fields(self, task):
         """Extrai texto dos campos customizados da tarefa"""
-        fields = task.task_fields.all()
-        text_values = []
-        for field in fields:
-            if field.value:
-                text_values.append(str(field.value))
-            if field.array_values:
-                text_values.extend([str(v) for v in field.array_values if v])
-        return ' '.join(text_values)
+        # TODO: Implementar TaskField corretamente (GenericRelation ou query)
+        # fields = task.task_fields.all()
+        return ''
     
     def _extract_template_fields(self, template):
         """Extrai texto dos campos do template"""
@@ -396,7 +391,7 @@ class WorkflowSolrService:
             procedure.procedure_template_name,
             procedure.procedure_template.description if procedure.procedure_template else '',
             procedure.source or '',
-            procedure.created_by.name if procedure.created_by else '',
+            (procedure.created_by.user.get_full_name() or procedure.created_by.user.username) if procedure.created_by else '',
             procedure.requester.name if procedure.requester else '',
             procedure.responsible_group.name if procedure.responsible_group else '',
             self._extract_payload_text(procedure.payload)
@@ -408,7 +403,7 @@ class WorkflowSolrService:
         parts = [
             task.name,
             task.description or '',
-            task.created_by.name if task.created_by else '',
+            (task.created_by.user.get_full_name() or task.created_by.user.username) if task.created_by else '',
             task.assignee.name if task.assignee else '',
             task.group_assignee.name if task.group_assignee else '',
             task.procedure.process_number,

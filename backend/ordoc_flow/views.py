@@ -482,6 +482,7 @@ class TaskViewSet(BaseViewSet):
     def my_tasks(self, request):
         """Tarefas atribuídas ao usuário atual"""
         user = self.get_current_user()
+        ordoc_user = self.get_current_ordoc_user()
         
         # Para usuários internos, busca por tarefas atribuídas diretamente
         # Para usuários externos, busca por external requester
@@ -491,12 +492,17 @@ class TaskViewSet(BaseViewSet):
             )
         else:
             # Busca tarefas onde o usuário é membro do grupo responsável
-            user_groups = user.member_groups.filter(
-                grouprequestermember__is_active=True
-            )
+            # Fix: Consultar GroupRequesterMember usando OrdocUser
+            active_group_ids = []
+            if ordoc_user:
+                active_group_ids = GroupRequesterMember.objects.filter(
+                    user=ordoc_user,
+                    is_active=True,
+                    group__status='active'
+                ).values_list('group_id', flat=True)
+            
             queryset = self.get_queryset().filter(
-                Q(group_assignee__in=user_groups) |
-                Q(assignee__isnull=True, group_assignee__in=user_groups)
+                group_assignee__in=active_group_ids
             )
         
         # Aplicar filtros
@@ -674,12 +680,12 @@ class WorkflowDashboardViewSet(BaseViewSet):
         if ordoc_user:
             # Get users in same organization
             from ordoc_cloud.models import UserOrganizationRole
-            org_users = UserOrganizationRole.objects.filter(
+            org_users_roles = UserOrganizationRole.objects.filter(
                 organization=organization,
                 role__in=['admin', 'manager', 'member'] # Filter relevant roles
             ).select_related('user__user')[:5] # Limit to 5 for widget
 
-            for role_entry in org_users:
+            for role_entry in org_users_roles:
                  u = role_entry.user
                  # Count overdue approvals
                  overdue_count = ApprovalStepInstance.objects.filter(
@@ -701,13 +707,55 @@ class WorkflowDashboardViewSet(BaseViewSet):
                      'avatar': u.avatar.url if u.avatar else None
                  })
 
+        # --- Calculate Global Stats (Documents & Users) ---
+        from ordoc_air.models import Document
+        from datetime import timedelta
+        
+        # 1. Total Documents
+        total_documents = Document.objects.filter(department__organization=organization).count()
+        
+        # Documents Change (last 30 days growth)
+        last_30_days = timezone.now() - timedelta(days=30)
+        new_docs_count = Document.objects.filter(
+            department__organization=organization, 
+            created_at__gte=last_30_days
+        ).count()
+        
+        # Simplified change logic: just show how many new docs as percentage of total (growth)
+        # or compare to previous month. For simplicity/speed:
+        prev_docs_count = total_documents - new_docs_count
+        if prev_docs_count > 0:
+            doc_change_pct = (new_docs_count / prev_docs_count) * 100
+            documents_change = f"+{int(doc_change_pct)}%"
+        else:
+            documents_change = "+100%" if total_documents > 0 else "+0%"
+
+        # 2. Active Users
+        # Count users with roles in this organization
+        active_users = UserOrganizationRole.objects.filter(organization=organization).values('user').distinct().count()
+        users_change = "+0%" # Placeholder, user growth is slow
+
+        # 3. Approval Rate (Completed Procedures / Total Procedures)
+        total_procs = procedure_stats.get('total', 0)
+        completed_procs = procedure_stats.get('finished', 0)
+        approval_rate = round((completed_procs / total_procs * 100), 1) if total_procs > 0 else 0.0
+        approval_rate_change = "+0%" # Placeholder
+
         dashboard_data = {
+            'total_documents': total_documents,
+            'active_users': active_users,
+            'approval_rate': approval_rate,
+            'documents_change': documents_change,
+            'users_change': users_change,
+            'procedures_change': "+0%", # Placeholder
+            'approval_rate_change': approval_rate_change,
+            
             'procedure_stats': procedure_stats,
             'task_stats': task_stats,
             'pending_approvals': pending_approvals,
             'overdue_tasks': overdue_tasks,
             'recent_activities': recent_activities,
-            'team_stats': team_stats # Add this
+            'team_stats': team_stats
         }
         
         serializer = WorkflowDashboardSerializer(dashboard_data)

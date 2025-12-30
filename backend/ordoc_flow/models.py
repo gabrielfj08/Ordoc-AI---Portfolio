@@ -333,7 +333,8 @@ class GroupRequesterMember(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.user.name} - {self.group.name} ({self.get_role_display()})"
+        user_name = self.user.user.get_full_name() or self.user.user.username
+        return f"{user_name} - {self.group.name} ({self.get_role_display()})"
 
 
 class ProcedureTemplate(models.Model):
@@ -761,6 +762,24 @@ class Procedure(models.Model):
                 
         # Adiciona total
         status_counts['total'] = sum(status_counts.values())
+
+        # Estatísticas derivadas para o dashboard
+        active_statuses = ['draft', 'running', 'started']
+        
+        # Urgente: Alta prioridade & ativo
+        status_counts['urgent'] = queryset.filter(
+            priority='high',
+            status__in=active_statuses
+        ).count()
+        
+        # Normal: Prioridade normal & ativo
+        status_counts['normal'] = queryset.filter(
+            priority='normal',
+            status__in=active_statuses
+        ).count()
+        
+        # Concluído: Alias para finished
+        status_counts['completed'] = status_counts.get('finished', 0)
         
         return status_counts
     
@@ -1046,6 +1065,24 @@ class Task(models.Model):
                 
         # Adiciona total
         status_counts['total'] = sum(status_counts.values())
+
+        # Estatísticas derivadas para o dashboard
+        active_statuses = ['draft', 'running', 'started']
+        
+        # Urgente: Alta prioridade & ativo
+        status_counts['urgent'] = queryset.filter(
+            priority='high',
+            status__in=active_statuses
+        ).count()
+        
+        # Normal: Prioridade normal & ativo
+        status_counts['normal'] = queryset.filter(
+            priority='normal',
+            status__in=active_statuses
+        ).count()
+        
+        # Concluído: Alias para finished
+        status_counts['completed'] = status_counts.get('finished', 0)
         
         return status_counts
     
