@@ -510,15 +510,31 @@ class PolicyViewSet(QueryOptimizationMixin, BaseViewSet):
 
     
     def get_queryset(self):
-        """Filter policies by current organization"""
+        """
+        Filter policies by current organization.
+
+        Optimized with prefetch_related to prevent N+1 queries
+        in affected_users() action.
+        """
+        from django.db.models import Prefetch
+
         queryset = super().get_queryset()
-        
+
         if hasattr(self.request, 'current_organization') and self.request.current_organization:
             queryset = queryset.filter(organization=self.request.current_organization)
-        
+
         # Exclude deleted policies
         queryset = queryset.filter(deleted_at__isnull=True)
-        
+
+        # Optimize for affected_users() action - prefetch users and groups
+        queryset = queryset.prefetch_related(
+            'users',
+            Prefetch(
+                'user_groups',
+                queryset=UserGroup.objects.prefetch_related('users')
+            )
+        )
+
         return queryset
     
     def perform_create(self, serializer):

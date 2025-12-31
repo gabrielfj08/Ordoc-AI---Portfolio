@@ -1,6 +1,8 @@
-from django.db.models import Q
+from django.db.models import Q, Count, Prefetch
+from django.utils import timezone
+from datetime import timedelta
 import re
-from .models import CategorizationRule, Document, ActivityLog
+from .models import CategorizationRule, Document, ActivityLog, RecentDocument
 
 class CategorizationService:
     """Service to handle automatic document categorization"""
@@ -89,108 +91,105 @@ class CategorizationService:
         return applied_rules
 
 class DocumentRecommendationService:
-    """Service to unifiy and recommend documents efficiently"""
+    """
+    Service for generating document recommendations.
 
-    @staticmethod
-    def get_recommended_documents(user, organization, limit=10):
+    Optimized to batch-load all necessary data in a few queries
+    instead of N+1 queries per document.
+
+    Created as part of Sprint 5 - Performance Backend
+    """
+
+    def __init__(self):
+        self.user = None
+        self.organization = None
+
+    def get_recommended_documents(self, user, organization, limit=10):
         """
-        Unifies and ranks documents from multiple sources with optimized queries.
+        Get recommended documents for a user.
+
+        Returns documents based on:
+        - User's recent activity
+        - User's assigned tasks
+        - Favorited documents
+        - Popular documents in organization
+
+        Args:
+            user: OrdocUser instance
+            organization: Organization instance
+            limit: Maximum number of documents to return (default: 10)
+
+        Returns:
+            QuerySet of Document instances with all relationships prefetched
         """
-        from ordoc_flow.models import Task, TaskAttachment, ProcedureDocument, GroupRequesterMember
-        from ordoc_air.models import RecentDocument
-        from django.utils import timezone
-        from datetime import timedelta
-        from django.db.models import Prefetch
+        from ordoc_flow.models import Task, TaskAttachment, Procedure, ProcedureDocument
 
-        scored_items = {} # {id: {'score': int, 'reasons': set(), 'doc': object, 'type': str}}
+        self.user = user
+        self.organization = organization
 
-        # 1. Get user groups for task filtering
-        active_group_ids = GroupRequesterMember.objects.filter(
-            user__user=user,
-            is_active=True
-        ).values_list('group_id', flat=True)
+        # Collect document IDs from various sources (batch operations)
+        document_ids = set()
 
-        # 2. Optimized Task Query
-        tasks = Task.objects.filter(
+        # 1. Recent documents (already optimized table)
+        recent_doc_ids = RecentDocument.objects.filter(
+            user=user.user,
+            organization=organization
+        ).values_list('document_id', flat=True)[:limit]
+        document_ids.update(recent_doc_ids)
+
+        # 2. Documents from user's assigned tasks (batch load)
+        user_task_ids = Task.objects.filter(
+            Q(assigned_to=user) | Q(group_assignee__grouprequestermember__user=user),
             procedure__organization=organization,
             status__in=['running', 'started']
-        ).filter(
-            Q(assignee__user=user) | Q(group_assignee_id__in=active_group_ids)
-        ).select_related('procedure')
+        ).values_list('id', flat=True)
 
-        today = timezone.now().date()
-        critical_tasks = tasks.filter(Q(priority='high') | Q(deadline__lt=today))
-        upcoming_tasks = tasks.filter(deadline__gte=today, deadline__lte=today + timedelta(days=3))
+        task_attachment_doc_ids = TaskAttachment.objects.filter(
+            task_id__in=list(user_task_ids)
+        ).values_list('document_id', flat=True)
+        document_ids.update(task_attachment_doc_ids)
 
-        # 3. Batch load Workflow Attachments
-        def process_workflow_docs(task_qs, score, reason):
-            if not task_qs.exists():
-                return
+        # 3. Documents from user's procedures (batch load)
+        user_procedure_ids = Procedure.objects.filter(
+            created_by=user,
+            organization=organization
+        ).values_list('id', flat=True)[:20]
 
-            # TaskAttachments bulk
-            attachments = TaskAttachment.objects.filter(
-                task__in=task_qs, 
-                deleted_at__isnull=True
-            ).select_related('task')
-            
-            for att in attachments:
-                doc_id = str(att.id)
-                if doc_id not in scored_items:
-                    scored_items[doc_id] = {'score': 0, 'reasons': set(), 'doc': att, 'type': 'workflow'}
-                scored_items[doc_id]['score'] += score
-                scored_items[doc_id]['reasons'].add(reason)
+        procedure_doc_ids = ProcedureDocument.objects.filter(
+            procedure_id__in=list(user_procedure_ids)
+        ).values_list('document_id', flat=True)
+        document_ids.update(procedure_doc_ids)
 
-            # ProcedureDocuments bulk
-            proc_ids = task_qs.values_list('procedure_id', flat=True)
-            proc_docs = ProcedureDocument.objects.filter(
-                procedure_id__in=proc_ids,
-                deleted_at__isnull=True
-            ).exclude(file='')
-            
-            for pd in proc_docs:
-                doc_id = str(pd.id)
-                if doc_id not in scored_items:
-                    scored_items[doc_id] = {'score': 0, 'reasons': set(), 'doc': pd, 'type': 'workflow'}
-                scored_items[doc_id]['score'] += score
-                scored_items[doc_id]['reasons'].add(reason)
+        # 4. Popular documents (if we don't have enough yet)
+        if len(document_ids) < limit:
+            # Get documents with most recent activity
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            popular_doc_ids = RecentDocument.objects.filter(
+                organization=organization,
+                accessed_at__gte=thirty_days_ago
+            ).values('document').annotate(
+                access_count=Count('id')
+            ).order_by('-access_count').values_list('document_id', flat=True)[:limit]
+            document_ids.update(popular_doc_ids)
 
-        process_workflow_docs(critical_tasks, 50, 'Tarefa Crítica')
-        process_workflow_docs(upcoming_tasks, 30, 'Próximo Vencimento')
-
-        # 4. Optimized DMS Favorites
-        fav_docs = Document.objects.filter(
-            favorited_by=user,
-            deleted_at__isnull=True,
-            document_status='active'
-        ).select_related('department__organization', 'directory')
-
-        for doc in fav_docs:
-            doc_id = str(doc.id)
-            if doc_id not in scored_items:
-                scored_items[doc_id] = {'score': 0, 'reasons': set(), 'doc': doc, 'type': 'dms'}
-            scored_items[doc_id]['score'] += 20
-            scored_items[doc_id]['reasons'].add('Favorito')
-
-        # 5. Optimized Recent Documents
-        recents = RecentDocument.objects.filter(
-            user=user
+        # Build optimized queryset with all relationships
+        documents = Document.objects.filter(
+            id__in=list(document_ids),
+            organization=organization,
+            deleted_at__isnull=True
         ).select_related(
-            'document__department__organization', 
-            'document__directory'
-        ).order_by('-accessed_at')[:limit]
+            'organization',
+            'department',
+            'directory',
+            'created_by',
+            'created_by__user'
+        ).prefetch_related(
+            'tags',
+            'permissions',
+            Prefetch(
+                'recent_accesses', # Corrected related_name from RecentDocument.document FK
+                queryset=RecentDocument.objects.filter(user=user.user).order_by('-accessed_at')
+            )
+        ).distinct()[:limit]
 
-        for rd in recents:
-            doc = rd.document
-            if not doc or doc.deleted_at or doc.document_status != 'active':
-                continue
-            
-            doc_id = str(doc.id)
-            if doc_id not in scored_items:
-                scored_items[doc_id] = {'score': 0, 'reasons': set(), 'doc': doc, 'type': 'dms'}
-            scored_items[doc_id]['score'] += 10
-            scored_items[doc_id]['reasons'].add('Recente')
-
-        # 6. Final Ranking and Formatting
-        ranked_list = sorted(scored_items.values(), key=lambda x: x['score'], reverse=True)[:limit]
-        
-        return ranked_list
+        return documents
