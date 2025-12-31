@@ -5,6 +5,7 @@ import QueryProvider from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { generatePageMetadata, DEFAULT_METADATA } from "@/lib/metadata";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,24 +18,13 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export const metadata: Metadata = {
-  title: "Ordoc-AI - Ordem Inteligente no Cuidado",
-  description: "Transforme conversas médicas em documentação perfeita. Plataforma completa de gestão documental e workflow empresarial com IA para profissionais de saúde.",
-  keywords: "gestão documental, workflow médico, IA médica, assinatura digital, OCR, documentação médica, prontuário eletrônico",
-  authors: [{ name: "Ordoc-AI Team" }],
-  robots: "index, follow",
-  openGraph: {
-    title: "Ordoc-AI - Ordem Inteligente no Cuidado",
-    description: "Transforme conversas médicas em documentação perfeita com nossa plataforma de IA.",
-    type: "website",
-    locale: "pt_BR",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Ordoc-AI - Ordem Inteligente no Cuidado",
-    description: "Transforme conversas médicas em documentação perfeita com nossa plataforma de IA.",
-  },
-};
+// Enhanced metadata using our metadata utilities
+export const metadata: Metadata = generatePageMetadata({
+  title: DEFAULT_METADATA.title,
+  description: DEFAULT_METADATA.description,
+  keywords: DEFAULT_METADATA.keywords,
+  ogType: 'website',
+});
 
 export default function RootLayout({
   children,

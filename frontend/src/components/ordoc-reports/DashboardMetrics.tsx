@@ -2,23 +2,47 @@
 
 import React, { useEffect, useState } from 'react';
 import { reportsService } from '@/services/reports';
+import { useWebSocketDashboard } from '@/hooks/useWebSocketDashboard';
 import { type DashboardMetrics } from '@/types/ordoc-reports';
+
 export default function DashboardMetrics() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // WebSocket for real-time updates (optional - gracefully degrades if not available)
+  const {
+    metrics: wsMetrics,
+    isConnected: wsConnected,
+  } = useWebSocketDashboard({
+    autoConnect: true,
+    onMetricsUpdate: (newMetrics) => {
+      setMetrics(newMetrics);
+      setLoading(false);
+    },
+  });
+
+  // Initial load via HTTP API
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         const data = await reportsService.getDashboardMetrics();
         setMetrics(data);
+      } catch (error) {
+        console.error('Failed to load dashboard metrics:', error);
       } finally {
         setLoading(false);
       }
     };
     load();
   }, []);
+
+  // Update metrics when WebSocket provides data
+  useEffect(() => {
+    if (wsMetrics) {
+      setMetrics(wsMetrics);
+    }
+  }, [wsMetrics]);
 
   if (loading) {
     return (
@@ -33,6 +57,14 @@ export default function DashboardMetrics() {
 
   return (
     <div className="space-y-6">
+      {/* WebSocket connection status indicator */}
+      {wsConnected && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-sm text-green-700">Atualizações em tempo real ativas</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center">
