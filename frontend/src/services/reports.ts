@@ -3,6 +3,13 @@
  */
 
 import axios from 'axios';
+import {
+  DashboardMetricsSchema,
+  ReportSchema,
+  ReportTemplateSchema,
+  type DashboardMetrics,
+} from '@/lib/schemas/reports';
+import { validateApiResponse, createPaginatedResponseSchema } from '@/lib/schemas/common';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -48,7 +55,12 @@ export const reportsService = {
    */
   async getReports(params?: { status?: string; search?: string }): Promise<Report[]> {
     const response = await api.get('/reports/', { params });
-    return Array.isArray(response.data) ? response.data : response.data.results || [];
+    const data = Array.isArray(response.data) ? response.data : response.data.results || [];
+
+    // Validate each report with Zod schema
+    return data.map((report: unknown, index: number) =>
+      validateApiResponse(ReportSchema, report, `getReports[${index}]`)
+    );
   },
 
   /**
@@ -56,7 +68,12 @@ export const reportsService = {
    */
   async getTemplates(): Promise<ReportTemplate[]> {
     const response = await api.get('/templates/');
-    return Array.isArray(response.data) ? response.data : response.data.results || [];
+    const data = Array.isArray(response.data) ? response.data : response.data.results || [];
+
+    // Validate each template with Zod schema
+    return data.map((template: unknown, index: number) =>
+      validateApiResponse(ReportTemplateSchema, template, `getTemplates[${index}]`)
+    );
   },
 
   /**
@@ -67,7 +84,9 @@ export const reportsService = {
       template_id: templateId,
       parameters
     });
-    return response.data;
+
+    // Validate response with Zod schema
+    return validateApiResponse(ReportSchema, response.data, 'createReport');
   },
 
   /**
@@ -82,7 +101,16 @@ export const reportsService = {
    */
   getDownloadUrl(reportId: string): string {
     return `${API_BASE_URL}/ordoc-reports/api/reports/${reportId}/download/`;
-  }
+  },
+
+  /**
+   * Get dashboard metrics
+   */
+  async getDashboardMetrics(): Promise<DashboardMetrics> {
+    const response = await api.get('/metrics/dashboard/');
+    // Validate response with Zod schema
+    return validateApiResponse(DashboardMetricsSchema, response.data, 'getDashboardMetrics');
+  },
 };
 
 export default reportsService;
