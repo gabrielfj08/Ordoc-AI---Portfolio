@@ -100,11 +100,8 @@ class DocumentRecommendationService:
     Created as part of Sprint 5 - Performance Backend
     """
 
-    def __init__(self):
-        self.user = None
-        self.organization = None
-
-    def get_recommended_documents(self, user, organization, limit=10):
+    @classmethod
+    def get_recommended_documents(cls, user, organization, limit=10):
         """
         Get recommended documents for a user.
 
@@ -115,81 +112,108 @@ class DocumentRecommendationService:
         - Popular documents in organization
 
         Args:
-            user: OrdocUser instance
+            user: User or ExternalRequester instance
             organization: Organization instance
             limit: Maximum number of documents to return (default: 10)
 
         Returns:
-            QuerySet of Document instances with all relationships prefetched
+            List of dicts: [{'doc': Document, 'reasons': set, 'type': str}]
         """
-        from ordoc_flow.models import Task, TaskAttachment, Procedure, ProcedureDocument
+        from django.contrib.auth.models import User
+        from ordoc_cloud.models import OrdocUser
+        from ordoc_flow.models import Task, TaskAttachment, Procedure, ProcedureDocument, ExternalRequester
 
-        self.user = user
-        self.organization = organization
+        # Track reasons for each document
+        doc_meta = {} # doc_id -> {'reasons': set(), 'type': 'dms'}
 
-        # Collect document IDs from various sources (batch operations)
-        document_ids = set()
+        def add_doc_ids(ids, reason, source_type='dms'):
+            for d_id in ids:
+                if d_id not in doc_meta:
+                    doc_meta[d_id] = {'reasons': set(), 'type': source_type}
+                doc_meta[d_id]['reasons'].add(reason)
 
-        # 1. Recent documents (already optimized table)
-        recent_doc_ids = RecentDocument.objects.filter(
-            user=user.user,
-            organization=organization
-        ).values_list('document_id', flat=True)[:limit]
-        document_ids.update(recent_doc_ids)
+        # Identify user context
+        django_user = user if isinstance(user, User) else None
+        external_user = user if isinstance(user, ExternalRequester) else None
+        
+        ordoc_user = None
+        if django_user:
+            try:
+                ordoc_user = django_user.ordoc_profile
+            except:
+                pass
 
-        # 2. Documents from user's assigned tasks (batch load)
-        user_task_ids = Task.objects.filter(
-            Q(assigned_to=user) | Q(group_assignee__grouprequestermember__user=user),
-            procedure__organization=organization,
-            status__in=['running', 'started']
-        ).values_list('id', flat=True)
+        # 1. Recent documents (Internal users only)
+        if django_user:
+            recent_doc_ids = list(RecentDocument.objects.filter(
+                user=django_user,
+                document__department__organization=organization
+            ).values_list('document_id', flat=True)[:limit])
+            add_doc_ids(recent_doc_ids, 'Recente')
 
-        task_attachment_doc_ids = TaskAttachment.objects.filter(
-            task_id__in=list(user_task_ids)
-        ).values_list('document_id', flat=True)
-        document_ids.update(task_attachment_doc_ids)
+        # 2. Documents from user's procedures (Internal users only)
+        # Note: We don't have direct link from ProcedureDocument to DMS Document yet
+        # So we skip this for now to avoid FieldError
+        pass
 
-        # 3. Documents from user's procedures (batch load)
-        user_procedure_ids = Procedure.objects.filter(
-            created_by=user,
-            organization=organization
-        ).values_list('id', flat=True)[:20]
-
-        procedure_doc_ids = ProcedureDocument.objects.filter(
-            procedure_id__in=list(user_procedure_ids)
-        ).values_list('document_id', flat=True)
-        document_ids.update(procedure_doc_ids)
-
-        # 4. Popular documents (if we don't have enough yet)
-        if len(document_ids) < limit:
-            # Get documents with most recent activity
+        # 4. Popular documents (if needed)
+        if len(doc_meta) < limit:
             thirty_days_ago = timezone.now() - timedelta(days=30)
-            popular_doc_ids = RecentDocument.objects.filter(
-                organization=organization,
+            popular_ids = list(RecentDocument.objects.filter(
+                document__department__organization=organization,
                 accessed_at__gte=thirty_days_ago
             ).values('document').annotate(
                 access_count=Count('id')
-            ).order_by('-access_count').values_list('document_id', flat=True)[:limit]
-            document_ids.update(popular_doc_ids)
+            ).order_by('-access_count').values_list('document_id', flat=True)[:limit])
+            add_doc_ids(popular_ids, 'Popular na Organização')
 
-        # Build optimized queryset with all relationships
+        # Fetch and optimize documents in a single query
+        all_ids = list(doc_meta.keys())
+        if not all_ids:
+            return []
+
         documents = Document.objects.filter(
-            id__in=list(document_ids),
-            organization=organization,
+            id__in=all_ids,
+            department__organization=organization,
             deleted_at__isnull=True
         ).select_related(
-            'organization',
+            'department__organization',
             'department',
             'directory',
-            'created_by',
-            'created_by__user'
+            'created_by'
         ).prefetch_related(
             'tags',
             'permissions',
             Prefetch(
-                'recent_accesses', # Corrected related_name from RecentDocument.document FK
-                queryset=RecentDocument.objects.filter(user=user.user).order_by('-accessed_at')
+                'recent_accesses',
+                queryset=RecentDocument.objects.filter(user=django_user).order_by('-accessed_at') if django_user else RecentDocument.objects.none()
             )
         ).distinct()[:limit]
 
-        return documents
+        # Weights for scoring
+        weights = {
+            'Tarefa Crítica': 100,
+            'Próximo Vencimento': 95,
+            'Favorito': 90,
+            'Recente': 80,
+            'Procedimento': 70,
+            'Popular na Organização': 50
+        }
+
+        # Final structure for view
+        results = []
+        for doc in documents:
+            meta = doc_meta.get(doc.id, {'reasons': set(), 'type': 'dms'})
+            
+            # Calculate score based on max weight of reasons
+            score = max([weights.get(r, 0) for r in meta['reasons']]) if meta['reasons'] else 0
+            
+            results.append({
+                'doc': doc,
+                'reasons': meta['reasons'],
+                'type': meta['type'],
+                'score': score
+            })
+
+        # Sort by score desc
+        return sorted(results, key=lambda x: x['score'], reverse=True)

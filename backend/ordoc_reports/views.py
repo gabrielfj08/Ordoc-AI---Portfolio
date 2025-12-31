@@ -553,8 +553,6 @@ class ReportMetricViewSet(BaseViewSet):
     
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
-    @action(detail=False, methods=['get'])
-    def dashboard(self, request):
         """
         Dashboard com métricas principais.
 
