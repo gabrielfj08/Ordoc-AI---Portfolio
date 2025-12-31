@@ -28,11 +28,16 @@ djangorestframework-simplejwt = "^5.5.1"
 pysolr = "^3.9.0"
 drf-spectacular = "^0.29.0"
 requests = "^2.31.0"
-cryptography = "^46.0.3"
+cryptography = "^44.0.0"  # Compatible with pyOpenSSL 24.x
 pyotp = "^2.9.0"
 # Intelligence module dependencies (Ollama-only for efficiency)
 ollama = "^0.4.0"            # Local LLM client for Council and Extraction
 pyhanko = {extras = ["crypto"], version = "^0.32.0"}
+# XML Signing for NF-e/NFC-e
+lxml = "^5.0.0"              # XML processing
+signxml = "^3.2.2"           # XML-DSig signatures
+pyOpenSSL = "^24.0.0"        # Required by signxml
+zeep = "^4.2.1"              # SOAP client for SEFAZ Web Services
 # WebSocket support
 channels = "^4.0.0"
 channels-redis = "^4.1.0"
