@@ -1,5 +1,14 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 import { logApiCall, logError } from '@/utils/logger'
+
+// Estender tipo do Axios para incluir metadata customizada
+declare module 'axios' {
+    export interface InternalAxiosRequestConfig {
+        metadata?: {
+            startTime: number
+        }
+    }
+}
 
 // Configuração base do cliente HTTP
 const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -134,26 +143,15 @@ apiClient.interceptors.response.use(
             })
         }
 
-        // Log de erros 4xx/5xx
-        const duration = error.config?.metadata?.startTime
-            ? Date.now() - error.config.metadata.startTime
-            : undefined
-
-        if (error.response) {
-            logApiCall({
-                method: error.config?.method?.toUpperCase() || 'UNKNOWN',
-                url: error.config?.url || 'unknown',
-                status: error.response.status,
-                duration,
-                error: error,
-            })
-        } else {
+        // Log apenas erros de rede/timeout (não erros de API com resposta)
+        if (!error.response) {
             // Erro de rede ou timeout
             logError(error, 'Network error or timeout', {
                 url: error.config?.url,
                 method: error.config?.method,
             })
         }
+        // Erros 4xx/5xx são tratados pelos componentes que fazem a chamada
 
         return Promise.reject(error)
     }

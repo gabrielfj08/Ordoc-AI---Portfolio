@@ -6,6 +6,30 @@
  * Opções: WebExtension (Chrome/Firefox) ou Aplicativo Electron
  */
 
+// Declarações de tipo para Chrome Extension API
+declare global {
+    interface Window {
+        electron?: any;
+    }
+    const chrome: {
+        runtime: {
+            connectNative(application: string): ChromePort;
+        };
+    } | undefined;
+}
+
+interface ChromePort {
+    onMessage: {
+        addListener(callback: (message: any) => void): void;
+        removeListener(callback: (message: any) => void): void;
+    };
+    onDisconnect: {
+        addListener(callback: () => void): void;
+    };
+    postMessage(message: any): void;
+    disconnect(): void;
+}
+
 export interface Certificate {
     id: string;
     subject: string;
@@ -27,7 +51,7 @@ export interface SignatureResult {
  * Gerenciador de certificados em hardware local
  */
 export class HardwareCertificateManager {
-    private nativePort: chrome.runtime.Port | null = null;
+    private nativePort: ChromePort | null = null;
     private isElectron: boolean = false;
 
     constructor() {
@@ -74,7 +98,7 @@ export class HardwareCertificateManager {
 
             this.nativePort = chrome.runtime.connectNative('com.ordoc.certificate_manager');
 
-            this.nativePort.onMessage.addListener((message) => {
+            this.nativePort.onMessage.addListener((message: any) => {
                 if (message.type === 'initialized') {
                     resolve(true);
                 }
