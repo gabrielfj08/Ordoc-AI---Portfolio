@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
 from ordoc_ai.base_viewset import BaseViewSet
+from ordoc_ai.query_optimizations import QueryOptimizationMixin
 from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog
 from .serializers import (
     OrdocUserSerializer, OrdocUserCreateSerializer, OrdocUserListSerializer,
@@ -488,7 +489,7 @@ class UserGroupViewSet(BaseViewSet):
         return Response({'status': f'Removed {len(users)} users from group'})
 
 
-class PolicyViewSet(BaseViewSet):
+class PolicyViewSet(QueryOptimizationMixin, BaseViewSet):
     """
     ViewSet for managing Policies
     """
@@ -499,6 +500,14 @@ class PolicyViewSet(BaseViewSet):
     search_fields = ['name', 'description', 'service']
     ordering_fields = ['name', 'created_at', 'service']
     ordering = ['name']
+
+    # Query Optimization
+    select_related_fields = ['organization']
+    prefetch_related_fields = [
+        'users__user',
+        'user_groups__users__user'
+    ]
+
     
     def get_queryset(self):
         """Filter policies by current organization"""

@@ -30,9 +30,8 @@ drf-spectacular = "^0.29.0"
 requests = "^2.31.0"
 cryptography = "^46.0.3"
 pyotp = "^2.9.0"
-# Intelligence module dependencies
-gliner2 = "^1.2.0"           # Entity extraction (CPU-friendly)
-ollama = "^0.4.0"            # Local LLM client for Council
+# Intelligence module dependencies (Ollama-only for efficiency)
+ollama = "^0.4.0"            # Local LLM client for Council and Extraction
 pyhanko = {extras = ["crypto"], version = "^0.32.0"}
 # WebSocket support
 channels = "^4.0.0"

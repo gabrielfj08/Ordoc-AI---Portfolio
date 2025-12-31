@@ -3,7 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Avg, Q, Sum
+from django.db.models.functions import TruncMonth
 from django.http import HttpResponse, Http404
 from datetime import datetime, timedelta
 import json
@@ -552,96 +553,75 @@ class ReportMetricViewSet(BaseViewSet):
     
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
-        """Dashboard com métricas principais"""
+        """Dashboard com métricas principais - Otimizado para performance"""
         organization = self.get_current_organization()
-        
-        # Calcula métricas do dashboard
         now = timezone.now()
         this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
-        # Métricas básicas
-        total_reports = Report.objects.filter(organization=organization).count()
-        reports_this_month = Report.objects.filter(
-            organization=organization,
-            created_at__gte=this_month_start
-        ).count()
+        # 1. Agregação consolidada para métricas baseadas no modelo Report
+        report_stats = Report.objects.filter(
+            organization=organization
+        ).aggregate(
+            total=Count('id'),
+            this_month=Count('id', filter=Q(created_at__gte=this_month_start)),
+            avg_time=Avg('generation_time'),
+            failed=Count('id', filter=Q(status='failed'))
+        )
         
-        active_templates = ReportTemplate.objects.filter(
-            organization=organization,
-            status='active'
-        ).count()
-        
-        active_schedules = ReportSchedule.objects.filter(
-            organization=organization,
-            status='active'
-        ).count()
-        
-        # Tempo médio de geração
-        avg_generation_time = Report.objects.filter(
-            organization=organization,
-            generation_time__isnull=False
-        ).aggregate(avg=Avg('generation_time'))['avg']
-        
+        total_reports = report_stats['total'] or 0
+        avg_generation_time = report_stats['avg_time']
         if avg_generation_time:
             avg_generation_time = avg_generation_time.total_seconds()
         else:
             avg_generation_time = 0
-        
-        # Template mais usado
-        most_used_template = Report.objects.filter(
-            organization=organization
-        ).values('template__name').annotate(
-            count=Count('id')
-        ).order_by('-count').first()
-        
-        # Relatórios por status
-        reports_by_status = dict(
-            Report.objects.filter(
-                organization=organization
-            ).values('status').annotate(
-                count=Count('id')
-            ).values_list('status', 'count')
-        )
-        
-        # Relatórios por formato
-        reports_by_format = dict(
-            Report.objects.filter(
-                organization=organization
-            ).values('format').annotate(
-                count=Count('id')
-            ).values_list('format', 'count')
-        )
-        
-        # Tendência mensal (últimos 12 meses)
-        monthly_trend = []
-        for i in range(12):
-            month_start = (now.replace(day=1) - timedelta(days=30*i)).replace(day=1)
-            month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
             
-            count = Report.objects.filter(
-                organization=organization,
-                created_at__gte=month_start,
-                created_at__lte=month_end
-            ).count()
-            
-            monthly_trend.append({
-                'month': month_start.strftime('%Y-%m'),
-                'count': count
-            })
-        
-        monthly_trend.reverse()
-        
-        # Taxa de erro
-        failed_reports = Report.objects.filter(
-            organization=organization,
-            status='failed'
+        # 2. Métricas de Templates e Agendamentos
+        active_templates = ReportTemplate.objects.filter(
+            organization=organization, status='active'
         ).count()
         
-        error_rate = (failed_reports / total_reports * 100) if total_reports > 0 else 0
+        active_schedules = ReportSchedule.objects.filter(
+            organization=organization, status='active'
+        ).count()
+        
+        # 3. Distribuição por Status e Formato (Queries rápidas via values/annotate)
+        reports_by_status = dict(
+            Report.objects.filter(organization=organization)
+            .values('status').annotate(count=Count('id'))
+            .values_list('status', 'count')
+        )
+        
+        reports_by_format = dict(
+            Report.objects.filter(organization=organization)
+            .values('format').annotate(count=Count('id'))
+            .values_list('format', 'count')
+        )
+        
+        # 4. Tendência Mensal (Única query via TruncMonth)
+        monthly_trend_qs = Report.objects.filter(
+            organization=organization,
+            created_at__gte=now - timedelta(days=365)
+        ).annotate(
+            month=TruncMonth('created_at')
+        ).values('month').annotate(
+            count=Count('id')
+        ).order_by('month')
+        
+        monthly_trend = [
+            {'month': item['month'].strftime('%Y-%m'), 'count': item['count']}
+            for item in monthly_trend_qs
+        ]
+        
+        # 5. Template mais usado
+        most_used_template = Report.objects.filter(organization=organization) \
+            .values('template__name').annotate(count=Count('id')) \
+            .order_by('-count').first()
+        
+        error_rate = (report_stats['failed'] / total_reports * 100) if total_reports > 0 else 0
         
         dashboard_data = {
             'total_reports': total_reports,
-            'reports_this_month': reports_this_month,
+            'reports_this_month': report_stats['this_month'] or 0,
             'active_templates': active_templates,
             'active_schedules': active_schedules,
             'avg_generation_time': avg_generation_time,
