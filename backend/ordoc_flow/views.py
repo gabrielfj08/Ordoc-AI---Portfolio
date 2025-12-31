@@ -657,10 +657,17 @@ class WorkflowDashboardViewSet(BaseViewSet):
         ).count()
         
         # Atividades recentes (últimos 10 procedimentos criados)
+        # Optimized with select_related to prevent N+1 when accessing created_by.user
         recent_procedures = Procedure.objects.filter(
             organization=organization
         ).select_related(
-            'procedure_template', 'requester', 'created_by'
+            'procedure_template',
+            'requester',
+            'created_by',
+            'created_by__user',  # Prevent N+1 when accessing user details
+            'organization'
+        ).prefetch_related(
+            'tasks'  # Prefetch tasks if serializer needs them
         ).order_by('-created_at')[:10]
         
         recent_activities = []

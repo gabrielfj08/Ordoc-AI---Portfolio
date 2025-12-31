@@ -1,6 +1,8 @@
-from django.db.models import Q
+from django.db.models import Q, Count, Prefetch
+from django.utils import timezone
+from datetime import timedelta
 import re
-from .models import CategorizationRule, Document, ActivityLog
+from .models import CategorizationRule, Document, ActivityLog, RecentDocument
 
 class CategorizationService:
     """Service to handle automatic document categorization"""
@@ -87,3 +89,108 @@ class CategorizationService:
                     )
 
         return applied_rules
+
+
+class DocumentRecommendationService:
+    """
+    Service for generating document recommendations.
+
+    Optimized to batch-load all necessary data in a few queries
+    instead of N+1 queries per document.
+
+    Created as part of Sprint 5 - Performance Backend
+    """
+
+    def __init__(self):
+        self.user = None
+        self.organization = None
+
+    def get_recommended_documents(self, user, organization, limit=10):
+        """
+        Get recommended documents for a user.
+
+        Returns documents based on:
+        - User's recent activity
+        - User's assigned tasks
+        - Favorited documents
+        - Popular documents in organization
+
+        Args:
+            user: OrdocUser instance
+            organization: Organization instance
+            limit: Maximum number of documents to return (default: 10)
+
+        Returns:
+            QuerySet of Document instances with all relationships prefetched
+        """
+        from ordoc_flow.models import Task, TaskAttachment, Procedure, ProcedureDocument
+
+        self.user = user
+        self.organization = organization
+
+        # Collect document IDs from various sources (batch operations)
+        document_ids = set()
+
+        # 1. Recent documents (already optimized table)
+        recent_doc_ids = RecentDocument.objects.filter(
+            user=user.user,
+            organization=organization
+        ).values_list('document_id', flat=True)[:limit]
+        document_ids.update(recent_doc_ids)
+
+        # 2. Documents from user's assigned tasks (batch load)
+        user_task_ids = Task.objects.filter(
+            Q(assigned_to=user) | Q(group_assignee__grouprequestermember__user=user),
+            procedure__organization=organization,
+            status__in=['running', 'started']
+        ).values_list('id', flat=True)
+
+        task_attachment_doc_ids = TaskAttachment.objects.filter(
+            task_id__in=list(user_task_ids)
+        ).values_list('document_id', flat=True)
+        document_ids.update(task_attachment_doc_ids)
+
+        # 3. Documents from user's procedures (batch load)
+        user_procedure_ids = Procedure.objects.filter(
+            created_by=user,
+            organization=organization
+        ).values_list('id', flat=True)[:20]
+
+        procedure_doc_ids = ProcedureDocument.objects.filter(
+            procedure_id__in=list(user_procedure_ids)
+        ).values_list('document_id', flat=True)
+        document_ids.update(procedure_doc_ids)
+
+        # 4. Popular documents (if we don't have enough yet)
+        if len(document_ids) < limit:
+            # Get documents with most recent activity
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            popular_doc_ids = RecentDocument.objects.filter(
+                organization=organization,
+                accessed_at__gte=thirty_days_ago
+            ).values('document').annotate(
+                access_count=Count('id')
+            ).order_by('-access_count').values_list('document_id', flat=True)[:limit]
+            document_ids.update(popular_doc_ids)
+
+        # Build optimized queryset with all relationships
+        documents = Document.objects.filter(
+            id__in=list(document_ids),
+            organization=organization,
+            deleted_at__isnull=True
+        ).select_related(
+            'organization',
+            'department',
+            'directory',
+            'uploaded_by',
+            'uploaded_by__user'
+        ).prefetch_related(
+            'tags',
+            'permissions',
+            Prefetch(
+                'recentdocument_set',
+                queryset=RecentDocument.objects.filter(user=user.user).order_by('-accessed_at')
+            )
+        ).distinct()[:limit]
+
+        return documents
