@@ -6,11 +6,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.utils import timezone
 from ordoc_ai.base_viewset import BaseViewSet
-from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog
+from .models import (
+    OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog,
+    PersonalDataMapping, DataSubjectRequest, ConsentRecord
+)
 from .serializers import (
     OrdocUserSerializer, OrdocUserCreateSerializer, OrdocUserListSerializer,
     UserGroupSerializer, UserGroupCreateSerializer, PolicySerializer, UserOrganizationRoleSerializer,
-    AuditLogSerializer
+    AuditLogSerializer,
+    PersonalDataMappingSerializer, DataSubjectRequestSerializer, ConsentRecordSerializer
 )
 from .permissions import (
     IsActiveUser, IsAdmin, IsOrganizationManager, CanManageUsers,
@@ -778,3 +782,106 @@ class AuditLogViewSet(BaseViewSet):
             'by_action': list(action_counts),
             'top_users': list(user_counts),
         })
+
+
+# ============================================
+# LGPD COMPLIANCE VIEWSETS
+# ============================================
+
+class PersonalDataMappingViewSet(BaseViewSet):
+    """ViewSet para Mapeamento de Dados Pessoais (LGPD)"""
+
+    queryset = PersonalDataMapping.objects.all()
+    serializer_class = PersonalDataMappingSerializer
+    filterset_fields = ['data_type', 'legal_basis', 'is_active', 'is_shared']
+    search_fields = ['field_name', 'field_description', 'model_name']
+    ordering_fields = ['created_at', 'field_name']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(organization=self.request.organization)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            organization=self.request.organization,
+            created_by=self.request.user
+        )
+
+
+class DataSubjectRequestViewSet(BaseViewSet):
+    """ViewSet para Solicitações do Titular (LGPD Arts. 17-19)"""
+
+    queryset = DataSubjectRequest.objects.all()
+    serializer_class = DataSubjectRequestSerializer
+    filterset_fields = ['request_type', 'status']
+    search_fields = ['requester_name', 'requester_email', 'requester_cpf']
+    ordering_fields = ['request_date', 'deadline_date']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(organization=self.request.organization)
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.organization)
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        """Completa solicitação do titular"""
+        data_request = self.get_object()
+
+        response_text = request.data.get('response', '')
+        if not response_text:
+            return Response(
+                {'error': 'Campo response é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        data_request.status = 'completed'
+        data_request.response = response_text
+        data_request.completion_date = timezone.now()
+        data_request.save()
+
+        serializer = self.get_serializer(data_request)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def overdue(self, request):
+        """Lista solicitações atrasadas (prazo legal de 15 dias vencido)"""
+        queryset = self.get_queryset()
+        overdue_requests = [req for req in queryset if req.is_overdue()]
+
+        serializer = self.get_serializer(overdue_requests, many=True)
+        return Response(serializer.data)
+
+
+class ConsentRecordViewSet(BaseViewSet):
+    """ViewSet para Registro de Consentimento (LGPD Art. 8º)"""
+
+    queryset = ConsentRecord.objects.all()
+    serializer_class = ConsentRecordSerializer
+    filterset_fields = ['is_active', 'data_subject_cpf']
+    search_fields = ['data_subject_name', 'data_subject_email', 'data_subject_cpf']
+    ordering_fields = ['granted_at', 'revoked_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(organization=self.request.organization)
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.organization)
+
+    @action(detail=True, methods=['post'])
+    def revoke(self, request, pk=None):
+        """Revoga consentimento (LGPD Art. 8º, §5º)"""
+        consent = self.get_object()
+
+        if not consent.is_active:
+            return Response(
+                {'error': 'Consentimento já foi revogado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        consent.revoke()
+
+        serializer = self.get_serializer(consent)
+        return Response(serializer.data)
