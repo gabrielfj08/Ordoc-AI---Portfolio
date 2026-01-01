@@ -417,3 +417,182 @@ class LanguageModelStatusView(APIView):
             ]
         })
 
+
+# ============================================
+# COMPLIANCE VALIDATION ENDPOINTS
+# ============================================
+
+class ValidateComplianceView(APIView):
+    """
+    Endpoint para validar compliance de documentos.
+
+    POST /api/v1/intelligence/validate-compliance/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Valida compliance do documento."""
+        from .serializers import ComplianceValidationRequestSerializer
+        from ..validators import EArqBrasilValidator, LegalHoldValidator, LGPDValidator
+        import time
+
+        # Valida request
+        serializer = ComplianceValidationRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        document_id = data['document_id']
+        validators_to_run = data.get('validators', ['earq', 'legal_hold', 'lgpd'])
+
+        start_time = time.time()
+
+        try:
+            # Busca documento
+            from ordoc_air.models import Document
+            try:
+                document = Document.objects.select_related(
+                    'organization', 'department', 'document_type'
+                ).get(id=document_id)
+            except Document.DoesNotExist:
+                return Response(
+                    {'error': f'Documento {document_id} não encontrado'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Conteúdo do documento
+            document_content = data.get('document_content', '')
+            if not document_content and hasattr(document, 'content'):
+                document_content = document.content or ''
+
+            # Metadados
+            document_metadata = {
+                'id': str(document.id),
+                'title': document.title,
+                'type': document.document_type.name if document.document_type else 'unknown',
+            }
+
+            # Contexto rico
+            context = {
+                'organization_id': str(document.organization_id),
+                'sector': document.department.name if document.department else '',
+                'retention_status': None,
+                'legal_holds': [],
+                'data_mappings': [],
+                'consents': [],
+            }
+
+            # Retention status
+            if hasattr(document, 'retention_status'):
+                rs = document.retention_status
+                context['retention_status'] = {
+                    'current_phase_end': rs.current_phase_end.isoformat() if rs.current_phase_end else None,
+                    'retention_code': rs.retention_schedule.code,
+                    'is_eligible_for_disposition': rs.is_eligible_for_disposition(),
+                    'final_disposition': rs.retention_schedule.final_disposition,
+                }
+
+            # Legal holds ativos
+            for hold in document.legal_holds.filter(status='active'):
+                context['legal_holds'].append({
+                    'id': str(hold.id),
+                    'status': hold.status,
+                    'case_number': hold.case_number,
+                    'title': hold.title,
+                    'issuing_authority': hold.issuing_authority,
+                    'legal_basis': hold.legal_basis,
+                })
+
+            # Data mappings (LGPD)
+            from ordoc_cloud.models import PersonalDataMapping
+            for mapping in PersonalDataMapping.objects.filter(organization=document.organization, is_active=True):
+                context['data_mappings'].append({
+                    'field_name': mapping.field_name,
+                    'data_type': mapping.data_type,
+                    'legal_basis': mapping.legal_basis,
+                    'purpose': mapping.purpose,
+                })
+
+            # Consents
+            from ordoc_cloud.models import ConsentRecord
+            for consent in ConsentRecord.objects.filter(organization=document.organization).order_by('-granted_at')[:10]:
+                context['consents'].append({
+                    'id': str(consent.id),
+                    'is_active': consent.is_active,
+                    'purpose': consent.purpose,
+                    'revoked_at': consent.revoked_at.isoformat() if consent.revoked_at else None,
+                })
+
+            # Executa validators
+            all_alerts = []
+            validators_executed = []
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                if 'earq' in validators_to_run:
+                    earq = EArqBrasilValidator()
+                    alerts = loop.run_until_complete(
+                        earq.validate(document_content, document_metadata, context)
+                    )
+                    all_alerts.extend(alerts)
+                    validators_executed.append('earq')
+
+                if 'legal_hold' in validators_to_run:
+                    legal_hold = LegalHoldValidator()
+                    alerts = loop.run_until_complete(
+                        legal_hold.validate(document_content, document_metadata, context)
+                    )
+                    all_alerts.extend(alerts)
+                    validators_executed.append('legal_hold')
+
+                if 'lgpd' in validators_to_run:
+                    lgpd = LGPDValidator()
+                    alerts = loop.run_until_complete(
+                        lgpd.validate(document_content, document_metadata, context)
+                    )
+                    all_alerts.extend(alerts)
+                    validators_executed.append('lgpd')
+            finally:
+                loop.close()
+
+            # Monta resposta
+            alerts_data = []
+            for alert in all_alerts:
+                alerts_data.append({
+                    'severity': alert.severity.value,
+                    'alert_type': alert.alert_type.value,
+                    'field_name': alert.field_name or '',
+                    'message': alert.message,
+                    'suggestion': alert.suggestion or '',
+                    'metadata': alert.metadata,
+                })
+
+            severity_counts = {}
+            for alert in all_alerts:
+                severity = alert.severity.value
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+            processing_time_ms = (time.time() - start_time) * 1000
+
+            return Response({
+                'document_id': str(document_id),
+                'validators_executed': validators_executed,
+                'alerts': alerts_data,
+                'summary': {
+                    'total_alerts': len(all_alerts),
+                    'critical': severity_counts.get('CRITICAL', 0),
+                    'warning': severity_counts.get('WARNING', 0),
+                    'error': severity_counts.get('ERROR', 0),
+                    'info': severity_counts.get('INFO', 0),
+                },
+                'processing_time_ms': processing_time_ms,
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Erro ao validar compliance: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Erro ao validar compliance: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+

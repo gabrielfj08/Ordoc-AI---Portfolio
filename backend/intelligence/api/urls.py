@@ -11,7 +11,8 @@ from .views import (
     PatternViewSet,
     AnalysisViewSet,
     RankingViewSet,
-    LanguageModelStatusView
+    LanguageModelStatusView,
+    ValidateComplianceView
 )
 
 app_name = 'intelligence'
@@ -27,5 +28,6 @@ urlpatterns = [
     path('analyze/', AnalyzeDocumentView.as_view(), name='analyze'),
     path('extract/', QuickExtractView.as_view(), name='extract'),
     path('status/', LanguageModelStatusView.as_view(), name='status'),
+    path('validate-compliance/', ValidateComplianceView.as_view(), name='validate-compliance'),
     path('', include(router.urls)),
 ]

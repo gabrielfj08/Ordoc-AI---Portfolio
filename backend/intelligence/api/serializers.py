@@ -154,11 +154,49 @@ class AnalysisResultSerializer(serializers.Serializer):
 
 class UserBehaviorScoreSerializer(serializers.ModelSerializer):
     """Serializer for behavior scores."""
-    
+
     class Meta:
         model = UserBehaviorScore
         fields = [
-            'entity_type', 'entity_id', 'score', 
-            'personal_score', 'department_score', 
+            'entity_type', 'entity_id', 'score',
+            'personal_score', 'department_score',
             'organization_score', 'sector_score', 'last_updated'
         ]
+
+
+# ============================================
+# COMPLIANCE VALIDATION SERIALIZERS
+# ============================================
+
+class ComplianceValidationRequestSerializer(serializers.Serializer):
+    """Serializer para requisição de validação de compliance."""
+
+    document_id = serializers.UUIDField()
+    document_content = serializers.CharField(required=False, allow_blank=True)
+    validators = serializers.ListField(
+        child=serializers.ChoiceField(choices=['earq', 'legal_hold', 'lgpd']),
+        default=['earq', 'legal_hold', 'lgpd']
+    )
+    context = serializers.DictField(required=False)
+
+
+class ValidationAlertSerializer(serializers.Serializer):
+    """Serializer para alertas de validação de compliance."""
+
+    severity = serializers.CharField()
+    alert_type = serializers.CharField()
+    field_name = serializers.CharField(required=False, allow_blank=True)
+    message = serializers.CharField()
+    suggestion = serializers.CharField(required=False, allow_blank=True)
+    metadata = serializers.DictField()
+
+
+class ComplianceValidationResponseSerializer(serializers.Serializer):
+    """Serializer para resposta de validação de compliance."""
+
+    document_id = serializers.UUIDField()
+    validators_executed = serializers.ListField(child=serializers.CharField())
+    alerts = ValidationAlertSerializer(many=True)
+    summary = serializers.DictField()
+    processing_time_ms = serializers.FloatField()
+
