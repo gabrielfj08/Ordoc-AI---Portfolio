@@ -11,11 +11,12 @@ from .views import (
     ShareableLinkViewSet,
     RecentDocumentViewSet,
     PermissionViewSet,
-    PermissionViewSet,
     TagViewSet,
     ActivityLogViewSet,
     CategorizationRuleViewSet,
     DocumentTemplateViewSet,
+    RetentionScheduleViewSet,
+    LegalHoldViewSet,
 )
 
 # Create router for OrdocAir API endpoints
@@ -33,6 +34,10 @@ router.register(r'tags', TagViewSet, basename='tag')
 router.register(r'activity-logs', ActivityLogViewSet, basename='activitylog')
 router.register(r'categorization-rules', CategorizationRuleViewSet, basename='categorizationrule')
 router.register(r'document-templates', DocumentTemplateViewSet, basename='documenttemplate')
+
+# Compliance (e-ARQ Brasil + Legal Hold)
+router.register(r'compliance/retention-schedules', RetentionScheduleViewSet, basename='retentionschedule')
+router.register(r'compliance/legal-holds', LegalHoldViewSet, basename='legalhold')
 
 app_name = 'ordoc_air'
 

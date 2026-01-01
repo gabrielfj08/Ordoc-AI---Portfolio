@@ -24,6 +24,9 @@ from .models import (
     ActivityLog,
     CategorizationRule,
     DocumentTemplate,
+    RetentionSchedule,
+    DocumentRetentionStatus,
+    LegalHold,
 )
 from .serializers import (
     OrganizationSerializer,
@@ -40,6 +43,10 @@ from .serializers import (
     ActivityLogSerializer,
     CategorizationRuleSerializer,
     DocumentTemplateSerializer,
+    RetentionScheduleSerializer,
+    DocumentRetentionStatusSerializer,
+    LegalHoldSerializer,
+    LegalHoldReleaseSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
 import uuid
@@ -1605,5 +1612,103 @@ class DocumentTemplateViewSet(BaseViewSet):
                 'confidence': 0.90,
                 'suggestion_reason': 'Alto volume de solicitações manuais detectadas. Template facilitaria processo.',
             })
-        
+
         return Response(suggestions)
+
+
+# ============================================
+# COMPLIANCE VIEWSETS (e-ARQ + Legal Hold)
+# ============================================
+
+class RetentionScheduleViewSet(BaseViewSet):
+    """ViewSet para Tabela de Temporalidade (e-ARQ Brasil)"""
+
+    queryset = RetentionSchedule.objects.all()
+    serializer_class = RetentionScheduleSerializer
+    filterset_fields = ['is_active', 'final_disposition', 'document_type']
+    search_fields = ['code', 'activity', 'description']
+    ordering_fields = ['code', 'activity', 'created_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(organization=self.request.organization)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            organization=self.request.organization,
+            created_by=self.request.user
+        )
+
+    @action(detail=False, methods=['get'])
+    def eligible_documents(self, request):
+        """Lista documentos elegíveis para destinação"""
+        from .models import DocumentRetentionStatus
+
+        eligible = DocumentRetentionStatus.objects.filter(
+            document__organization=request.organization
+        ).select_related('document', 'retention_schedule')
+
+        eligible_list = []
+        for retention_status in eligible:
+            if retention_status.is_eligible_for_disposition():
+                eligible_list.append({
+                    'document_id': str(retention_status.document.id),
+                    'document_title': retention_status.document.title,
+                    'retention_code': retention_status.retention_schedule.code,
+                    'final_disposition': retention_status.retention_schedule.final_disposition,
+                })
+
+        return Response(eligible_list)
+
+
+class LegalHoldViewSet(BaseViewSet):
+    """ViewSet para Legal Hold"""
+
+    queryset = LegalHold.objects.all()
+    serializer_class = LegalHoldSerializer
+    filterset_fields = ['status', 'case_number']
+    search_fields = ['case_number', 'title', 'description']
+    ordering_fields = ['effective_date', 'created_at']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.filter(organization=self.request.organization)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            organization=self.request.organization,
+            created_by=self.request.user
+        )
+
+    @action(detail=True, methods=['post'])
+    def release(self, request, pk=None):
+        """Libera Legal Hold"""
+        legal_hold = self.get_object()
+
+        if legal_hold.status != 'active':
+            return Response(
+                {'error': 'Legal Hold já liberado'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        legal_hold.release(user=request.user)
+        serializer = self.get_serializer(legal_hold)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def add_documents(self, request, pk=None):
+        """Adiciona documentos ao Legal Hold"""
+        legal_hold = self.get_object()
+        document_ids = request.data.get('document_ids', [])
+
+        documents = Document.objects.filter(
+            id__in=document_ids,
+            organization=request.organization
+        )
+
+        legal_hold.documents.add(*documents)
+
+        return Response({
+            'message': f'{documents.count()} documentos adicionados',
+            'total_documents': legal_hold.documents.count()
+        })
