@@ -504,10 +504,6 @@ class PolicyViewSet(BaseViewSet):
     ordering_fields = ['name', 'created_at', 'service']
     ordering = ['name']
 
-    # Query Optimization
-        'users__user',
-        'user_groups__users__user'
-    ]
 
     
     def get_queryset(self):
