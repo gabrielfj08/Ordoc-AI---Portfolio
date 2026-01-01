@@ -12,6 +12,11 @@ router.register(r'policies', views.PolicyViewSet)
 router.register(r'roles', views.UserOrganizationRoleViewSet)
 router.register(r'audit-logs', views.AuditLogViewSet)
 
+# LGPD Compliance
+router.register(r'lgpd/data-mappings', views.PersonalDataMappingViewSet, basename='personaldatamapping')
+router.register(r'lgpd/data-requests', views.DataSubjectRequestViewSet, basename='datasubjectrequest')
+router.register(r'lgpd/consents', views.ConsentRecordViewSet, basename='consentrecord')
+
 app_name = 'ordoc_cloud'
 
 urlpatterns = [

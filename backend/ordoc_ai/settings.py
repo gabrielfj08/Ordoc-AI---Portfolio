@@ -176,6 +176,17 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    # Rate Limiting (Throttling) - Sprint 1
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',      # Usuários anônimos: 100 req/hora
+        'user': '1000/hour',     # Usuários autenticados: 1000 req/hora
+        'burst': '60/minute',    # Limite de burst: 60 req/minuto
+        'sustained': '5000/day', # Limite diário: 5000 req/dia
+    },
 }
 
 # CORS settings

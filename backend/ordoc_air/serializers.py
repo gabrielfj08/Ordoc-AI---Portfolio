@@ -18,6 +18,9 @@ from .models import (
     ActivityLog,
     CategorizationRule,
     DocumentTemplate,
+    RetentionSchedule,
+    DocumentRetentionStatus,
+    LegalHold,
 )
 from ordoc_cloud.models import OrdocUser
 
@@ -500,3 +503,104 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         """Set updated_by from context"""
         validated_data['updated_by'] = self.context.get('current_user')
         return super().update(instance, validated_data)
+
+
+# ============================================
+# COMPLIANCE SERIALIZERS (e-ARQ + Legal Hold)
+# ============================================
+
+class RetentionScheduleSerializer(serializers.ModelSerializer):
+    """Serializer para Tabela de Temporalidade"""
+
+    organization_name = serializers.CharField(source='organization.corporate_name', read_only=True)
+    document_type_name = serializers.CharField(source='document_type.name', read_only=True)
+    total_retention_years = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RetentionSchedule
+        fields = [
+            'id', 'code', 'activity', 'description',
+            'current_phase_years', 'intermediate_phase_years',
+            'final_disposition', 'legal_basis', 'is_active',
+            'organization', 'organization_name',
+            'document_type', 'document_type_name',
+            'total_retention_years', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organization', 'created_at', 'updated_at']
+
+    def get_total_retention_years(self, obj):
+        return obj.get_total_retention_years()
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
+        return 'Sistema'
+
+
+class DocumentRetentionStatusSerializer(serializers.ModelSerializer):
+    """Serializer para Status de Retenção de Documentos"""
+
+    document_title = serializers.CharField(source='document.title', read_only=True)
+    retention_schedule_code = serializers.CharField(source='retention_schedule.code', read_only=True)
+    is_eligible = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DocumentRetentionStatus
+        fields = [
+            'id', 'document', 'document_title',
+            'retention_schedule', 'retention_schedule_code',
+            'current_phase_start', 'current_phase_end',
+            'intermediate_phase_start', 'intermediate_phase_end',
+            'disposition_date', 'disposition_approved_by',
+            'notes', 'is_eligible',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_is_eligible(self, obj):
+        return obj.is_eligible_for_disposition()
+
+
+class LegalHoldSerializer(serializers.ModelSerializer):
+    """Serializer para Legal Hold"""
+
+    organization_name = serializers.CharField(source='organization.corporate_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    released_by_name = serializers.SerializerMethodField()
+    document_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LegalHold
+        fields = [
+            'id', 'case_number', 'title', 'description',
+            'status', 'effective_date', 'release_date',
+            'issuing_authority', 'legal_basis',
+            'organization', 'organization_name',
+            'documents', 'document_count',
+            'custodians_notified',
+            'created_by', 'created_by_name',
+            'released_by', 'released_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organization', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
+        return 'Sistema'
+
+    def get_released_by_name(self, obj):
+        if obj.released_by:
+            return obj.released_by.get_full_name() or obj.released_by.username
+        return None
+
+    def get_document_count(self, obj):
+        return obj.documents.count()
+
+
+class LegalHoldReleaseSerializer(serializers.Serializer):
+    """Serializer para liberação de Legal Hold"""
+
+    reason = serializers.CharField(required=False, allow_blank=True)

@@ -2,7 +2,10 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 import uuid
-from .models import OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog
+from .models import (
+    OrdocUser, UserOrganizationRole, UserGroup, Policy, AuditLog,
+    PersonalDataMapping, DataSubjectRequest, ConsentRecord
+)
 from ordoc_air.models import Organization, Department
 
 
@@ -457,3 +460,107 @@ class AuditLogSerializer(serializers.ModelSerializer):
         if obj.target_user:
             return obj.target_user.user.get_full_name() or obj.target_user.user.username
         return None
+
+
+# ============================================
+# LGPD COMPLIANCE SERIALIZERS
+# ============================================
+
+class PersonalDataMappingSerializer(serializers.ModelSerializer):
+    """Serializer para Mapeamento de Dados Pessoais"""
+
+    organization_name = serializers.CharField(source='organization.corporate_name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    data_type_display = serializers.CharField(source='get_data_type_display', read_only=True)
+    legal_basis_display = serializers.CharField(source='get_legal_basis_display', read_only=True)
+
+    class Meta:
+        model = PersonalDataMapping
+        fields = [
+            'id', 'field_name', 'field_description',
+            'data_type', 'data_type_display',
+            'model_name', 'table_name',
+            'legal_basis', 'legal_basis_display',
+            'purpose', 'retention_period_days',
+            'data_subject_categories',
+            'is_shared', 'shared_with',
+            'is_active',
+            'organization', 'organization_name',
+            'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organization', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
+        return 'Sistema'
+
+
+class DataSubjectRequestSerializer(serializers.ModelSerializer):
+    """Serializer para Solicitações do Titular"""
+
+    organization_name = serializers.CharField(source='organization.corporate_name', read_only=True)
+    assigned_to_name = serializers.SerializerMethodField()
+    request_type_display = serializers.CharField(source='get_request_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    is_overdue = serializers.SerializerMethodField()
+    days_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DataSubjectRequest
+        fields = [
+            'id', 'requester_name', 'requester_email', 'requester_cpf',
+            'request_type', 'request_type_display',
+            'description', 'status', 'status_display',
+            'request_date', 'deadline_date', 'completion_date',
+            'response', 'rejection_reason',
+            'evidence_files',
+            'organization', 'organization_name',
+            'assigned_to', 'assigned_to_name',
+            'is_overdue', 'days_remaining',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organization', 'request_date', 'deadline_date', 'created_at', 'updated_at']
+
+    def get_assigned_to_name(self, obj):
+        if obj.assigned_to:
+            return obj.assigned_to.get_full_name() or obj.assigned_to.username
+        return None
+
+    def get_is_overdue(self, obj):
+        return obj.is_overdue()
+
+    def get_days_remaining(self, obj):
+        from django.utils import timezone
+        if obj.status == 'completed':
+            return 0
+        delta = obj.deadline_date - timezone.now()
+        return max(0, delta.days)
+
+
+class ConsentRecordSerializer(serializers.ModelSerializer):
+    """Serializer para Registro de Consentimento"""
+
+    organization_name = serializers.CharField(source='organization.corporate_name', read_only=True)
+    data_mapping_description = serializers.CharField(source='data_mapping.field_description', read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ConsentRecord
+        fields = [
+            'id', 'data_subject_cpf', 'data_subject_name', 'data_subject_email',
+            'purpose', 'consent_text',
+            'is_active', 'granted_at', 'revoked_at',
+            'ip_address', 'user_agent', 'consent_method',
+            'organization', 'organization_name',
+            'data_mapping', 'data_mapping_description',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'organization', 'granted_at', 'revoked_at', 'created_at', 'updated_at']
+
+
+class ConsentRevokeSerializer(serializers.Serializer):
+    """Serializer para revogação de consentimento"""
+
+    reason = serializers.CharField(required=False, allow_blank=True)

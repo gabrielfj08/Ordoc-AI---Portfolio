@@ -680,3 +680,302 @@ class DocumentTemplate(models.Model):
         """Incrementa o contador de uso"""
         self.usage_count += 1
         self.save(update_fields=['usage_count', 'updated_at'])
+
+
+# ============================================
+# COMPLIANCE: e-ARQ Brasil + Legal Hold
+# ============================================
+
+class RetentionSchedule(models.Model):
+    """
+    Tabela de Temporalidade (e-ARQ Brasil)
+    Define prazos de guarda e destinação final por tipo documental
+    """
+
+    PHASE_CHOICES = [
+        ('current', 'Corrente'),           # Fase corrente - documentos em uso frequente
+        ('intermediate', 'Intermediária'),  # Fase intermediária - uso esporádico
+        ('permanent', 'Permanente'),        # Guarda permanente
+    ]
+
+    DISPOSITION_CHOICES = [
+        ('eliminate', 'Eliminação'),           # Documentos podem ser eliminados
+        ('permanent_custody', 'Guarda Permanente'),  # Documentos de valor histórico
+        ('review', 'Reavaliação'),             # Requer reavaliação antes de destinação
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Classificação
+    code = models.CharField(max_length=50, verbose_name="Código de Classificação")
+    activity = models.CharField(max_length=255, verbose_name="Atividade/Tipo Documental")
+    description = models.TextField(verbose_name="Descrição")
+
+    # Prazos de guarda (em anos)
+    current_phase_years = models.PositiveIntegerField(
+        default=2,
+        verbose_name="Prazo Fase Corrente (anos)"
+    )
+    intermediate_phase_years = models.PositiveIntegerField(
+        default=5,
+        verbose_name="Prazo Fase Intermediária (anos)"
+    )
+
+    # Destinação final
+    final_disposition = models.CharField(
+        max_length=20,
+        choices=DISPOSITION_CHOICES,
+        verbose_name="Destinação Final"
+    )
+
+    # Base legal
+    legal_basis = models.TextField(
+        blank=True,
+        verbose_name="Fundamento Legal"
+    )
+
+    # Status
+    is_active = models.BooleanField(default=True, verbose_name="Ativa")
+
+    # Relations
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='retention_schedules',
+        verbose_name="Organização"
+    )
+    document_type = models.ForeignKey(
+        DocumentType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='retention_schedule',
+        verbose_name="Tipo de Documento"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # User tracking
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_retention_schedules'
+    )
+
+    class Meta:
+        verbose_name = "Tabela de Temporalidade"
+        verbose_name_plural = "Tabelas de Temporalidade"
+        ordering = ['code', 'activity']
+        indexes = [
+            models.Index(fields=['organization', 'is_active']),
+            models.Index(fields=['code']),
+        ]
+
+    def __str__(self):
+        return f"{self.code} - {self.activity}"
+
+    def get_total_retention_years(self):
+        """Calcula prazo total de guarda"""
+        if self.final_disposition == 'permanent_custody':
+            return None  # Guarda permanente
+        return self.current_phase_years + self.intermediate_phase_years
+
+
+class DocumentRetentionStatus(models.Model):
+    """
+    Status de retenção de cada documento conforme tabela de temporalidade
+    Permite rastrear ciclo de vida do documento
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Relations
+    document = models.OneToOneField(
+        Document,
+        on_delete=models.CASCADE,
+        related_name='retention_status',
+        verbose_name="Documento"
+    )
+    retention_schedule = models.ForeignKey(
+        RetentionSchedule,
+        on_delete=models.PROTECT,
+        related_name='documents',
+        verbose_name="Tabela de Temporalidade"
+    )
+
+    # Datas do ciclo de vida
+    current_phase_start = models.DateField(
+        auto_now_add=True,
+        verbose_name="Início Fase Corrente"
+    )
+    current_phase_end = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fim Fase Corrente"
+    )
+    intermediate_phase_start = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Início Fase Intermediária"
+    )
+    intermediate_phase_end = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fim Fase Intermediária"
+    )
+
+    # Destinação
+    disposition_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de Destinação"
+    )
+    disposition_approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_dispositions',
+        verbose_name="Aprovado por"
+    )
+
+    # Observações
+    notes = models.TextField(blank=True, verbose_name="Observações")
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Status de Retenção"
+        verbose_name_plural = "Status de Retenção"
+        indexes = [
+            models.Index(fields=['current_phase_end']),
+            models.Index(fields=['intermediate_phase_end']),
+        ]
+
+    def __str__(self):
+        return f"Retenção: {self.document.title}"
+
+    def is_eligible_for_disposition(self):
+        """Verifica se documento está elegível para destinação final"""
+        if not self.intermediate_phase_end:
+            return False
+        return timezone.now().date() >= self.intermediate_phase_end
+
+
+class LegalHold(models.Model):
+    """
+    Legal Hold - Suspensão legal de eliminação de documentos
+    Documentos sob custódia não podem ser alterados/eliminados
+    """
+
+    STATUS_CHOICES = [
+        ('active', 'Ativo'),
+        ('released', 'Liberado'),
+        ('expired', 'Expirado'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Identificação
+    case_number = models.CharField(
+        max_length=100,
+        verbose_name="Número do Processo/Caso"
+    )
+    title = models.CharField(max_length=255, verbose_name="Título")
+    description = models.TextField(verbose_name="Descrição")
+
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='active',
+        verbose_name="Status"
+    )
+
+    # Datas
+    effective_date = models.DateField(
+        default=timezone.now,
+        verbose_name="Data de Vigência"
+    )
+    release_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de Liberação"
+    )
+
+    # Autoridade legal
+    issuing_authority = models.CharField(
+        max_length=255,
+        verbose_name="Autoridade Emissora"
+    )
+    legal_basis = models.TextField(verbose_name="Fundamento Legal")
+
+    # Relations
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name='legal_holds',
+        verbose_name="Organização"
+    )
+    documents = models.ManyToManyField(
+        Document,
+        related_name='legal_holds',
+        verbose_name="Documentos"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # User tracking
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_legal_holds',
+        verbose_name="Criado por"
+    )
+    released_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='released_legal_holds',
+        verbose_name="Liberado por"
+    )
+
+    # Notificações
+    custodians_notified = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Custodiantes Notificados"
+    )
+
+    class Meta:
+        verbose_name = "Legal Hold"
+        verbose_name_plural = "Legal Holds"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['organization', 'status']),
+            models.Index(fields=['case_number']),
+            models.Index(fields=['effective_date']),
+        ]
+
+    def __str__(self):
+        return f"Legal Hold: {self.case_number} - {self.title}"
+
+    def release(self, user):
+        """Libera o legal hold"""
+        self.status = 'released'
+        self.release_date = timezone.now().date()
+        self.released_by = user
+        self.save()
+
+    def is_document_on_hold(self, document):
+        """Verifica se documento está sob legal hold ativo"""
+        return self.status == 'active' and document in self.documents.all()

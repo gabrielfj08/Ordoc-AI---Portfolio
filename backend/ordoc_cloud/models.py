@@ -842,3 +842,300 @@ class Comment(models.Model):
         return self.parent is not None
 
 
+# ============================================
+# COMPLIANCE: LGPD (Lei Geral de Proteção de Dados)
+# ============================================
+
+class PersonalDataMapping(models.Model):
+    """
+    Mapeamento de dados pessoais/sensíveis no sistema (Art. 5º LGPD)
+    Identifica onde dados pessoais são armazenados e processados
+    """
+
+    DATA_TYPE_CHOICES = [
+        ('personal', 'Dado Pessoal'),           # Art. 5º, I - nome, email, telefone, CPF
+        ('sensitive', 'Dado Sensível'),          # Art. 5º, II - saúde, biometria, raça, religião
+        ('children', 'Dado de Criança'),         # Art. 14 - menores de 18 anos
+        ('anonymous', 'Dado Anonimizado'),       # Art. 5º, III
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Identificação do dado
+    field_name = models.CharField(max_length=100, verbose_name="Nome do Campo")
+    field_description = models.TextField(verbose_name="Descrição do Dado")
+    data_type = models.CharField(
+        max_length=20,
+        choices=DATA_TYPE_CHOICES,
+        verbose_name="Tipo de Dado"
+    )
+
+    # Localização
+    model_name = models.CharField(max_length=100, verbose_name="Model Django")
+    table_name = models.CharField(max_length=100, verbose_name="Tabela no Banco")
+
+    # Base legal (Art. 7º LGPD)
+    LEGAL_BASIS_CHOICES = [
+        ('consent', 'Consentimento'),                    # Art. 7º, I
+        ('legal_obligation', 'Obrigação Legal'),         # Art. 7º, II
+        ('contract', 'Execução de Contrato'),            # Art. 7º, V
+        ('legitimate_interest', 'Interesse Legítimo'),   # Art. 7º, IX
+        ('vital_interest', 'Proteção da Vida'),          # Art. 7º, VII
+    ]
+
+    legal_basis = models.CharField(
+        max_length=30,
+        choices=LEGAL_BASIS_CHOICES,
+        verbose_name="Base Legal"
+    )
+
+    # Finalidade (Art. 6º, I - princípio da finalidade)
+    purpose = models.TextField(verbose_name="Finalidade do Tratamento")
+
+    # Retenção (Art. 6º, V - princípio da necessidade)
+    retention_period_days = models.PositiveIntegerField(
+        verbose_name="Período de Retenção (dias)"
+    )
+
+    # Categorias de titulares
+    data_subject_categories = models.JSONField(
+        default=list,
+        verbose_name="Categorias de Titulares"  # ex: ["clientes", "funcionários"]
+    )
+
+    # Compartilhamento (Art. 26 - operadores)
+    is_shared = models.BooleanField(default=False, verbose_name="Dados Compartilhados")
+    shared_with = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Compartilhado Com"  # ex: ["AWS", "SendGrid"]
+    )
+
+    # Status
+    is_active = models.BooleanField(default=True, verbose_name="Ativo")
+
+    # Relations
+    organization = models.ForeignKey(
+        'ordoc_air.Organization',
+        on_delete=models.CASCADE,
+        related_name='personal_data_mappings',
+        verbose_name="Organização"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # User tracking
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_data_mappings'
+    )
+
+    class Meta:
+        verbose_name = "Mapeamento de Dados Pessoais"
+        verbose_name_plural = "Mapeamentos de Dados Pessoais"
+        ordering = ['model_name', 'field_name']
+        indexes = [
+            models.Index(fields=['organization', 'data_type']),
+            models.Index(fields=['model_name']),
+        ]
+
+    def __str__(self):
+        return f"{self.model_name}.{self.field_name} ({self.get_data_type_display()})"
+
+    def is_sensitive(self):
+        """Verifica se é dado sensível"""
+        return self.data_type == 'sensitive'
+
+
+class DataSubjectRequest(models.Model):
+    """
+    Solicitações do titular de dados (Arts. 17-19 LGPD)
+    Direitos: acesso, correção, anonimização, portabilidade, eliminação
+    """
+
+    REQUEST_TYPE_CHOICES = [
+        ('access', 'Acesso aos Dados'),              # Art. 18, II
+        ('correction', 'Correção de Dados'),         # Art. 18, III
+        ('anonymization', 'Anonimização'),           # Art. 18, IV
+        ('portability', 'Portabilidade'),            # Art. 18, V
+        ('erasure', 'Eliminação'),                   # Art. 18, VI (Direito ao Esquecimento)
+        ('revoke_consent', 'Revogação de Consentimento'),  # Art. 18, IX
+        ('info_sharing', 'Informação sobre Compartilhamento'),  # Art. 18, VII
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('in_progress', 'Em Andamento'),
+        ('completed', 'Concluída'),
+        ('rejected', 'Rejeitada'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Solicitante
+    requester_name = models.CharField(max_length=255, verbose_name="Nome do Solicitante")
+    requester_email = models.EmailField(verbose_name="Email do Solicitante")
+    requester_cpf = models.CharField(
+        max_length=14,
+        verbose_name="CPF do Solicitante"
+    )
+
+    # Tipo de solicitação
+    request_type = models.CharField(
+        max_length=20,
+        choices=REQUEST_TYPE_CHOICES,
+        verbose_name="Tipo de Solicitação"
+    )
+    description = models.TextField(verbose_name="Descrição")
+
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name="Status"
+    )
+
+    # Prazo legal: 15 dias (Art. 19, §3º)
+    request_date = models.DateTimeField(auto_now_add=True, verbose_name="Data da Solicitação")
+    deadline_date = models.DateTimeField(verbose_name="Prazo Legal (15 dias)")
+    completion_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Data de Conclusão"
+    )
+
+    # Resposta
+    response = models.TextField(blank=True, verbose_name="Resposta")
+    rejection_reason = models.TextField(blank=True, verbose_name="Motivo de Rejeição")
+
+    # Evidências (para comprovação)
+    evidence_files = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Arquivos de Evidência"
+    )
+
+    # Relations
+    organization = models.ForeignKey(
+        'ordoc_air.Organization',
+        on_delete=models.CASCADE,
+        related_name='data_subject_requests',
+        verbose_name="Organização"
+    )
+    assigned_to = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_lgpd_requests',
+        verbose_name="Responsável"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Solicitação do Titular (LGPD)"
+        verbose_name_plural = "Solicitações dos Titulares (LGPD)"
+        ordering = ['-request_date']
+        indexes = [
+            models.Index(fields=['organization', 'status']),
+            models.Index(fields=['requester_cpf']),
+            models.Index(fields=['deadline_date']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_request_type_display()} - {self.requester_name}"
+
+    def save(self, *args, **kwargs):
+        # Calcula deadline (15 dias conforme LGPD)
+        if not self.deadline_date:
+            from datetime import timedelta
+            self.deadline_date = timezone.now() + timedelta(days=15)
+        super().save(*args, **kwargs)
+
+    def is_overdue(self):
+        """Verifica se passou do prazo legal"""
+        return timezone.now() > self.deadline_date and self.status != 'completed'
+
+
+class ConsentRecord(models.Model):
+    """
+    Registro de consentimento (Art. 8º LGPD)
+    Armazena consentimentos de titulares para processamento de dados
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    # Titular
+    data_subject_cpf = models.CharField(max_length=14, verbose_name="CPF do Titular")
+    data_subject_name = models.CharField(max_length=255, verbose_name="Nome do Titular")
+    data_subject_email = models.EmailField(verbose_name="Email do Titular")
+
+    # Consentimento
+    purpose = models.TextField(verbose_name="Finalidade do Consentimento")
+    consent_text = models.TextField(verbose_name="Texto do Consentimento")
+
+    # Status
+    is_active = models.BooleanField(default=True, verbose_name="Consentimento Ativo")
+    granted_at = models.DateTimeField(auto_now_add=True, verbose_name="Concedido em")
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Revogado em"
+    )
+
+    # Evidência (Art. 8º, §6º - prova do consentimento)
+    ip_address = models.GenericIPAddressField(verbose_name="Endereço IP")
+    user_agent = models.TextField(verbose_name="User Agent")
+    consent_method = models.CharField(
+        max_length=50,
+        default='web_form',
+        verbose_name="Método de Consentimento"  # web_form, email, paper
+    )
+
+    # Relations
+    organization = models.ForeignKey(
+        'ordoc_air.Organization',
+        on_delete=models.CASCADE,
+        related_name='consent_records',
+        verbose_name="Organização"
+    )
+    data_mapping = models.ForeignKey(
+        PersonalDataMapping,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='consents',
+        verbose_name="Mapeamento de Dado"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Registro de Consentimento"
+        verbose_name_plural = "Registros de Consentimento"
+        ordering = ['-granted_at']
+        indexes = [
+            models.Index(fields=['organization', 'is_active']),
+            models.Index(fields=['data_subject_cpf']),
+            models.Index(fields=['granted_at']),
+        ]
+
+    def __str__(self):
+        return f"Consentimento: {self.data_subject_name} - {self.purpose[:50]}"
+
+    def revoke(self):
+        """Revoga o consentimento (Art. 8º, §5º)"""
+        self.is_active = False
+        self.revoked_at = timezone.now()
+        self.save()
+
