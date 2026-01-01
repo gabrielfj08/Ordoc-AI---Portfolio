@@ -39,7 +39,7 @@ class IntelligenceService:
     def __init__(
         self,
         ollama_endpoint: str = None,
-        extractor_name: str = "gliner2",
+        extractor_name: str = "ollama",
         model_name: str = "qwen2.5:7b"
     ):
         """

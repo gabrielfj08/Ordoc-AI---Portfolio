@@ -11,7 +11,7 @@ from django.db.models import Q, Count, Sum
 from django.http import Http404
 from guardian.shortcuts import assign_perm, remove_perm
 from ordoc_ai.base_viewset import BaseViewSet
-from ordoc_ai.query_optimizations import TreeQueryOptimizationMixin
+from ordoc_ai.query_optimizations import TreeQueryOptimizationMixin, QueryOptimizationMixin
 from .models import (
     Organization,
     Department,
@@ -49,6 +49,15 @@ from .serializers import (
     LegalHoldReleaseSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
+# TODO: Descomentar após resolver dependências signxml/pyOpenSSL
+# from .document_auth_actions import (
+#     sign_document,
+#     validate_nfe,
+#     validate_nfse,
+#     signatures,
+#     upload_certificate,
+#     my_certificates
+# )
 import uuid
 
 
@@ -395,7 +404,7 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
         })
 
 
-class DocumentViewSet(BaseViewSet):
+class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
     """
     ViewSet for Document management
     Equivalent to Rails DocumentsController
@@ -403,6 +412,19 @@ class DocumentViewSet(BaseViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     filterset_class = DocumentFilter
+    
+    # Query Optimization
+    select_related_fields = [
+        'created_by',
+        'department__organization',
+        'directory'
+    ]
+    prefetch_related_fields = [
+        'tags',
+        'favorited_by',
+        'versions'
+    ]
+
     search_fields = ['name', 'description', 'ocr_content', 'tags']
     ordering_fields = ['name', 'created_at', 'updated_at', 'file_size']
     ordering = ['-created_at']
@@ -867,120 +889,48 @@ class DocumentViewSet(BaseViewSet):
     @action(detail=False, methods=['get'])
     def recommended(self, request):
         """
-        Retorna documentos recomendados unificando:
-        1. Anexos de Workflow (TaskAttachment, ProcedureDocument) ligados a tarefas críticas/próximas.
-        2. Documentos DMS (ordoc_air.Document) favoritos e recentes.
+        Retorna documentos recomendados unificando DMS e Workflow.
+        Optimized to prevent N+1 queries using DocumentRecommendationService.
         """
-        from ordoc_flow.models import Task, TaskAttachment, ProcedureDocument, GroupRequesterMember
-        from django.utils import timezone
-        from datetime import timedelta
+        from .services import DocumentRecommendationService
         
         user = self.get_current_user()
-        ordoc_user = self.get_current_ordoc_user()
         organization = self.get_current_organization()
         
-        scored_items = {} # {uuid: {'score': int, 'reasons': set(), 'data': dict}}
-        
-        def normalize_doc(obj, source_type, score, reason):
-            """Normaliza objetos para formato compatível com DocumentSerializer"""
-            doc_id = str(obj.id)
-            if doc_id in scored_items:
-                scored_items[doc_id]['score'] += score
-                scored_items[doc_id]['reasons'].add(reason)
-                return
+        # Get recommended items from service
+        limit = int(request.query_params.get('limit', 10))
+        recommendations = DocumentRecommendationService.get_recommended_documents(
+            user=user,
+            organization=organization,
+            limit=limit
+        )
 
-            # Mapeamento de campos
+        # Format for response
+        results = []
+        for item in recommendations:
+            obj = item['doc']
+            reasons = list(item['reasons'])
+            source_type = item['type']
+
             if source_type == 'dms':
-                # DMS Document - usar serializer
                 data = DocumentSerializer(obj, context=self.get_serializer_context()).data
             else:
-                # Workflow Document (TaskAttachment/ProcedureDocument)
-                # Construir representação manual similar ao DocumentSerializer
+                # Workflow Document manually formatted
                 data = {
                     'id': str(obj.id),
-                    'name': obj.name or obj.file_name,
-                    'file_name': obj.file_name,
+                    'name': getattr(obj, 'name', None) or getattr(obj, 'file_name', 'Arquivo'),
+                    'file_name': getattr(obj, 'file_name', ''),
                     'description': getattr(obj, 'description', ''),
                     'file': request.build_absolute_uri(obj.file.url) if obj.file else None,
-                    'file_size': obj.file_size,
+                    'file_size': getattr(obj, 'file_size', 0),
                     'mime_type': getattr(obj, 'file_type', None) or getattr(obj, 'mime_type', None),
                     'created_at': obj.created_at,
                     'status': 'active',
-                    'is_starred': False, # Workflow docs não têm favorito direto no Air ainda
+                    'is_starred': False,
                     'document_type': 'workflow_attachment'
                 }
-            
-            scored_items[doc_id] = {
-                'score': score,
-                'reasons': {reason},
-                'data': data
-            }
 
-        # 1. TAREFAS (Critical & Agenda)
-        active_group_ids = []
-        if ordoc_user:
-            active_group_ids = GroupRequesterMember.objects.filter(
-                user=ordoc_user,
-                is_active=True
-            ).values_list('group_id', flat=True)
-            
-        tasks = Task.objects.filter(
-            procedure__organization=organization,
-            status__in=['running', 'started']
-        ).filter(
-            Q(assignee=user.external_requester) if hasattr(user, 'external_requester') else
-            (Q(group_assignee_id__in=active_group_ids) | Q(created_by=ordoc_user))
-        )
-        
-        today = timezone.now().date()
-        critical_tasks = tasks.filter(Q(priority='high') | Q(deadline__lt=today))
-        upcoming_tasks = tasks.filter(deadline__gte=today, deadline__lte=today + timedelta(days=3))
-        
-        # Helper para processar queryset de tarefas
-        def process_tasks(task_qs, score, reason):
-            if not task_qs.exists():
-                return
-                
-            # TaskAttachments
-            attachments = TaskAttachment.objects.filter(task__in=task_qs, deleted_at__isnull=True)
-            for att in attachments:
-                normalize_doc(att, 'workflow', score, reason)
-                
-            # ProcedureDocuments
-            proc_ids = task_qs.values_list('procedure_id', flat=True)
-            proc_docs = ProcedureDocument.objects.filter(
-                procedure_id__in=proc_ids, 
-                deleted_at__isnull=True
-            ).exclude(file='') # Ignorar sem arquivo
-            for pd in proc_docs:
-                normalize_doc(pd, 'workflow', score, reason)
-                
-        process_tasks(critical_tasks, 50, 'Tarefa Crítica')
-        process_tasks(upcoming_tasks, 30, 'Próximo Vencimento')
-
-        # 2. FAVORITOS (DMS)
-        fav_docs = self.get_queryset().filter(favorited_by=user)
-        for doc in fav_docs:
-            normalize_doc(doc, 'dms', 20, 'Favorito')
-
-        # 3. RECENTES (DMS + Histórico)
-        # Buscar RecentDocument que aponta para DMS Document
-        recents = RecentDocument.objects.filter(user=user).select_related('document').order_by('-accessed_at')[:10]
-        for rd in recents:
-            doc = rd.document
-            if not doc or doc.deleted_at:
-                continue
-            # Se já pontuado por outro motivo, adiciona +10
-            # Se for novo, adiciona com score 10
-            normalize_doc(doc, 'dms', 10, 'Recente')
-
-        # FINALIZAR
-        results = []
-        for item in scored_items.values():
-            data = item['data']
-            reasons = item['reasons']
-            
-            # Prioridade de badge
+            # Add recommendation metadata
             primary_reason = 'Recente'
             if 'Tarefa Crítica' in reasons:
                 primary_reason = 'Tarefa Crítica'
@@ -988,26 +938,13 @@ class DocumentViewSet(BaseViewSet):
                 primary_reason = 'Próximo Vencimento'
             elif 'Favorito' in reasons:
                 primary_reason = 'Favorito'
-            
+
             data['recommendation_reason'] = primary_reason
+            data['all_reasons'] = reasons
             data['relevance_score'] = item['score']
             results.append(data)
-            
-        results.sort(key=lambda x: x['relevance_score'], reverse=True)
-        
-        # Paginação manual já que é uma lista heterogênea
-        page = self.paginate_queryset(results)
-        if page is not None:
-             return self.get_paginated_response(page)
-             
-        return Response(results[:10])
 
-        document.tags.remove(*tags)
-
-        return Response({
-            'message': 'Tags removed successfully',
-            'tags': TagSerializer(document.tags.all(), many=True).data
-        })
+        return Response(results)
 
     @action(detail=False, methods=['get'])
     def archived(self, request):
@@ -1090,6 +1027,17 @@ class DocumentViewSet(BaseViewSet):
                 }
             }
         })
+
+    # ========== Certificados Digitais e Validação SEFAZ ==========
+    # Integração com módulos de autenticação de documentos
+    # TODO: Descomentar após resolver dependências signxml/pyOpenSSL
+    
+    # sign_document = sign_document
+    # validate_nfe = validate_nfe
+    # validate_nfse = validate_nfse
+    # signatures = signatures
+    # upload_certificate = upload_certificate
+    # my_certificates = my_certificates
 
 
 class TagViewSet(BaseViewSet):

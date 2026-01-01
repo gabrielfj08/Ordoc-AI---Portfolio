@@ -6,7 +6,7 @@
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: ordoc_postgres
     restart: unless-stopped
     environment:
@@ -22,7 +22,7 @@ services:
     networks:
       - ordoc_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ordoc_user -d ordoc_ai"]
+      test: [ "CMD-SHELL", "pg_isready -U ordoc_user -d ordoc_ai" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,7 +39,7 @@ services:
     networks:
       - ordoc_network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,36 +59,36 @@ services:
       DB_PASSWORD: ordoc_password
       DB_HOST: postgres
       DB_PORT: 5432
-      
+
       # Redis/Celery
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      
+
       # Django
       DEBUG: "True"
       SECRET_KEY: "django-insecure-ordoc-ai-development-key-change-in-production"
       ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,backend"
-      
+
       # Superuser
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-changeme}
-      
+
       # AWS (for development, use local storage)
       USE_S3: "False"
       MEDIA_ROOT: /app/media
       STATIC_ROOT: /app/staticfiles
-      
+
       # OCR
       TESSERACT_CMD: tesseract
-      
+
       # Solr
       SOLR_URL: http://solr:8983/solr
       SOLR_COLLECTION: ordoc_core
       SOLR_USERNAME: ''
       SOLR_PASSWORD: ''
-      
+
     volumes:
       - .:/app
       - media_data:/app/media
@@ -103,7 +103,7 @@ services:
     networks:
       - ordoc_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/admin/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -124,19 +124,19 @@ services:
       DB_PASSWORD: ordoc_password
       DB_HOST: postgres
       DB_PORT: 5432
-      
+
       # Redis/Celery
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      
+
       # Django
       DEBUG: "True"
       SECRET_KEY: "django-insecure-ordoc-ai-development-key-change-in-production"
-      
+
       # OCR
       TESSERACT_CMD: tesseract
-      
+
     volumes:
       - .:/app
       - media_data:/app/media
@@ -166,16 +166,16 @@ services:
       DB_PASSWORD: ordoc_password
       DB_HOST: postgres
       DB_PORT: 5432
-      
+
       # Redis/Celery
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-      
+
       # Django
       DEBUG: "True"
       SECRET_KEY: "django-insecure-ordoc-ai-development-key-change-in-production"
-      
+
     volumes:
       - .:/app
     depends_on:
@@ -200,7 +200,7 @@ services:
       - ./docker/solr/ordoc_core:/opt/solr/server/solr/ordoc_core
     networks:
       - ordoc_network
-    command: 
+    command:
       - solr-precreate
       - ordoc_core
 

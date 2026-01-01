@@ -3,7 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Avg, Q, Sum
+from django.db.models.functions import TruncMonth
 from django.http import HttpResponse, Http404
 from datetime import datetime, timedelta
 import json

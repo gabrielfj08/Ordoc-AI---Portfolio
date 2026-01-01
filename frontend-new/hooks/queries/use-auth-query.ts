@@ -45,7 +45,8 @@ export function useLogin() {
       router.push('/my-day')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Erro ao fazer login')
+      // Erro será exibido inline no formulário
+      // Não precisa logar no console, já temos feedback visual
     },
   })
 }

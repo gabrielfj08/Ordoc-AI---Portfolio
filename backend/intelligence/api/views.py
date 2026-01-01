@@ -88,20 +88,25 @@ class AnalyzeDocumentView(APIView):
                 }
             )
             
-            # Create alerts
-            for alert_data in result.get('alerts') or []:
-                ProactiveAlert.objects.create(
-                    document_id=data['document_id'],
-                    document_type=data.get('document_type', ''),
-                    alert_type=alert_data.get('alert_type', 'suggestion'),
-                    severity=alert_data.get('severity', 'info'),
-                    title=alert_data.get('title', 'Alerta'),
-                    message=alert_data.get('message', ''),
-                    details=alert_data.get('details', {}),
-                    location=alert_data.get('location'),
-                    suggested_actions=alert_data.get('suggested_actions', []),
-                    organization=getattr(request.user, 'organization', None)
-                )
+            # Create alerts in bulk
+            alerts_data = result.get('alerts') or []
+            if alerts_data:
+                org = getattr(request.user, 'organization', None)
+                alerts_to_create = [
+                    ProactiveAlert(
+                        document_id=data['document_id'],
+                        document_type=data.get('document_type', ''),
+                        alert_type=alert_data.get('alert_type', 'suggestion'),
+                        severity=alert_data.get('severity', 'info'),
+                        title=alert_data.get('title', 'Alerta'),
+                        message=alert_data.get('message', ''),
+                        details=alert_data.get('details', {}),
+                        location=alert_data.get('location'),
+                        suggested_actions=alert_data.get('suggested_actions', []),
+                        organization=org
+                    ) for alert_data in alerts_data
+                ]
+                ProactiveAlert.objects.bulk_create(alerts_to_create)
             
             return Response(result, status=status.HTTP_200_OK)
             

@@ -1,32 +1,15 @@
 import axios, { AxiosResponse } from 'axios';
+import {
+  LoginResponseSchema,
+  TokenValidationResponseSchema,
+  TokenRefreshResponseSchema,
+  ProfileUpdateResponseSchema,
+  type LoginResponse,
+  type User,
+} from '@/lib/schemas/auth';
+import { validateApiResponse } from '@/lib/schemas/common';
 
-// Types
-interface LoginResponse {
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-    type: string;
-    status: string;
-    must_change_password?: boolean;
-    phone?: string;
-    cpf?: string;
-    avatar?: string | null;
-    language?: string;
-    timezone?: string;
-    profile_complete?: boolean;
-  };
-  token: string;
-  organization?: {
-    id: string;
-    name: string;
-    subdomain: string;
-  } | null;
-  expires_at: string;
-}
-
+// Types (keeping for backward compatibility)
 interface ApiError {
   error: string;
   status: number;
@@ -147,7 +130,8 @@ export const authService = {
         withCredentials: false
       });
 
-      return response.data;
+      // Validate response with Zod schema
+      return validateApiResponse(LoginResponseSchema, response.data, 'login');
     } catch (error: any) {
       console.error('Login error details:', {
         message: error?.message || 'Unknown error',
@@ -191,15 +175,17 @@ export const authService = {
   /**
    * Validate token and get user data
    */
-  async validateToken(token: string): Promise<LoginResponse['user']> {
+  async validateToken(token: string): Promise<User> {
     try {
-      const response: AxiosResponse<{ user: LoginResponse['user'] }> = await api.get('/api/auth/me/', {
+      const response = await api.get('/api/auth/me/', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      return response.data.user;
+      // Validate response with Zod schema
+      const validated = validateApiResponse(TokenValidationResponseSchema, response.data, 'validateToken');
+      return validated.user;
     } catch (error: any) {
       const apiError: ApiError = error.response?.data || { error: 'Token validation failed', status: 401 };
       throw new Error(apiError.error);
@@ -211,13 +197,15 @@ export const authService = {
    */
   async refreshToken(currentToken: string): Promise<string> {
     try {
-      const response: AxiosResponse<{ token: string }> = await api.post('/api/auth/refresh/', {}, {
+      const response = await api.post('/api/auth/refresh/', {}, {
         headers: {
           'Authorization': `Bearer ${currentToken}`,
         },
       });
 
-      return response.data.token;
+      // Validate response with Zod schema
+      const validated = validateApiResponse(TokenRefreshResponseSchema, response.data, 'refreshToken');
+      return validated.token;
     } catch (error: any) {
       const apiError: ApiError = error.response?.data || { error: 'Token refresh failed', status: 401 };
       throw new Error(apiError.error);
@@ -269,10 +257,13 @@ export const authService = {
   /**
    * Update current user profile
    */
-  async updateProfile(data: Partial<LoginResponse['user']>): Promise<LoginResponse['user']> {
+  async updateProfile(data: Partial<User>): Promise<User> {
     try {
-      const response: AxiosResponse<{ user: LoginResponse['user'] }> = await api.patch('/api/auth/me/', data);
-      return response.data.user;
+      const response = await api.patch('/api/auth/me/', data);
+
+      // Validate response with Zod schema
+      const validated = validateApiResponse(ProfileUpdateResponseSchema, response.data, 'updateProfile');
+      return validated.user;
     } catch (error: any) {
       const apiError: ApiError = error.response?.data || { error: 'Profile update failed', status: 500 };
       throw new Error(apiError.error);

@@ -25,7 +25,7 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const { mutate: login, isPending } = useLogin()
+  const { mutate: login, isPending, error, isError } = useLogin()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
 
@@ -33,6 +33,31 @@ export function LoginForm({
     e.preventDefault()
     login({ email, password })
   }
+
+  // Extrair mensagem de erro amigável
+  const errorMessage = isError
+    ? (() => {
+      const err = error as any
+      const status = err?.response?.status
+
+      // Erro 401 = credenciais inválidas
+      if (status === 401) {
+        return 'Email ou senha incorretos. Verifique suas credenciais.'
+      }
+
+      // Tentar pegar mensagem do backend
+      const backendMessage = err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.response?.data?.error
+
+      if (backendMessage && typeof backendMessage === 'string') {
+        return backendMessage
+      }
+
+      // Mensagem padrão
+      return 'Não foi possível fazer login. Tente novamente.'
+    })()
+    : null
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -98,7 +123,16 @@ export function LoginForm({
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isPending}
+                  className={isError ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {errorMessage && (
+                  <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="size-4">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+                    </svg>
+                    {errorMessage}
+                  </p>
+                )}
               </Field>
               <Field>
                 <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700" disabled={isPending}>
