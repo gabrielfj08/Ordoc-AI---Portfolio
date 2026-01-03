@@ -27,6 +27,7 @@ import {
     Grid3x3,
     Menu,
     ChevronLeft,
+    Sparkles,
 } from "lucide-react"
 import { AppDrawer } from "./app-drawer"
 import { useNotifications } from "@/hooks/use-notifications"
@@ -34,6 +35,7 @@ import { useAlerts } from "@/hooks/use-alerts"
 import { useAppStore } from "@/stores/app-store"
 import { useLogout } from "@/hooks/queries/use-auth-query"
 import { UserPreferencesDialog } from "@/components/settings/user-preferences-dialog"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface MainHeaderProps {
     showSidebarToggle?: boolean
@@ -43,6 +45,42 @@ interface MainHeaderProps {
 
 export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggle }: MainHeaderProps) {
     const pathname = usePathname()
+
+    // Search Logic (Moved to Top)
+    const searchParams = useSearchParams()
+    const router = useRouter()
+    const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '')
+
+    // Determine context
+    const isDocumentsPage = pathname?.startsWith('/documents')
+
+    // Sync with URL (Debounced)
+    const handleSearch = (term: string) => {
+        setSearchTerm(term)
+
+        const handler = setTimeout(() => {
+            const params = new URLSearchParams(searchParams.toString())
+            if (term) {
+                params.set('q', term)
+            } else {
+                params.delete('q')
+            }
+
+            if (isDocumentsPage) {
+                router.replace(`${pathname}?${params.toString()}`)
+            } else if (term) {
+                router.replace(`${pathname}?${params.toString()}`)
+            }
+        }, 300)
+        return () => clearTimeout(handler)
+    }
+
+    // Dynamic placeholder
+    const getSearchPlaceholder = () => {
+        if (isDocumentsPage) return "Pergunte sobre seus documentos..."
+        if (pathname === '/my-day') return "Busque em suas tarefas..."
+        return "Busque em toda a plataforma"
+    }
     const [appDrawerOpen, setAppDrawerOpen] = useState(false)
     const [searchFocused, setSearchFocused] = useState(false)
     const [isPreferencesOpen, setPreferencesOpen] = useState(false)
@@ -74,6 +112,8 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
     ]
 
     const isActive = (href: string) => pathname?.startsWith(href)
+
+
 
     return (
         <>
@@ -115,17 +155,27 @@ export function MainHeader({ showSidebarToggle, sidebarCollapsed, onSidebarToggl
                     <div className="flex-1" />
 
                     <div
-                        className={`hidden lg:flex relative transition-all duration-300 ${searchFocused ? "w-[500px]" : "w-96"
+                        className={`hidden lg:flex relative transition-all duration-300 ${searchFocused || searchTerm ? "w-[500px]" : "w-96"
                             }`}
                     >
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+                        <Search className={`absolute left-4 top-1/2 -translate-y-1/2 size-5 transition-colors ${searchFocused ? "text-primary" : "text-muted-foreground"}`} />
                         <Input
-                            placeholder="Buscar em Ordoc"
-                            className={`pl-12 pr-4 h-11 rounded-full bg-secondary/30 border-transparent transition-all ${searchFocused ? "bg-background shadow-lg border-border" : "hover:bg-secondary/50"
+                            placeholder={getSearchPlaceholder()}
+                            className={`pl-12 pr-12 h-11 rounded-full bg-secondary/30 border-transparent transition-all ${searchFocused || searchTerm ? "bg-background shadow-lg border-primary/20 ring-2 ring-primary/5" : "hover:bg-secondary/50"
                                 }`}
                             onFocus={() => setSearchFocused(true)}
                             onBlur={() => setSearchFocused(false)}
+                            value={searchTerm}
+                            onChange={(e) => handleSearch(e.target.value)}
                         />
+
+                        {/* IA Badge */}
+                        <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center transition-opacity duration-300 ${searchFocused || searchTerm ? 'opacity-100' : 'opacity-70'}`}>
+                            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center shadow-sm">
+                                <Sparkles className="size-3 mr-1" />
+                                IA
+                            </div>
+                        </div>
                     </div>
 
                     <DropdownMenu modal={false}>

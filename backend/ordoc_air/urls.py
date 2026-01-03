@@ -18,6 +18,7 @@ from .views import (
     RetentionScheduleViewSet,
     LegalHoldViewSet,
 )
+from .filter_views import DocumentFiltersView
 
 # Create router for OrdocAir API endpoints
 router = DefaultRouter()
@@ -42,6 +43,9 @@ router.register(r'compliance/legal-holds', LegalHoldViewSet, basename='legalhold
 app_name = 'ordoc_air'
 
 urlpatterns = [
+    # Dynamic Filters (must come BEFORE router to avoid conflict with documents/<pk>/)
+    path('documents/filters/', DocumentFiltersView.as_view(), name='document-filters'),
+
     path('', include(router.urls)),
 
     # Funcionalidades avançadas (Batch Operations, OCR, Solr)

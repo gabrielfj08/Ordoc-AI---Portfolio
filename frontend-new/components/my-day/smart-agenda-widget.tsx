@@ -3,148 +3,167 @@
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, ArrowRight } from "lucide-react"
+import { Calendar as CalendarIcon, Clock, ArrowRight, NotebookPen, Filter, Search, X, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { tasksApi } from "@/app/processes/api"
+import { useMyDayStore } from "@/stores/my-day-store"
 import type { Task } from "@/app/processes/types"
 import { Badge } from "@/components/ui/badge"
+import { Calendar } from "@/components/ui/calendar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { CardControls, CardPinIndicator } from "@/components/my-day/card-controls"
+import { Input } from "@/components/ui/input"
 
 export function SmartAgendaWidget() {
     const router = useRouter()
-    const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([])
-    const [isLoading, setIsLoading] = useState(true)
+    const { priorityTasks, isLoading } = useMyDayStore()
+    const [date, setDate] = useState<Date | undefined>(new Date())
+    const [tasksForDate, setTasksForDate] = useState<Task[]>([])
+    const [showFilters, setShowFilters] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
 
     useEffect(() => {
-        const loadAgenda = async () => {
-            try {
-                // Busca tarefas com deadline definido, ordenadas por data
-                // Status ativos apenas
-                const response = await tasksApi.myTasks({
-                    status: 'running,started',
-                    ordering: 'deadline',
-                    page_size: 5
-                })
-
-                // Filtrar apenas tarefas com deadline futuro ou hoje
-                // O backend já deve ordenar, mas precisamos garantir que tarefas sem deadline fiquem de fora ou no fim
-                // Aqui assumimos que tasksApi retorna o que pedimos. 
-                // Nota: O backend pode precisar de ajuste se 'deadline' não for um campo de ordenação suportado,
-                // mas geralmente é.
-
-                const tasksWithDeadline = response.results.filter(t => t.deadline)
-                setUpcomingTasks(tasksWithDeadline)
-            } catch (error) {
-                console.error("Erro ao carregar agenda:", error)
-            } finally {
-                setIsLoading(false)
-            }
+        if (priorityTasks && date) {
+            const filtered = priorityTasks.filter(task => {
+                if (!task.deadline) return false
+                const taskDate = new Date(task.deadline)
+                const matchesDate = taskDate.toDateString() === date.toDateString()
+                const matchesSearch = task.name.toLowerCase().includes(searchTerm.toLowerCase())
+                return matchesDate && matchesSearch
+            })
+            setTasksForDate(filtered)
         }
-
-        loadAgenda()
-    }, [])
-
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString)
-        const today = new Date()
-        const isToday = date.toDateString() === today.toDateString()
-        const isTomorrow = new Date(today.setDate(today.getDate() + 1)).toDateString() === date.toDateString()
-
-        if (isToday) return "Hoje"
-        if (isTomorrow) return "Amanhã"
-
-        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-    }
-
-    const getTime = (dateString: string) => {
-        // Se tiver hora, mostrar. Se for só data (YYYY-MM-DD), assumir dia todo.
-        if (dateString.includes('T')) {
-            return new Date(dateString).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        }
-        return null
-    }
+    }, [priorityTasks, date, searchTerm])
 
     if (isLoading) {
         return (
             <Card className="p-6 border-border/50 shadow-sm h-full">
                 <h3 className="font-bold mb-5 flex items-center gap-2">
-                    <Calendar className="size-5 text-chart-4" />
-                    Agenda Inteligente
+                    <CalendarIcon className="size-5 text-chart-4" />
+                    Agenda
                 </h3>
-                <div className="space-y-3">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-12 bg-muted animate-pulse rounded-lg" />
-                    ))}
+                <div className="flex gap-6 h-[300px]">
+                    <div className="flex-1 bg-muted animate-pulse rounded-lg" />
+                    <div className="flex-1 space-y-3">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="h-12 bg-muted animate-pulse rounded-lg" />
+                        ))}
+                    </div>
                 </div>
             </Card>
         )
     }
 
     return (
-        <Card className="p-6 border-border/50 shadow-sm h-full flex flex-col">
-            <div className="flex items-center justify-between mb-5">
-                <h3 className="font-bold flex items-center gap-2">
-                    <Calendar className="size-5 text-chart-4" />
-                    Agenda Inteligente
-                </h3>
-                <Button variant="ghost" size="icon" className="size-8 rounded-full">
-                    <ArrowRight className="size-4" />
-                </Button>
+        <Card className="p-6 border-border/50 shadow-sm grow flex flex-col overflow-hidden relative">
+            <CardPinIndicator cardId="smart-agenda" />
+
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h3 className="text-xl font-bold flex items-center gap-2">
+                        <CalendarIcon className="size-5 text-orange-600" />
+                        Agenda
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">Visualize e organize seus compromissos e tarefas</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant={showFilters ? "default" : "ghost"}
+                        size="sm"
+                        className="rounded-full gap-2"
+                        onClick={() => setShowFilters(!showFilters)}
+                    >
+                        <Filter className="size-4" />
+                        Filtrar
+                        {searchTerm && (
+                            <span className="ml-1 size-2 rounded-full bg-primary-foreground" />
+                        )}
+                    </Button>
+                    <CardControls cardId="smart-agenda" cardTitle="Agenda" />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full gap-2 text-primary"
+                        onClick={() => router.push('/processes/tasks')}
+                    >
+                        Ver todas
+                        <ChevronRight className="size-4" />
+                    </Button>
+                </div>
             </div>
 
-            <div className="space-y-3 flex-1">
-                {upcomingTasks.length === 0 ? (
-                    <div className="text-center p-6 rounded-xl bg-muted/30 border border-dashed border-border">
-                        <Calendar className="size-8 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">Nenhum evento próximo</p>
-                        <Button variant="link" size="sm" className="mt-2">
-                            Adicionar evento
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {upcomingTasks.map(task => (
-                            <div
-                                key={task.id}
-                                className="flex items-start gap-3 p-3 rounded-lg hover:bg-secondary/50 border border-transparent hover:border-border/50 transition-all cursor-pointer group"
-                                onClick={() => router.push(`/processes/tasks/${task.id}`)}
+            {/* Filtros */}
+            {showFilters && (
+                <div className="mb-6 p-4 rounded-lg border bg-secondary/30 relative">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar tarefas por nome..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 pr-9 h-9"
+                        />
+                        {searchTerm && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 size-7"
                             >
-                                <div className="flex flex-col items-center justify-center size-10 rounded-lg bg-primary/10 text-primary shrink-0">
-                                    <span className="text-xs font-bold uppercase">
-                                        {formatDate(task.deadline!).split(' ')[0].substring(0, 3)}
-                                    </span>
-                                    <span className="text-sm font-bold">
-                                        {new Date(task.deadline!).getDate()}
-                                    </span>
-                                </div>
+                                <X className="size-3" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            )}
 
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                                        {task.name}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                                        <Clock className="size-3" />
-                                        <span>
-                                            {formatDate(task.deadline!)}
-                                            {getTime(task.deadline!) && ` • ${getTime(task.deadline!)}`}
-                                        </span>
-                                        {task.priority === 'high' && (
-                                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-destructive/30 text-destructive">
-                                                Urgente
-                                            </Badge>
+            <div className="flex flex-col gap-4 w-full">
+                {/* Calendar Section - Full Width Horizontal, Standard Vertical */}
+                <div className="w-full">
+                    <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        showOutsideDays={false}
+                        className="p-1"
+                    />
+                </div>
+
+                {/* Task Notes Section - Minimalist */}
+                <div className="space-y-4 w-full">
+                    <div className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-[0.15em] px-1">
+                        Notas de Tarefas
+                    </div>
+
+                    <ScrollArea className="max-h-[300px] min-h-[60px] w-full">
+                        <div className="space-y-4 px-1 w-full">
+                            {tasksForDate.length === 0 ? (
+                                <div className="text-center py-8 border border-dashed border-border/20 rounded-lg w-full">
+                                    <p className="text-sm text-muted-foreground">Sem tarefas para este dia</p>
+                                </div>
+                            ) : (
+                                tasksForDate.map(task => (
+                                    <div
+                                        key={task.id}
+                                        className="py-2 border-l-2 border-l-orange-500 pl-4 transition-all cursor-pointer w-full hover:bg-muted/30"
+                                        onClick={() => router.push(`/processes/tasks/${task.id}`)}
+                                    >
+                                        <div className="text-sm font-semibold mb-1 line-clamp-1">
+                                            {task.name}
+                                        </div>
+                                        {task.deadline && (
+                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+                                                <Clock className="size-3" />
+                                                {new Date(task.deadline).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                                ))
+                            )}
+                        </div>
+                    </ScrollArea>
+                </div>
             </div>
-
-            {upcomingTasks.length > 0 && (
-                <Button variant="outline" className="w-full mt-4 rounded-full" size="sm">
-                    Ver agenda completa
-                </Button>
-            )}
         </Card>
     )
 }
+

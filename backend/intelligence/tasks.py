@@ -91,9 +91,11 @@ def analyze_document_async(self, document_id: str, document_type: str = 'unknown
             }
         )
 
-        # Criar alertas se houver
+        # Criar alertas E notificações se houver
+        from ordoc_cloud.models import Notification, OrdocUser
+        
         for alert_data in result.get('alerts', []):
-            ProactiveAlert.objects.create(
+            alert = ProactiveAlert.objects.create(
                 document_id=document_id,
                 document_type=document_type,
                 alert_type=alert_data.get('alert_type', 'suggestion'),
@@ -104,6 +106,72 @@ def analyze_document_async(self, document_id: str, document_type: str = 'unknown
                 suggested_actions=alert_data.get('suggested_actions', []),
                 organization_id=organization_id
             )
+            
+            # Criar notificação para o criador do documento
+            if document.created_by:
+                try:
+                    ordoc_user = OrdocUser.objects.get(user=document.created_by)
+                    
+                    # Mapear severidade para tipo de notificação
+                    notification_type_map = {
+                        'critical': 'error',
+                        'error': 'error',
+                        'warning': 'warning',
+                        'info': 'info',
+                    }
+                    
+                    Notification.objects.create(
+                        user=ordoc_user,
+                        title=alert.title,
+                        message=alert.message,
+                        notification_type=notification_type_map.get(alert.severity, 'info'),
+                        link=f'/documents/{document_id}',
+                        metadata={
+                            'alert_id': str(alert.id),
+                            'document_id': document_id,
+                            'document_name': document.name,
+                            'severity': alert.severity
+                        }
+                    )
+                    logger.info(f"Notificação criada para usuário {ordoc_user.id} sobre documento {document_id}")
+                except OrdocUser.DoesNotExist:
+                    logger.warning(f"OrdocUser não encontrado para {document.created_by.username}")
+
+        # Criar notificação automática para documentos críticos ou com dados sensíveis
+        if document.criticality in ['high', 'critical'] or document.contains_sensitive_data:
+            if document.created_by:
+                try:
+                    ordoc_user = OrdocUser.objects.get(user=document.created_by)
+                    
+                    # Mensagem personalizada baseada nas características
+                    messages = []
+                    if document.contains_sensitive_data:
+                        messages.append("contém dados sensíveis (LGPD)")
+                    if document.criticality in ['high', 'critical']:
+                        messages.append(f"tem criticidade {document.get_criticality_display().lower()}")
+                    if document.requires_signature:
+                        messages.append("requer assinatura")
+                    
+                    notification_message = f"O documento '{document.name}' {' e '.join(messages)}. Revise as configurações de segurança e acesso."
+                    
+                    Notification.objects.create(
+                        user=ordoc_user,
+                        title=f"📄 Documento {document.get_criticality_display()} Detectado",
+                        message=notification_message,
+                        notification_type='warning' if document.criticality == 'high' else 'error',
+                        link=f'/documents/{document_id}',
+                        metadata={
+                            'document_id': document_id,
+                            'document_name': document.name,
+                            'document_type': document.document_type,
+                            'criticality': document.criticality,
+                            'contains_sensitive_data': document.contains_sensitive_data,
+                            'requires_signature': document.requires_signature
+                        }
+                    )
+                    logger.info(f"Notificação de documento crítico criada para {ordoc_user.id}")
+                except OrdocUser.DoesNotExist:
+                    pass
 
         logger.info(f"Documento {document_id} analisado com sucesso - {len(result.get('alerts', []))} alertas")
         return result
@@ -115,6 +183,71 @@ def analyze_document_async(self, document_id: str, document_type: str = 'unknown
         logger.exception(f"Erro ao analisar documento {document_id}: {e}")
         # Retry com backoff exponencial
         raise self.retry(exc=e, countdown=2 ** self.request.retries * 60)
+
+
+@shared_task
+def notify_document_upload(document_id: str):
+    """
+    Cria notificação IMEDIATA quando um documento é enviado.
+    
+    Não espera análise completa - notifica o usuário instantaneamente.
+    """
+    from ordoc_air.models import Document
+    from ordoc_cloud.models import Notification, OrdocUser
+    
+    try:
+        document = Document.objects.select_related('created_by', 'department__organization').get(id=document_id)
+        
+        if not document.created_by:
+            return
+        
+        try:
+            ordoc_user = OrdocUser.objects.get(user=document.created_by)
+            
+            # Mensagem baseada nas características detectadas
+            characteristics = []
+            if document.document_type and document.document_type != 'other':
+                characteristics.append(f"Tipo: {document.get_document_type_display()}")
+            if document.contains_sensitive_data:
+                characteristics.append("⚠️ Dados Sensíveis (LGPD)")
+            if document.requires_signature:
+                characteristics.append("✍️ Requer Assinatura")
+            if document.criticality in ['high', 'critical']:
+                characteristics.append(f"🔴 Criticidade {document.get_criticality_display()}")
+            
+            if characteristics:
+                message = f"Documento enviado com sucesso. {' | '.join(characteristics)}"
+            else:
+                message = "Documento enviado com sucesso e está sendo processado."
+            
+            # Tipo de notificação baseado na criticidade
+            notification_type = 'success'
+            if document.criticality == 'critical' or document.contains_sensitive_data:
+                notification_type = 'warning'
+            
+            Notification.objects.create(
+                user=ordoc_user,
+                title=f"📄 {document.name}",
+                message=message,
+                notification_type=notification_type,
+                link=f'/documents/{document_id}',
+                metadata={
+                    'document_id': document_id,
+                    'document_name': document.name,
+                    'document_type': document.document_type,
+                    'upload_notification': True
+                }
+            )
+            
+            logger.info(f"Notificação de upload criada para {ordoc_user.id} - documento {document_id}")
+            
+        except OrdocUser.DoesNotExist:
+            logger.warning(f"OrdocUser não encontrado para {document.created_by.username}")
+            
+    except Document.DoesNotExist:
+        logger.error(f"Documento {document_id} não encontrado para notificação")
+    except Exception as e:
+        logger.exception(f"Erro ao criar notificação de upload: {e}")
 
 
 @shared_task

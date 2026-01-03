@@ -16,34 +16,12 @@ import {
     getPriorityLabel,
 } from '@/hooks/use-intelligent-priority'
 
+import { useMyDayStore } from '@/stores/my-day-store'
+
 export function PriorityTasksWidget() {
     const router = useRouter()
-    const [tasks, setTasks] = useState<Task[]>([])
-    const [loading, setLoading] = useState(true)
+    const { priorityTasks: tasks, isLoading: loading } = useMyDayStore()
     const { prioritizedTasks } = useIntelligentPriority(tasks)
-
-    useEffect(() => {
-        const fetchTasks = async () => {
-            try {
-                setLoading(true)
-                setLoading(true)
-                // Buscar tarefas do usuário (não finalizadas/recusadas já filtradas pelo status)
-                const response = await tasksApi.myTasks({
-                    status: 'running,started,draft',
-                })
-                setTasks(response.results)
-            } catch (error) {
-                console.error('Erro ao carregar tarefas:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchTasks()
-        // Atualizar a cada 2 minutos
-        const interval = setInterval(fetchTasks, 120000)
-        return () => clearInterval(interval)
-    }, [])
 
     const topTasks = prioritizedTasks.slice(0, 5)
 
@@ -127,10 +105,10 @@ export function PriorityTasksWidget() {
                                             {/* Ranking */}
                                             <div
                                                 className={`size-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-sm ${index === 0
-                                                        ? 'bg-destructive text-destructive-foreground'
-                                                        : index === 1
-                                                            ? 'bg-warning text-warning-foreground'
-                                                            : 'bg-muted text-muted-foreground'
+                                                    ? 'bg-destructive text-destructive-foreground'
+                                                    : index === 1
+                                                        ? 'bg-warning text-warning-foreground'
+                                                        : 'bg-muted text-muted-foreground'
                                                     }`}
                                             >
                                                 {index + 1}

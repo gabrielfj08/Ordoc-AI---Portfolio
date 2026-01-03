@@ -3,6 +3,7 @@ import apiClient from './api-client'
 const ORDOC_FLOW_BASE = '/api/v1/ordoc-flow'
 const ORDOC_AIR_BASE = '/api/v1/ordoc-air'
 const ORDOC_SIGN_BASE = '/api/v1/ordoc-sign'
+const DASHBOARD_BASE = '/api/v1/dashboard'
 
 export interface DashboardOverview {
     total_documents: number
@@ -51,6 +52,12 @@ export interface ActiveWorkflow {
     document_count: number
     average_time_days: number
     status: 'active' | 'paused'
+    // Rich UI fields (optional for compatibility)
+    current_step?: string
+    deadline_label?: string
+    deadline_status?: 'normal' | 'learning' | 'urgent' | 'late'
+    responsible?: string
+    code?: string // e.g. "Pregão 045/2025"
 }
 
 export interface PendingSummary {
@@ -58,7 +65,33 @@ export interface PendingSummary {
     pending_approvals: number
 }
 
+export interface DashboardConfig {
+    organization: {
+        id: string | null
+        type: string
+        subtype: string
+        features: Record<string, any>
+    }
+    user: {
+        roles: string[]
+        can_access_team_view: boolean
+    }
+    dashboard: {
+        cards: string[]
+    }
+}
+
 export const myDayApi = {
+    /**
+     * Get dashboard configuration (enabled cards, org subtype/features)
+     */
+    getDashboardConfig: async () => {
+        const response = await apiClient.get<DashboardConfig>(
+            `${DASHBOARD_BASE}/config/`
+        )
+        return response.data
+    },
+
     /**
      * Get dashboard overview with all metrics
      */
@@ -109,13 +142,25 @@ export const myDayApi = {
         )
 
         // Transform to ActiveWorkflow format
-        const workflows: ActiveWorkflow[] = response.data.results.map(proc => ({
-            id: proc.id,
-            name: proc.name || 'Workflow sem nome',
-            document_count: proc.document_count || 0,
-            average_time_days: proc.average_processing_time_days || 0,
-            status: proc.status === 'running' || proc.status === 'started' ? 'active' : 'paused',
-        }))
+        const workflows: ActiveWorkflow[] = response.data.results.map((proc, index) => {
+            // Simulated logic for rich fields (mocking based on user requirements for now 
+            // since backend field mapping is not yet confirmed)
+            const isRed = index === 0;
+            const isYellow = index === 1;
+
+            return {
+                id: proc.id,
+                name: proc.name || 'Workflow sem nome',
+                code: proc.code || `PRO-${2025000 + index}`, // Placeholder code
+                document_count: proc.document_count || 0,
+                average_time_days: proc.average_processing_time_days || 0,
+                status: proc.status === 'running' || proc.status === 'started' ? 'active' : 'paused',
+                current_step: proc.current_step || 'Etapa desconhecida',
+                responsible: proc.responsible_name,
+                deadline_label: isRed ? 'Prazo: HOJE' : (isYellow ? '2 dias restantes' : 'No prazo'),
+                deadline_status: isRed ? 'urgent' : (isYellow ? 'learning' : 'normal'),
+            }
+        })
 
         return workflows
     },

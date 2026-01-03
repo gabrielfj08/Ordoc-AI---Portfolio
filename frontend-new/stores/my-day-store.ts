@@ -1,9 +1,13 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { produce } from 'immer'
-import { myDayApi, type DashboardOverview, type RecentDocument, type ActiveWorkflow, type PendingSummary } from '@/services/my-day-api'
+import { myDayApi, type DashboardOverview, type RecentDocument, type ActiveWorkflow, type PendingSummary, type DashboardConfig } from '@/services/my-day-api'
+import { documentsApi, type StorageStats } from '@/services/documents-api'
 import { rankingApi, type RankedEntity } from '@/services/ranking-api'
 import { analysisApi, alertsApi, patternsApi } from '@/services/intelligence-api'
+import { tasksApi } from '@/app/processes/api'
+import type { Task } from '@/app/processes/types'
+
 
 // --- Data Types ---
 
@@ -13,6 +17,8 @@ export interface MyDayData {
     activeWorkflows: ActiveWorkflow[]
     pending: PendingSummary
     userName: string
+    dashboardConfig: DashboardConfig | null
+    enabledCardIds: string[]
     viewMode: 'personal' | 'team'
     canAccessTeamView: boolean
     privacyMode: {
@@ -25,12 +31,14 @@ export interface MyDayData {
         lastTask: any | null
         lastDocument: RecentDocument | null
     } | null
+    storageStats: StorageStats | null
     aiStats: {
         analysisCount: number
         alertsCount: number
         patternsCount: number
         systemStatus: string
     } | null
+    priorityTasks: Task[]
 }
 
 export interface RankingState {
@@ -92,11 +100,15 @@ const initialState: MyDayData & RankingState & { isLoading: boolean; error: stri
     activeWorkflows: [],
     pending: { pending_signatures: 0, pending_approvals: 0 },
     userName: '',
+    dashboardConfig: null,
+    enabledCardIds: [],
     viewMode: 'personal',
     canAccessTeamView: false,
     privacyMode: null,
     continueWorkingItems: null,
+    storageStats: null,
     aiStats: null,
+    priorityTasks: [],
 
     // Ranking data
     documentRankings: [],
@@ -134,7 +146,8 @@ export const useMyDayStore = create<MyDayState>()(
             fetchDashboardData: async () => {
                 set({ isLoading: true, error: null })
                 try {
-                    const [overview, documents, workflows, pending, userInfo, privacyInfo, analysisRes, alertsRes, patternsRes, continueWorkingRes] = await Promise.all([
+                    const [dashboardConfig, overview, documents, workflows, pending, userInfo, privacyInfo, analysisRes, alertsRes, patternsRes, continueWorkingRes, storageRes, tasksRes] = await Promise.all([
+                        myDayApi.getDashboardConfig().catch(() => null),
                         myDayApi.getDashboardOverview(),
                         myDayApi.getRecentDocuments(30),
                         myDayApi.getActiveWorkflows(10),
@@ -146,6 +159,8 @@ export const useMyDayStore = create<MyDayState>()(
                         alertsApi.list({}).catch(() => ({ count: 0 })),
                         patternsApi.list({}).catch(() => ({ count: 0 })),
                         myDayApi.getContinueWorkingItems().catch(() => null),
+                        documentsApi.getStorageStats().catch(() => null),
+                        tasksApi.myTasks({ status: 'running,started,draft', page_size: 20 }).catch(() => ({ results: [] })),
                     ])
 
                     const aiStats = {
@@ -155,17 +170,23 @@ export const useMyDayStore = create<MyDayState>()(
                         systemStatus: (privacyInfo as any)?.status || 'Online'
                     }
 
+
+
                     set({
+                        dashboardConfig: dashboardConfig as DashboardConfig | null,
+                        enabledCardIds: (dashboardConfig as any)?.dashboard?.cards || [],
                         overview,
                         recentDocuments: documents,
                         activeWorkflows: workflows,
                         pending,
                         userName: userInfo.first_name || userInfo.username || '',
                         viewMode: userInfo.view_mode || 'personal',
-                        canAccessTeamView: userInfo.can_access_team_view || false,
+                        canAccessTeamView: (dashboardConfig as any)?.user?.can_access_team_view ?? (userInfo.can_access_team_view || false),
                         privacyMode: privacyInfo ? (privacyInfo as any).privacy : null,
                         continueWorkingItems: continueWorkingRes,
+                        storageStats: storageRes,
                         aiStats,
+                        priorityTasks: (tasksRes as any)?.results || [],
                         isLoading: false,
                     })
 
@@ -364,3 +385,4 @@ export const selectViewMode = (state: MyDayState) => state.viewMode
 export const selectCanAccessTeamView = (state: MyDayState) => state.canAccessTeamView
 export const selectPrivacyMode = (state: MyDayState) => state.privacyMode
 export const selectAiStats = (state: MyDayState) => state.aiStats
+export const selectStorageStats = (state: MyDayState) => state.storageStats

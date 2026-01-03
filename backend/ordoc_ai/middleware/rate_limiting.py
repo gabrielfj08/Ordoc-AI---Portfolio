@@ -39,9 +39,9 @@ class RateLimitMiddleware(MiddlewareMixin):
         },
         # Upload endpoints - prevent spam
         '/api/v1/ordoc-air/documents/': {
-            'requests': 50,     # 50 uploads
+            'requests': 2000,   # Increased for listing/searching
             'window': 3600,     # per hour
-            'block_duration': 300,
+            'block_duration': 60,
         },
         # Write operations - moderate limits
         '/api/v1/ordoc-flow/procedures/': {

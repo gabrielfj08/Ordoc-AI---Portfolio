@@ -23,6 +23,7 @@ from rest_framework.routers import DefaultRouter
 from .auth_views import login, logout, refresh_token, me, change_password, validate_password_strength, password_requirements
 from .registration_views import register_user, register_external_requester, check_email, create_demo_organization
 from .health_views import health_check, readiness_check
+from .dashboard_views import dashboard_config
 
 # Create API router
 api_router = DefaultRouter()
@@ -51,6 +52,7 @@ urlpatterns = [
     
     # API Routes
     path('api/v1/', include([
+        path('dashboard/config/', dashboard_config, name='dashboard_config'),
         # Main modules
         path('ordoc-air/', include('ordoc_air.urls')),
         path('ordoc-flow/', include('ordoc_flow.urls')),

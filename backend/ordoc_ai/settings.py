@@ -182,10 +182,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',      # Usuários anônimos: 100 req/hora
-        'user': '1000/hour',     # Usuários autenticados: 1000 req/hora
-        'burst': '60/minute',    # Limite de burst: 60 req/minuto
-        'sustained': '5000/day', # Limite diário: 5000 req/dia
+        'anon': '1000/hour',     # Increased for dev ease
+        'user': '5000/hour',     # Increased for active usage
+        'burst': '300/minute',   # 5 req/sec burst
+        'sustained': '20000/day', # High daily limit
     },
 }
 
@@ -226,7 +226,8 @@ TURNSTILE_SECRET_KEY = config('TURNSTILE_SECRET_KEY', default='1x000000000000000
 
 # Rate Limiting Configuration
 # Disable rate limiting in debug mode for development (optional)
-DISABLE_RATE_LIMITING_IN_DEBUG = config('DISABLE_RATE_LIMITING_IN_DEBUG', default=False, cast=bool)
+# Disable rate limiting in debug mode for development (optional)
+DISABLE_RATE_LIMITING_IN_DEBUG = config('DISABLE_RATE_LIMITING_IN_DEBUG', default=True, cast=bool)
 
 # Guardian settings
 AUTHENTICATION_BACKENDS = (

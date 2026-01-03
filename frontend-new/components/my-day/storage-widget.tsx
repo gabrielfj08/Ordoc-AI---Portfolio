@@ -1,31 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Database, Loader2 } from "lucide-react"
-import { documentsApi, StorageStats } from "@/services/documents-api"
 import { useRouter } from "next/navigation"
+import { useMyDayStore } from "@/stores/my-day-store"
 
 export function StorageWidget() {
     const router = useRouter()
-    const [stats, setStats] = useState<StorageStats | null>(null)
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        const loadStats = async () => {
-            try {
-                const data = await documentsApi.getStorageStats()
-                setStats(data)
-            } catch (error) {
-                console.error("Failed to load storage stats", error)
-            } finally {
-                setLoading(false)
-            }
-        }
-        loadStats()
-    }, [])
+    const { storageStats: stats } = useMyDayStore()
+    // Local loading state is not needed if we rely on global loading or just show skeleton if null
+    // But since fetchDashboardData happens on page load, stats might be null initially.
+    // However, Dashboard usually shows a global loader.
+    // Let's treat null stats as loading.
+    const loading = !stats
 
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 B'

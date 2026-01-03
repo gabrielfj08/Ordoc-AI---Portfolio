@@ -15,8 +15,16 @@ export function usePrioritizedCards(maxCards?: number): PrioritizedCard[] {
     const { cardPreferences } = state
 
     const prioritizedCards = useMemo(() => {
+        const enabled = state.enabledCardIds && state.enabledCardIds.length > 0
+            ? new Set(state.enabledCardIds)
+            : null
+
+        const availableCards = enabled
+            ? DASHBOARD_CARDS.filter(card => enabled.has(card.id))
+            : DASHBOARD_CARDS
+
         return prioritizeCards(
-            DASHBOARD_CARDS,
+            availableCards,
             state,
             cardPreferences,
             maxCards
@@ -27,6 +35,7 @@ export function usePrioritizedCards(maxCards?: number): PrioritizedCard[] {
         state.documentRankings.length,
         state.procedureRankings.length,
         state.isRankingEnabled,
+        state.enabledCardIds,
         cardPreferences.pinnedCards,
         cardPreferences.hiddenCards,
         maxCards,

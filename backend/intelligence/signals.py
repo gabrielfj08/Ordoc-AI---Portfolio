@@ -53,7 +53,7 @@ def get_signature_request_model():
 @receiver(post_save, sender='ordoc_air.Document')
 def on_document_created(sender, instance, created, **kwargs):
     """
-    Quando um documento é criado, agenda análise automática.
+    Quando um documento é criado, detecta propriedades e agenda análise automática.
 
     Executa de forma ASSÍNCRONA via Celery para não bloquear o upload.
     """
@@ -61,22 +61,87 @@ def on_document_created(sender, instance, created, **kwargs):
         return
 
     # Importar task apenas quando necessário (evita circular import)
-    from .tasks import analyze_document_async
+    from .tasks import analyze_document_async, notify_document_upload
 
     try:
-        # Agendar análise assíncrona (não bloqueia)
-        analyze_document_async.apply_async(
-            args=[str(instance.id)],
-            kwargs={
-                'document_type': instance.document_type or 'unknown',
-                'organization_id': str(instance.organization_id) if instance.organization_id else None
-            },
-            countdown=2  # Aguarda 2s para DB commit completar
-        )
-        logger.info(f"Análise agendada para documento {instance.id}")
+        # Obter organization_id através de department
+        organization_id = None
+        if instance.department and instance.department.organization:
+            organization_id = str(instance.department.organization.id)
+        
+        # Garantir que document_type está definido
+        document_type = instance.document_type or 'other'
+        
+        # 1. Criar notificação SÍNCRONA IMEDIATA (não depende de Celery)
+        try:
+            from ordoc_cloud.models import Notification, OrdocUser
+            
+            if instance.created_by:
+                ordoc_user = OrdocUser.objects.get(user=instance.created_by)
+                
+                # Mensagem baseada nas características detectadas
+                characteristics = []
+                if instance.document_type and instance.document_type != 'other':
+                    characteristics.append(f"Tipo: {instance.get_document_type_display()}")
+                if instance.contains_sensitive_data:
+                    characteristics.append("⚠️ Dados Sensíveis (LGPD)")
+                if instance.requires_signature:
+                    characteristics.append("✍️ Requer Assinatura")
+                if instance.criticality in ['high', 'critical']:
+                    characteristics.append(f"🔴 Criticidade {instance.get_criticality_display()}")
+                
+                if characteristics:
+                    message = f"Documento enviado com sucesso. {' | '.join(characteristics)}"
+                else:
+                    message = "Documento enviado com sucesso e está sendo processado."
+                
+                # Tipo de notificação baseado na criticidade
+                notification_type = 'success'
+                if instance.criticality == 'critical' or instance.contains_sensitive_data:
+                    notification_type = 'warning'
+                
+                Notification.objects.create(
+                    user=ordoc_user,
+                    title=f"📄 {instance.name}",
+                    message=message,
+                    notification_type=notification_type,
+                    link=f'/documents/{instance.id}',
+                    metadata={
+                        'document_id': str(instance.id),
+                        'document_name': instance.name,
+                        'document_type': instance.document_type,
+                        'upload_notification': True
+                    }
+                )
+                logger.info(f"Notificação criada SÍNCRONAMENTE para {ordoc_user.id} - documento {instance.id}")
+        except Exception as e:
+            logger.warning(f"Erro ao criar notificação síncrona: {e}")
+        
+        # 2. Tentar agendar tasks assíncronas (se Celery estiver disponível)
+        try:
+            notify_document_upload.apply_async(
+                args=[str(instance.id)],
+                countdown=1
+            )
+        except Exception:
+            pass  # Celery não disponível, notificação já foi criada síncronamente
+        
+        try:
+            analyze_document_async.apply_async(
+                args=[str(instance.id)],
+                kwargs={
+                    'document_type': document_type,
+                    'organization_id': organization_id
+                },
+                countdown=2
+            )
+        except Exception:
+            pass  # Celery não disponível
+            
+        logger.info(f"Notificação criada e análise agendada para documento {instance.id} (tipo: {document_type})")
     except Exception as e:
         # Não propaga erro - falha na análise não afeta upload
-        logger.warning(f"Erro ao agendar análise do documento {instance.id}: {e}")
+        logger.warning(f"Erro ao processar documento {instance.id}: {e}")
 
 
 @receiver(post_save, sender='ordoc_flow.Task')

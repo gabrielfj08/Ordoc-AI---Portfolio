@@ -82,7 +82,7 @@ export const DASHBOARD_CARDS: DashboardCardConfig[] = [
     },
     {
         id: 'smart-agenda',
-        title: 'Agenda Inteligente',
+        title: 'Agenda',
         category: 'team',
         defaultPriority: 45,
         minWidth: 'sm',
@@ -105,6 +105,32 @@ export const DASHBOARD_CARDS: DashboardCardConfig[] = [
         defaultPriority: 35,
         minWidth: 'sm',
         isVisible: () => true, // Always visible
+    },
+
+    // Dynamic Feature Cards (Enabled via Backend Config)
+    {
+        id: 'compliance-overview',
+        title: 'Conformidade LGPD',
+        category: 'insights',
+        defaultPriority: 90, // High priority if enabled
+        minWidth: 'md',
+        isVisible: () => true, // Visibility controlled by enabledCardIds
+    },
+    {
+        id: 'court-key-movements',
+        title: 'Movimentações Processuais',
+        category: 'content',
+        defaultPriority: 85,
+        minWidth: 'lg',
+        isVisible: () => true,
+    },
+    {
+        id: 'official-diaries',
+        title: 'Diários Oficiais',
+        category: 'content',
+        defaultPriority: 82,
+        minWidth: 'md',
+        isVisible: () => true,
     },
 ]
 
