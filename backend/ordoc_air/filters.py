@@ -45,12 +45,34 @@ class DocumentFilter(django_filters.FilterSet):
     is_current_version = django_filters.BooleanFilter()
     version = django_filters.NumberFilter()
     
+    # Custom sidebar filters
+    is_favorited = django_filters.BooleanFilter(method='filter_is_favorited')
+    in_trash = django_filters.BooleanFilter(method='filter_in_trash')
+    is_shared = django_filters.BooleanFilter(method='filter_is_shared')
+    
     class Meta:
         model = Document
         fields = [
             'status', 'file_type', 'mime_type', 'directory', 'department',
-            'uploaded_by', 'is_current_version', 'version'
+            'uploaded_by', 'is_current_version', 'version', 
+            'is_shared', 'contains_sensitive_data', 'requires_signature', 'criticality'
         ]
+    
+    def filter_is_favorited(self, queryset, name, value):
+        user = self.request.user
+        if value and user.is_authenticated:
+            return queryset.filter(favorited_by=user)
+        return queryset
+
+    def filter_in_trash(self, queryset, name, value):
+        if value:
+             return queryset.filter(deleted_at__isnull=False)
+        return queryset.filter(deleted_at__isnull=True)
+
+    def filter_is_shared(self, queryset, name, value):
+        if value:
+            return queryset.filter(is_shared=True)
+        return queryset
     
     def filter_tags(self, queryset, name, value):
         """Filter documents by tags (comma-separated)"""
@@ -89,7 +111,7 @@ class DirectoryFilter(django_filters.FilterSet):
     description = django_filters.CharFilter(lookup_expr='icontains')
     
     # Relationship filters
-    parent = django_filters.ModelChoiceFilter(queryset=Directory.objects.all())
+    parent = django_filters.ModelChoiceFilter(queryset=Directory.objects.all(), field_name='parent_directory')
     department = django_filters.ModelChoiceFilter(queryset=Department.objects.all())
     
     # Hierarchy filters
@@ -108,16 +130,16 @@ class DirectoryFilter(django_filters.FilterSet):
     def filter_is_root(self, queryset, name, value):
         """Filter root directories (no parent)"""
         if value:
-            return queryset.filter(parent__isnull=True)
+            return queryset.filter(parent_directory__isnull=True)
         else:
-            return queryset.filter(parent__isnull=False)
+            return queryset.filter(parent_directory__isnull=False)
     
     def filter_has_children(self, queryset, name, value):
         """Filter directories that have or don't have children"""
         if value:
-            return queryset.filter(children__isnull=False).distinct()
+            return queryset.filter(subdirectories__isnull=False).distinct()
         else:
-            return queryset.filter(children__isnull=True)
+            return queryset.filter(subdirectories__isnull=True)
     
     def filter_has_documents(self, queryset, name, value):
         """Filter directories that have or don't have documents"""

@@ -20,6 +20,19 @@ export interface Document {
     is_favorite: boolean
     is_archived: boolean
     version: number
+    // Intelligence fields
+    document_type?: string
+    document_type_display?: string
+    contains_sensitive_data?: boolean
+    requires_signature?: boolean
+    criticality?: 'low' | 'medium' | 'high' | 'critical'
+    criticality_display?: string
+    // Dynamic filter fields
+    has_deadline?: boolean
+    deadline_date?: string
+    is_from_external_source?: boolean
+    external_source_name?: string
+    is_public?: boolean
     created_at: string
     updated_at: string
 }
@@ -96,6 +109,28 @@ export interface StorageStats {
 
 export const documentsApi = {
     /**
+     * Create new directory
+     */
+    createDirectory: async (data: { name: string, parent?: string, department?: string }) => {
+        const response = await apiClient.post<Directory>(
+            `${BASE_URL}/directories/`,
+            data
+        )
+        return response.data
+    },
+
+    /**
+     * List directories
+     */
+    listDirectories: async (params?: { parent?: string, department?: string }) => {
+        const response = await apiClient.get<PaginatedResponse<Directory>>(
+            `${BASE_URL}/directories/`,
+            { params }
+        )
+        return response.data
+    },
+
+    /**
      * Get storage usage statistics
      */
     getStorageStats: async () => {
@@ -113,7 +148,14 @@ export const documentsApi = {
         tags?: string[]
         search?: string
         is_favorite?: boolean
+        is_favorited?: boolean // Alias for backend filter
         is_archived?: boolean
+        is_shared?: boolean
+        in_trash?: boolean
+        requires_signature?: boolean
+        has_deadline?: boolean
+        criticality?: string
+        status?: string
         file_type?: string
         ordering?: string
         page?: number
@@ -121,6 +163,26 @@ export const documentsApi = {
         const response = await apiClient.get<PaginatedResponse<Document>>(
             `${BASE_URL}/documents/`,
             { params }
+        )
+        return response.data
+    },
+
+    createBlankDocument: async (name: string = "Novo Documento.txt") => {
+        const char = " ";
+        const blob = new Blob([char], { type: "text/plain" })
+        const file = new File([blob], name, { type: "text/plain" })
+
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await apiClient.post<Document>(
+            `${BASE_URL}/documents/`,
+            formData,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            }
         )
         return response.data
     },

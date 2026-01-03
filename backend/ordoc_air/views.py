@@ -198,7 +198,7 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
 
     # Tree optimization configuration
     tree_parent_field = 'parent_directory'
-    tree_children_field = 'children'
+    tree_children_field = 'subdirectories'
 
     def get_queryset(self):
         """
@@ -207,33 +207,43 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
         """
         queryset = super().get_queryset()
         return queryset.select_related(
-            'organization',
             'department',
             'parent_directory'
-        ).prefetch_related('children', 'documents')
+        ).prefetch_related('subdirectories', 'documents')
     
     def perform_create(self, serializer):
         """Override to set automatic fields on directory creation"""
         from django.utils.text import slugify
         import uuid
         
+        # Get parent directory first to check for department inheritance
+        parent = serializer.validated_data.get('parent_directory')
+        
         # Get department (required)
         department = serializer.validated_data.get('department')
+        
+        # If no department provided, try to inherit from parent
+        if not department and parent:
+            department = parent.department
+            
+        # If still no department, try to get first department from current organization
         if not department:
-            # Try to get first department from current organization
             organization = self.get_current_organization()
-            department = organization.departments.first()
+            if organization:
+                department = organization.departments.first()
+                
             if not department:
                 from rest_framework.exceptions import ValidationError
-                raise ValidationError({"department": "No department available"})
+                raise ValidationError({"department": "No department available. Please create a department first."})
         
         # Auto-generate path if not provided
         path = serializer.validated_data.get('path')
         if not path:
             name = serializer.validated_data.get('name', 'unnamed')
-            parent = serializer.validated_data.get('parent_directory')
             if parent:
-                path = f"{parent.path}/{slugify(name)}"
+                # Ensure parent path exists/is valid
+                parent_path = parent.path if parent.path else ""
+                path = f"{parent_path}/{slugify(name)}"
             else:
                 path = f"/{slugify(name)}"
         
@@ -255,7 +265,7 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
     def children(self, request, pk=None):
         """Get directory children"""
         directory = self.get_object()
-        children = directory.children.filter(deleted_at__isnull=True)
+        children = directory.subdirectories.filter(deleted_at__isnull=True)
         serializer = self.get_serializer(children, many=True)
         return Response(serializer.data)
     

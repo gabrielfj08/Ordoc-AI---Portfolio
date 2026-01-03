@@ -20,6 +20,12 @@ class Organization(models.Model):
     subdomain = models.CharField(max_length=100, unique=True, verbose_name="Subdomínio")
     prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
     is_active = models.BooleanField(default=True, verbose_name="Ativo")
+
+    type = models.CharField(max_length=50, blank=True, default='', verbose_name="Tipo")
+    subtype = models.CharField(max_length=50, blank=True, default='', verbose_name="Subtipo")
+    features = models.JSONField(default=dict, blank=True, verbose_name="Features")
+    subtype_source = models.CharField(max_length=50, blank=True, default='', verbose_name="Origem do Subtipo")
+    subtype_confidence = models.FloatField(null=True, blank=True, verbose_name="Confiança do Subtipo")
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -202,6 +208,120 @@ class Document(models.Model):
     mime_type = models.CharField(max_length=100, blank=True, null=True, verbose_name="Tipo MIME")
     prn = models.CharField(max_length=500, unique=True, verbose_name="PRN")
 
+    # Document Classification (Auto-detected) - ENUM UNIVERSAL
+    DOCUMENT_TYPE_CHOICES = [
+        # Contratos e Acordos
+        ('contract', 'Contrato'),
+        ('agreement', 'Acordo'),
+        ('addendum', 'Aditivo'),
+        
+        # Documentos Jurídicos
+        ('petition', 'Petição'),
+        ('sentence', 'Sentença'),
+        ('summons', 'Intimação'),
+        ('power_of_attorney', 'Procuração'),
+        ('opinion', 'Parecer Jurídico'),
+        
+        # Documentos Governamentais
+        ('ordinance', 'Portaria'),
+        ('decree', 'Decreto'),
+        ('law', 'Lei'),
+        ('resolution', 'Resolução'),
+        ('edict', 'Edital'),
+        
+        # Documentos Fiscais
+        ('invoice', 'Nota Fiscal'),
+        ('receipt', 'Recibo'),
+        ('tax_document', 'Documento Fiscal'),
+        
+        # Certidões
+        ('certificate', 'Certidão'),
+        ('certificate_negative', 'Certidão Negativa'),
+        
+        # Documentos Administrativos
+        ('proposal', 'Proposta'),
+        ('report', 'Relatório'),
+        ('minutes', 'Ata'),
+        ('letter', 'Ofício'),
+        ('memo', 'Memorando'),
+        
+        # Outros
+        ('other', 'Outro'),
+    ]
+    
+    document_type = models.CharField(
+        max_length=50,
+        choices=DOCUMENT_TYPE_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name="Tipo de Documento",
+        help_text="Detectado automaticamente pela IA"
+    )
+    
+    # LGPD / Data Protection
+    contains_sensitive_data = models.BooleanField(
+        default=False,
+        verbose_name="Contém Dados Sensíveis",
+        help_text="CPF, RG, dados pessoais, etc"
+    )
+    
+    # Signature Requirements
+    requires_signature = models.BooleanField(
+        default=False,
+        verbose_name="Requer Assinatura",
+        help_text="Documento precisa ser assinado"
+    )
+    
+    # Deadline Management
+    has_deadline = models.BooleanField(
+        default=False,
+        verbose_name="Possui Prazo",
+        help_text="Documento tem prazo de vencimento"
+    )
+    deadline_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Data do Prazo",
+        help_text="Data limite para ação"
+    )
+    
+    # External Source (Tribunal, Gov.br, etc)
+    is_from_external_source = models.BooleanField(
+        default=False,
+        verbose_name="Origem Externa",
+        help_text="Recebido de fonte externa (Tribunal, Gov.br, etc)"
+    )
+    external_source_name = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        verbose_name="Nome da Fonte Externa",
+        help_text="Ex: TJSP, Portal Nacional de Licitações"
+    )
+    
+    # Public vs Restricted
+    is_public = models.BooleanField(
+        default=True,
+        verbose_name="Público",
+        help_text="Documento é público ou restrito"
+    )
+    
+    # Criticality Level
+    CRITICALITY_CHOICES = [
+        ('low', 'Baixa'),
+        ('medium', 'Média'),
+        ('high', 'Alta'),
+        ('critical', 'Crítica'),
+    ]
+    
+    criticality = models.CharField(
+        max_length=20,
+        choices=CRITICALITY_CHOICES,
+        default='low',
+        verbose_name="Criticidade",
+        help_text="Nível de importância do documento"
+    )
+
     # Versioning
     version = models.PositiveIntegerField(default=1)
     is_current_version = models.BooleanField(default=True)
@@ -334,6 +454,89 @@ class Document(models.Model):
     @content_type.setter
     def content_type(self, value):  # pragma: no cover
         self.mime_type = value
+
+    def auto_detect_properties(self):
+        """
+        Detecta automaticamente tipo, sensibilidade e criticidade do documento.
+        
+        Usa análise do nome do arquivo e padrões conhecidos.
+        Deve ser chamado ANTES de salvar o documento pela primeira vez.
+        """
+        import re
+        
+        if not self.name:
+            return
+        
+        filename_lower = self.name.lower()
+        
+        # 1. Detectar tipo de documento
+        type_patterns = {
+            'contract': ['contrato', 'contract', 'acordo_comercial'],
+            'petition': ['petição', 'peticao', 'inicial', 'recurso'],
+            'certificate': ['certidão', 'certidao', 'certificate'],
+            'power_of_attorney': ['procuração', 'procuracao', 'power_of_attorney'],
+            'agreement': ['acordo', 'agreement', 'termo'],
+            'opinion': ['parecer', 'opinion', 'análise_jurídica'],
+            'ordinance': ['portaria', 'ordinance'],
+            'decree': ['decreto', 'decree'],
+            'law': ['lei', 'law'],
+            'resolution': ['resolução', 'resolution'],
+            'invoice': ['nota_fiscal', 'invoice', 'nf'],
+            'receipt': ['recibo', 'receipt'],
+            'report': ['relatório', 'relatorio', 'report'],
+        }
+        
+        for doc_type, patterns in type_patterns.items():
+            if any(pattern in filename_lower for pattern in patterns):
+                self.document_type = doc_type
+                break
+        
+        if not self.document_type:
+            self.document_type = 'other'
+        
+        # 2. Detectar dados sensíveis (LGPD)
+        sensitive_patterns = [
+            r'\bcpf\b', r'\brg\b', r'\bcnh\b',
+            r'\d{3}\.\d{3}\.\d{3}-\d{2}',  # CPF formatado
+            r'\d{11}',  # CPF sem formatação (11 dígitos)
+            'dados_pessoais', 'confidencial', 'sigiloso',
+            'lgpd', 'gdpr', 'privacidade'
+        ]
+        
+        self.contains_sensitive_data = any(
+            re.search(pattern, filename_lower) for pattern in sensitive_patterns
+        )
+        
+        # 3. Detectar necessidade de assinatura
+        signature_patterns = [
+            'contrato', 'acordo', 'termo', 'procuração',
+            'assinatura', 'assinar', 'signature'
+        ]
+        
+        self.requires_signature = any(
+            pattern in filename_lower for pattern in signature_patterns
+        )
+        
+        # 4. Determinar criticidade
+        if self.contains_sensitive_data:
+            self.criticality = 'high'
+        elif self.document_type in ['contract', 'petition', 'power_of_attorney']:
+            self.criticality = 'high'
+        elif self.document_type in ['agreement', 'opinion', 'certificate']:
+            self.criticality = 'medium'
+        else:
+            self.criticality = 'low'
+        
+        # Se tem "urgente" ou "crítico" no nome, aumenta criticidade
+        if any(word in filename_lower for word in ['urgente', 'crítico', 'critico', 'urgent', 'critical']):
+            self.criticality = 'critical'
+
+    @property
+    def organization_id(self):
+        """Helper para acessar organization_id através de department."""
+        if self.department and self.department.organization:
+            return self.department.organization.id
+        return None
 
     # FSM Transitions - equivalente ao AASM do Rails
     @transition(field=status, source='created', target='enqueued')
@@ -744,14 +947,7 @@ class RetentionSchedule(models.Model):
         related_name='retention_schedules',
         verbose_name="Organização"
     )
-    document_type = models.ForeignKey(
-        DocumentType,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='retention_schedule',
-        verbose_name="Tipo de Documento"
-    )
+
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

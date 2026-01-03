@@ -250,6 +250,10 @@ class DocumentSerializer(serializers.ModelSerializer):
     )
     is_archived = serializers.BooleanField(read_only=True)
     ocr_content = serializers.CharField(source='extracted_text', read_only=True)
+    
+    # Intelligence fields - human-readable labels
+    document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
+    criticality_display = serializers.CharField(source='get_criticality_display', read_only=True)
 
     class Meta:
         model = Document
@@ -260,12 +264,21 @@ class DocumentSerializer(serializers.ModelSerializer):
             'department', 'tags', 'tag_ids', 'extracted_text', 'ocr_content',
             'ocr_confidence', 'ocr_language', 'storage_key',
             'is_archived', 'archived_at', 'archived_by',
+            # Intelligence fields
+            'document_type', 'document_type_display',
+            'contains_sensitive_data', 'requires_signature',
+            'criticality', 'criticality_display',
+            # Dynamic filter fields
+            'has_deadline', 'deadline_date',
+            'is_from_external_source', 'external_source_name',
+            'is_public',
             'created_at', 'updated_at', 'processed_at'
         ]
         read_only_fields = [
             'id', 'file_size', 'mime_type', 'status', 'version',
             'is_current_version', 'parent_document', 'prn',
             'directory_name', 'tags', 'ocr_content', 'is_archived',
+            'document_type_display', 'criticality_display',
             'created_at', 'updated_at', 'processed_at'
         ]
 
