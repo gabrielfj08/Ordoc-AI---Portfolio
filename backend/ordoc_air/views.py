@@ -42,15 +42,14 @@ from .serializers import (
     DocumentTemplateSerializer,
 )
 from .filters import DocumentFilter, DirectoryFilter
-# TODO: Descomentar após resolver dependências signxml/pyOpenSSL
-# from .document_auth_actions import (
-#     sign_document,
-#     validate_nfe,
-#     validate_nfse,
-#     signatures,
-#     upload_certificate,
-#     my_certificates
-# )
+from .document_auth_actions import (
+    sign_document,
+    validate_nfe,
+    validate_nfse,
+    signatures,
+    upload_certificate,
+    my_certificates
+)
 import uuid
 
 
@@ -1023,14 +1022,13 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
 
     # ========== Certificados Digitais e Validação SEFAZ ==========
     # Integração com módulos de autenticação de documentos
-    # TODO: Descomentar após resolver dependências signxml/pyOpenSSL
-    
-    # sign_document = sign_document
-    # validate_nfe = validate_nfe
-    # validate_nfse = validate_nfse
-    # signatures = signatures
-    # upload_certificate = upload_certificate
-    # my_certificates = my_certificates
+
+    sign_document = sign_document
+    validate_nfe = validate_nfe
+    validate_nfse = validate_nfse
+    signatures = signatures
+    upload_certificate = upload_certificate
+    my_certificates = my_certificates
 
 
 class TagViewSet(BaseViewSet):

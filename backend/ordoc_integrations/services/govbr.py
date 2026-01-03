@@ -134,29 +134,81 @@ class GovBrService(BaseIntegrationService):
         except Exception as e:
             raise IntegrationException(f"Falha na comunicação com Gov.br: {str(e)}")
 
+    def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
+        """
+        Renova o access token usando refresh token
+
+        Args:
+            refresh_token: Refresh token recebido na autenticação inicial
+
+        Returns:
+            Dict com novos tokens (access_token, refresh_token, expires_in, etc)
+
+        Exemplo de uso:
+            >>> govbr = GovBrService()
+            >>> tokens = govbr.refresh_access_token(user.govbr_refresh_token)
+            >>> user.govbr_access_token = tokens['access_token']
+            >>> user.govbr_refresh_token = tokens.get('refresh_token', user.govbr_refresh_token)
+            >>> user.save()
+        """
+        if not self.client_secret:
+            raise IntegrationException("Client Secret Gov.br não configurado")
+
+        # Basic Auth com Client ID e Client Secret
+        auth_string = f"{self.client_id}:{self.client_secret}"
+        auth_header = base64.b64encode(auth_string.encode()).decode()
+
+        headers = {
+            'Authorization': f"Basic {auth_header}",
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token
+        }
+
+        try:
+            response = self.session.post(
+                f"{self.base_url}{self.TOKEN_ENDPOINT}",
+                headers=headers,
+                data=data,
+                timeout=self.timeout
+            )
+
+            if response.status_code != 200:
+                raise IntegrationException(
+                    f"Erro ao renovar token Gov.br: {response.status_code} - {response.text}"
+                )
+
+            return response.json()
+
+        except Exception as e:
+            raise IntegrationException(f"Falha ao renovar token Gov.br: {str(e)}")
+
     def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """
         Obtém dados do usuário (UserInfo endpoint)
-        
+
         Args:
             access_token: Token de acesso válido
-            
+
         Returns:
             Dict com dados do perfil (sub, name, email, cpf, etc)
         """
         headers = {'Authorization': f"Bearer {access_token}"}
-        
+
         try:
             response = self.session.get(
                 f"{self.base_url}{self.USERINFO_ENDPOINT}",
                 headers=headers,
                 timeout=self.timeout
             )
-            
+
             if response.status_code != 200:
                 raise IntegrationException(f"Erro Gov.br UserInfo: {response.status_code} - {response.text}")
-                
+
             return response.json()
-            
+
         except Exception as e:
             raise IntegrationException(f"Falha ao obter dados do usuário Gov.br: {str(e)}")
