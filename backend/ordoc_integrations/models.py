@@ -20,25 +20,23 @@ class IntegrationService(models.Model):
     """
 
     class ServiceType(models.TextChoices):
+        # Integrações Governamentais Base
         GOVBR = 'govbr', _('Gov.br - Login Único')
-        RECEITA_FEDERAL = 'receita_federal', _('Receita Federal')
-        SERASA = 'serasa', _('SERASA Experian')
-        CARTORIO = 'cartorio', _('Cartórios (CRI/CNJ)')
-        DETRAN = 'detran', _('DETRAN')
+        RECEITA_FEDERAL = 'receita_federal', _('Receita Federal do Brasil')
         TSE = 'tse', _('TSE - Tribunal Superior Eleitoral')
-        INSS = 'inss', _('INSS - Previdência')
-        ANS = 'ans', _('ANS - Saúde Suplementar')
-        CVM = 'cvm', _('CVM - Mercado Financeiro')
-        OAB = 'oab', _('OAB - Ordem dos Advogados')
+        ANS = 'ans', _('ANS - Agência Nacional de Saúde Suplementar')
+
+        # Conselhos Profissionais (Validação de Licenças)
+        OAB = 'oab', _('OAB - Ordem dos Advogados do Brasil')
         CRM = 'crm', _('CRM - Conselho Regional de Medicina')
         CRO = 'cro', _('CRO - Conselho Regional de Odontologia')
         CREA = 'crea', _('CREA - Conselho Regional de Engenharia')
-        PIX = 'pix', _('PIX - Banco Central')
-        NFE = 'nfe', _('NFe/NFSe - Notas Fiscais')
-        ESOCIAL = 'esocial', _('eSocial - Eventos Trabalhistas')
-        CAGED = 'caged', _('CAGED - Declarações Trabalhistas')
-        SINTEGRA = 'sintegra', _('SINTEGRA - Integração Fiscal')
-        JUCESP = 'jucesp', _('JUCESP - Junta Comercial')
+
+        # Autenticação de Documentos e Operações Fiscais
+        CARTORIOS = 'cartorios', _('Cartórios (CRI/CNJ)')
+        SINTEGRA = 'sintegra', _('SINTEGRA - Sistema Integrado Fiscal')
+
+        # Customizado
         CUSTOM = 'custom', _('Integração Customizada')
 
     class ServiceStatus(models.TextChoices):
