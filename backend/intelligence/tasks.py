@@ -798,22 +798,61 @@ def track_document_access(document_id: str, user_id: str):
         sensitive_keywords = ['confidencial', 'secreto', 'restrito', 'sigiloso']
         is_sensitive = any(kw in document.name.lower() for kw in sensitive_keywords) if hasattr(document, 'name') else False
 
+        if is_sensitive:
+             logger.info(f"Acesso a documento sensível {document.id} por {user_id}")
+
+        # Registrar acesso
         KnowledgeFeedback.objects.create(
             layer='user',
-            document_type='document_access',
+            document_type=document.document_type or 'unknown',
             action_type='observation',
             context={
                 'document_id': document_id,
-                'is_sensitive': is_sensitive
+                'document_name': document.name,
+                'action_label': 'access'
             },
             user_id=user_id,
             organization_id=str(document.organization_id) if document.organization_id else None
         )
 
     except Document.DoesNotExist:
-        logger.warning(f"Documento {document_id} não encontrado")
+        logger.warning(f"Documento {document_id} não encontrado para rastreamento de acesso")
     except Exception as e:
         logger.error(f"Erro ao rastrear acesso: {e}")
+
+
+@shared_task
+def track_directory_creation(directory_id: str, user_id: str = None):
+    """
+    Rastreia criação de diretórios/pastas.
+    """
+    from ordoc_air.models import Directory
+    from .models import KnowledgeFeedback
+
+    try:
+        directory = Directory.objects.get(id=directory_id)
+
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type='directory',
+            action_type='approval', # Using 'approval' (positive action) since 'create' isn't in ActionType
+            context={
+                'action_detail': 'create',
+                'folder_id': directory_id,
+                'folder_name': directory.name,
+                'path': directory.get_full_path(),
+                'location': directory.get_full_path()
+            },
+            user_id=user_id,
+            organization_id=str(directory.department.organization_id) if directory.department else None
+        )
+        
+        logger.info(f"Criação de diretório {directory.name} registrada no feed")
+
+    except Directory.DoesNotExist:
+        logger.warning(f"Diretório {directory_id} não encontrado para rastreamento")
+    except Exception as e:
+        logger.error(f"Erro ao rastrear criação de diretório: {e}")
 
 
 @shared_task
@@ -1322,3 +1361,96 @@ def recalculate_behavior_scores():
             
     logger.info(f"Recálculo de scores concluído: {success_count} sucessos, {error_count} falhas")
     return {"success": success_count, "errors": error_count}
+
+
+@shared_task
+def track_document_share(document_id: str, user_id: str, shared_with: str = None):
+    """
+    Rastreia compartilhamentos de documentos.
+    """
+    from ordoc_air.models import Document
+    from .models import KnowledgeFeedback
+    
+    try:
+        document = Document.objects.get(id=document_id)
+        
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type=document.document_type or 'unknown',
+            action_type='approval',
+            context={
+                'action_detail': 'share',
+                'document_id': document_id,
+                'document_name': document.name,
+                'shared_with': shared_with,
+                'location': 'Meu Drive'
+            },
+            user_id=user_id,
+            organization_id=str(document.organization_id) if document.organization_id else None
+        )
+        
+        logger.info(f"Compartilhamento rastreado: Doc {document_id} por User {user_id}")
+        
+    except Document.DoesNotExist:
+        logger.warning(f"Documento {document_id} não encontrado para rastreamento de share")
+    except Exception as e:
+        logger.error(f"Erro ao rastrear share: {e}")
+
+
+@shared_task
+def track_document_creation(document_id: str, user_id: str):
+    """
+    Registra a criação de um documento no feed de atividades.
+    """
+    from ordoc_air.models import Document
+    from .models import KnowledgeFeedback
+    
+    try:
+        document = Document.objects.get(id=document_id)
+        
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type=document.document_type or 'unknown',
+            action_type='approval', # Proxy para 'creation' (ação positiva)
+            context={
+                'action_detail': 'create',
+                'document_id': document_id,
+                'document_name': document.name,
+                'location': 'Meu Drive' # TODO: Pegar do directory
+            },
+            user_id=user_id,
+            organization_id=str(document.organization_id) if document.organization_id else None
+        )
+    except Exception as e:
+        logger.error(f"Erro ao rastrear criação doc {document_id}: {e}")
+
+
+@shared_task
+def track_signature_event(signature_id: str, event_type: str):
+    """
+    Registra eventos de assinatura (solicitado, assinado).
+    """
+    from ordoc_sign.models import SignatureRequest
+    from .models import KnowledgeFeedback
+    
+    try:
+        sig = SignatureRequest.objects.get(id=signature_id)
+        
+        action_detail = 'sign_completed' if event_type == 'completed' else 'sign_requested'
+        
+        KnowledgeFeedback.objects.create(
+            layer='user',
+            document_type='signature',
+            action_type='approval',
+            context={
+                'action_detail': action_detail,
+                'document_id': str(sig.document_id) if sig.document else None,
+                'document_name': sig.document.name if sig.document else 'Documento',
+                'signer_name': sig.signer_name or sig.signer_email
+            },
+            # Se tiver usuário associado ao signer
+            user_id=str(sig.signer_user.id) if sig.signer_user else None,
+            organization_id=str(sig.workflow.organization_id) if hasattr(sig, 'workflow') else None
+        )
+    except Exception as e:
+        logger.error(f"Erro ao rastrear assinatura {signature_id}: {e}")

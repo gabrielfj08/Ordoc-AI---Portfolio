@@ -21,15 +21,20 @@ export interface Document {
     is_archived: boolean
     version: number
     // Intelligence fields
+    file_size_formatted: string
+    is_shared: boolean
+    contains_sensitive_data: boolean
     document_type?: string
+    requires_signature: boolean
+    has_deadline: boolean
+    deadline?: string
+    criticality: 'low' | 'medium' | 'high' | 'critical'
     document_type_display?: string
-    contains_sensitive_data?: boolean
-    requires_signature?: boolean
-    criticality?: 'low' | 'medium' | 'high' | 'critical'
-    criticality_display?: string
+    // Trash fields
+    deleted_at?: string | null
+    deleted_by?: string | null // or User object
+    original_directory?: string | null
     // Dynamic filter fields
-    has_deadline?: boolean
-    deadline_date?: string
     is_from_external_source?: boolean
     external_source_name?: string
     is_public?: boolean
@@ -47,6 +52,9 @@ export interface Directory {
     created_by: string
     created_at: string
     updated_at: string
+    // Trash fields
+    deleted_at?: string | null
+    deleted_by?: string | null
 }
 
 export interface Tag {
@@ -109,51 +117,11 @@ export interface StorageStats {
 
 export const documentsApi = {
     /**
-     * Create new directory
+     * Get activity history for document
      */
-    createDirectory: async (data: { name: string, parent?: string, department?: string }) => {
-        const response = await apiClient.post<Directory>(
-            `${BASE_URL}/directories/`,
-            data
-        )
-        return response.data
-    },
-
-    /**
-     * List directories
-     */
-    listDirectories: async (params?: { parent?: string, department?: string, in_trash?: boolean }) => {
-        const response = await apiClient.get<PaginatedResponse<Directory>>(
-            `${BASE_URL}/directories/`,
-            { params }
-        )
-        return response.data
-    },
-
-    /**
-     * Update directory
-     */
-    updateDirectory: async (id: string, data: Partial<Directory>) => {
-        const response = await apiClient.patch<Directory>(
-            `${BASE_URL}/directories/${id}/`,
-            data
-        )
-        return response.data
-    },
-
-    /**
-     * Delete directory
-     */
-    deleteDirectory: async (id: string) => {
-        await apiClient.delete(`${BASE_URL}/directories/${id}/`)
-    },
-
-    /**
-     * Get storage usage statistics
-     */
-    getStorageStats: async () => {
-        const response = await apiClient.get<StorageStats>(
-            `${BASE_URL}/documents/storage_stats/`
+    getActivity: async (id: string) => {
+        const response = await apiClient.get<any[]>(
+            `${BASE_URL}/documents/${id}/activity/`
         )
         return response.data
     },
@@ -376,6 +344,72 @@ export const documentsApi = {
         )
         return response.data
     },
+
+    /**
+     * Get storage usage statistics
+     */
+    getStorageStats: async () => {
+        const response = await apiClient.get<StorageStats>(
+            `${BASE_URL}/documents/storage_stats/`
+        )
+        return response.data
+    },
+
+    /**
+     * Move to trash (Soft Delete)
+     */
+    trash: async (id: string) => {
+        const response = await apiClient.post<{ success: boolean; document: Document }>(
+            `${BASE_URL}/documents/${id}/trash/`
+        )
+        return response.data
+    },
+
+    /**
+     * Restore from trash
+     */
+    restore: async (id: string) => {
+        const response = await apiClient.post<{ success: boolean; document: Document }>(
+            `${BASE_URL}/documents/${id}/restore/`
+        )
+        return response.data
+    },
+
+    /**
+     * Permanent Delete (Hard Delete)
+     */
+    hardDelete: async (id: string) => {
+        await apiClient.delete(
+            `${BASE_URL}/documents/${id}/`,
+            {
+                headers: {
+                    'X-Confirm-Delete': 'EXCLUIR'
+                }
+            }
+        )
+    },
+
+    /**
+     * Bulk Trash
+     */
+    bulkTrash: async (documentIds: string[]) => {
+        const response = await apiClient.post(
+            `${BASE_URL}/documents/bulk-trash/`,
+            { document_ids: documentIds }
+        )
+        return response.data
+    },
+
+    /**
+     * Bulk Move
+     */
+    bulkMove: async (itemIds: string[], targetFolderId: string) => {
+        const response = await apiClient.post(
+            `${BASE_URL}/documents/bulk-move/`,
+            { item_ids: itemIds, target_folder_id: targetFolderId }
+        )
+        return response.data
+    },
 }
 
 // ===========================
@@ -383,6 +417,26 @@ export const documentsApi = {
 // ===========================
 
 export const directoriesApi = {
+    /**
+     * Get activity history for directory
+     */
+    getActivity: async (id: string) => {
+        const response = await apiClient.get<any[]>(
+            `${BASE_URL}/directories/${id}/activity/`
+        )
+        return response.data
+    },
+
+    /**
+     * Get directory by ID
+     */
+    retrieve: async (id: string) => {
+        const response = await apiClient.get<Directory>(
+            `${BASE_URL}/directories/${id}/`
+        )
+        return response.data
+    },
+
     /**
      * Lista diretórios
      */
@@ -434,6 +488,16 @@ export const directoriesApi = {
         const response = await apiClient.post<Directory>(
             `${BASE_URL}/directories/${id}/move/`,
             { parent: newParent }
+        )
+        return response.data
+    },
+
+    /**
+     * Obtém estatísticas e insights da pasta
+     */
+    getStats: async (id: string) => {
+        const response = await apiClient.get<any>(
+            `${BASE_URL}/directories/${id}/stats/`
         )
         return response.data
     },
@@ -536,4 +600,37 @@ export const shareableLinksApi = {
         )
         return response.data
     },
+}
+
+// ===========================
+// TRASH API
+// ===========================
+
+export const trashApi = {
+    /**
+     * List items in trash
+     */
+    list: async (params?: { type?: 'documents' | 'folders'; ordering?: string }) => {
+        const response = await apiClient.get<PaginatedResponse<any> & { stats: { total_items: number; total_size: number; total_size_formatted: string } }>(
+            `${BASE_URL}/trash/`,
+            { params }
+        )
+        return response.data
+    },
+
+    /**
+     * Empty trash
+     */
+    empty: async () => {
+        const response = await apiClient.post(
+            `${BASE_URL}/trash/empty/`,
+            {},
+            {
+                headers: {
+                    'X-Confirm-Delete': 'ESVAZIAR LIXEIRA'
+                }
+            }
+        )
+        return response.data
+    }
 }

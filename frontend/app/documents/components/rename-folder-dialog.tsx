@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { documentsApi, Directory } from "@/services/documents-api"
+import { directoriesApi, Directory } from "@/services/documents-api"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -31,7 +31,7 @@ export function RenameFolderDialog({ directory, open, onOpenChange, onSuccess }:
 
         try {
             setLoading(true)
-            await documentsApi.updateDirectory(directory.id, { name: name.trim() })
+            await directoriesApi.update(directory.id, { name: name.trim() })
             toast.success("Pasta renomeada com sucesso")
             onOpenChange(false)
             onSuccess()

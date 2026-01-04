@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { documentsApi, Document, Directory, PaginatedResponse } from '@/services/documents-api'
+import { documentsApi, directoriesApi, Document, Directory, PaginatedResponse } from '@/services/documents-api'
 
 interface UseDocumentsOptions {
     directory?: string
@@ -59,9 +59,8 @@ export function useDocuments(options: UseDocumentsOptions = {}): UseDocumentsRet
                 // Fetch directories if not searching/filtering (except trash)
                 // or if explicitly navigating a directory
                 (!options.search && !options.is_shared && !options.is_favorite && !options.is_favorited) || options.in_trash
-                    ? documentsApi.listDirectories({
-                        parent: options.directory,
-                        in_trash: options.in_trash
+                    ? directoriesApi.list({
+                        parent: options.directory
                     })
                     : Promise.resolve({ results: [], count: 0 })
             ])

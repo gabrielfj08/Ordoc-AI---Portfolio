@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { documentsApi } from "@/services/documents-api"
+import { directoriesApi } from '@/services/documents-api'
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -25,9 +25,9 @@ export function CreateFolderDialog({ open, onOpenChange, onSuccess, currentDirec
 
         try {
             setLoading(true)
-            await documentsApi.createDirectory({
+            await directoriesApi.create({
                 name: name.trim(),
-                parent: currentDirectory
+                parent: currentDirectory || undefined
             })
             toast.success("Pasta criada com sucesso")
             setName("")

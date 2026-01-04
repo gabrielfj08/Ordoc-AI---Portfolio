@@ -371,6 +371,9 @@ class Document(models.Model):
     # Relations
     directory = models.ForeignKey(Directory, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
     department = models.ForeignKey(Department, on_delete=models.CASCADE, null=True, blank=True, related_name='documents')
+    
+    # Trash Restore Support
+    original_directory = models.ForeignKey(Directory, on_delete=models.SET_NULL, null=True, blank=True, related_name='restorable_documents', verbose_name="Pasta Original")
     tags = models.ManyToManyField(Tag, blank=True, related_name='documents', verbose_name="Tags")
     
     # Timestamps

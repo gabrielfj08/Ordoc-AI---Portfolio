@@ -21,11 +21,13 @@ import {
     Info,
     Sparkles,
     Move,
-    Palette
+    Palette,
+    RefreshCcw
 } from "lucide-react"
-import { Directory, documentsApi } from "@/services/documents-api"
+import { documentsApi, directoriesApi, Directory } from "@/services/documents-api"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { useDocumentsStore } from "@/stores/documentsStore"
 
 interface FolderActionsMenuProps {
     directory: Directory
@@ -49,7 +51,7 @@ export function FolderActionsMenu({ directory, onRename, onDelete, onRefresh }: 
         if (!confirmed) return
 
         try {
-            await documentsApi.deleteDirectory(directory.id)
+            await directoriesApi.delete(directory.id)
             toast.success(`Pasta "${directory.name}" movida para a lixeira`)
             onRefresh()
         } catch (error: any) {
@@ -73,6 +75,46 @@ export function FolderActionsMenu({ directory, onRename, onDelete, onRefresh }: 
     const handleSummarize = (e: React.MouseEvent) => {
         e.stopPropagation()
         toast.info("Funcionalidade em desenvolvimento. Disponível em breve!")
+    }
+
+    const { openPermanentDeleteModal } = useDocumentsStore()
+
+    const handleRestore = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        try {
+            // await documentsApi.restore(directory.id)
+            toast.error("Restauração de pasta não implementada")
+        } catch (error) {
+
+        }
+    }
+
+    const handlePermanentDelete = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        openPermanentDeleteModal([{ id: directory.id, name: directory.name, type: 'folder' }])
+    }
+
+    if (directory.deleted_at) {
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="size-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="size-3" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuItem onClick={handleRestore} disabled>
+                        <RefreshCcw className="size-4 mr-2" />
+                        Restaurar (Em breve)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handlePermanentDelete} className="text-red-600">
+                        <Trash2 className="size-4 mr-2" />
+                        Excluir permanentemente
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        )
     }
 
     return (

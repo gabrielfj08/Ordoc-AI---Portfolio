@@ -14,11 +14,13 @@ import {
     Star,
     Pencil,
     Trash2,
-    Share2
+    Share2,
+    RefreshCcw
 } from "lucide-react"
 import { Document, documentsApi } from "@/services/documents-api"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useDocumentsStore } from "@/stores/documentsStore"
 
 interface DocumentActionsMenuProps {
     document: Document
@@ -66,6 +68,47 @@ export function DocumentActionsMenu({ document, onRename, onRefresh }: DocumentA
         }
     }
 
+    const { openPermanentDeleteModal } = useDocumentsStore()
+
+    const handleRestore = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        try {
+            await documentsApi.restore(document.id)
+            toast.success("Documento restaurado")
+            onRefresh()
+        } catch (error) {
+            toast.error("Erro ao restaurar documento")
+        }
+    }
+
+    const handlePermanentDelete = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        openPermanentDeleteModal([{ id: document.id, name: document.name, type: 'document' }])
+    }
+
+    if (document.deleted_at) {
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="size-3" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleRestore}>
+                        <RefreshCcw className="size-4 mr-2" />
+                        Restaurar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handlePermanentDelete} className="text-red-600">
+                        <Trash2 className="size-4 mr-2" />
+                        Excluir permanentemente
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        )
+    }
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -97,7 +140,7 @@ export function DocumentActionsMenu({ document, onRename, onRefresh }: DocumentA
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleDelete} className="text-red-600">
                     <Trash2 className="size-4 mr-2" />
-                    Excluir
+                    Mover para lixeira
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

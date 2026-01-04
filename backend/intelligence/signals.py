@@ -138,10 +138,43 @@ def on_document_created(sender, instance, created, **kwargs):
         except Exception:
             pass  # Celery não disponível
             
+        # 3. Registrar "Criação" no feed de atividades
+        try:
+            from .tasks import track_document_creation
+            track_document_creation.apply_async(
+                args=[str(instance.id), str(instance.created_by.id) if instance.created_by else None],
+                countdown=1
+            )
+        except Exception:
+            pass
+
         logger.info(f"Notificação criada e análise agendada para documento {instance.id} (tipo: {document_type})")
     except Exception as e:
         # Não propaga erro - falha na análise não afeta upload
         logger.warning(f"Erro ao processar documento {instance.id}: {e}")
+
+
+@receiver(post_save, sender='ordoc_air.Directory')
+def on_directory_created(sender, instance, created, **kwargs):
+    """
+    Quando um diretório é criado.
+    """
+    if not created:
+        return
+
+    try:
+        from .tasks import track_directory_creation
+        
+        user_id = str(instance.created_by.id) if instance.created_by else None
+        
+        track_directory_creation.apply_async(
+            args=[str(instance.id), user_id],
+            countdown=1
+        )
+        logger.info(f"Rastreamento de criação de diretório agendado: {instance.id}")
+    except Exception as e:
+        logger.warning(f"Erro ao agendar rastreamento de diretório {instance.id}: {e}")
+
 
 
 @receiver(post_save, sender='ordoc_flow.Task')
@@ -192,6 +225,14 @@ def on_signature_completed(sender, instance, created, **kwargs):
             args=[str(instance.id)],
             countdown=1
         )
+        
+        # Registrar evento no feed de atividades
+        from .tasks import track_signature_event
+        track_signature_event.apply_async(
+             args=[str(instance.id), 'completed'],
+             countdown=1
+        )
+        
         logger.debug(f"Análise de assinatura agendada: {instance.id}")
     except Exception as e:
         logger.warning(f"Erro ao agendar análise de assinatura {instance.id}: {e}")
@@ -404,6 +445,23 @@ def on_document_downloaded(sender, document, user, **kwargs):
         )
     except Exception as e:
         logger.warning(f"Erro ao rastrear download do documento {document.id}: {e}")
+
+
+@receiver(document_shared)
+def on_document_shared(sender, document, user, shared_with=None, **kwargs):
+    """
+    Custom signal: quando um documento é compartilhado.
+    """
+    from .tasks import track_document_share
+
+    try:
+        track_document_share.apply_async(
+            args=[str(document.id), str(user.id)],
+            kwargs={'shared_with': shared_with},
+            countdown=1
+        )
+    except Exception as e:
+        logger.warning(f"Erro ao rastrear compartilhamento do documento {document.id}: {e}")
 
 
 # ========================================

@@ -269,9 +269,6 @@ export const feedbackApi = {
         return response.data
     },
 
-    /**
-     * Lista feedbacks
-     */
     list: async (analysisId?: string) => {
         const response = await apiClient.get<PaginatedResponse<Feedback>>(
             `${BASE_URL}/feedback/`,
@@ -279,4 +276,42 @@ export const feedbackApi = {
         )
         return response.data
     },
+}
+
+// ===========================
+// ACTIVITY API
+// ===========================
+
+export interface ActivityItem {
+    name: string
+    type: string
+    location: string
+}
+
+export interface ActivityFeedItem {
+    id: string
+    action: string
+    date: string
+    user_name: string
+    user_avatar: string
+    items: ActivityItem[]
+    document_type: string
+    context?: Record<string, any>
+}
+
+export const activitiesApi = {
+    /**
+     * Lista atividades do feed
+     */
+    getFeed: async (params?: {
+        scope?: 'user' | 'organization' | 'folder' | 'document'
+        context_id?: string
+        limit?: number
+    }) => {
+        const response = await apiClient.get<ActivityFeedItem[]>(
+            `${BASE_URL}/activity-feed/`,
+            { params }
+        )
+        return response.data
+    }
 }
