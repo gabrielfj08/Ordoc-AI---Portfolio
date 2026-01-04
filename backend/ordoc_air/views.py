@@ -201,14 +201,31 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
 
     def get_queryset(self):
         """
-        Optimized queryset with select_related for tree operations.
-        Reduces queries from O(n) to O(1) for tree traversal.
+        Optimized queryset with manual organization and trash filtering.
+        Overrides BaseViewSet to allow accessing soft-deleted records.
         """
-        queryset = super().get_queryset()
-        return queryset.select_related(
+        # Start fresh to bypass BaseViewSet's forced soft-delete filter
+        queryset = Directory.objects.all()
+        
+        # Manual organization filtering via Department (since Directory lacks organization field)
+        organization = self.get_current_organization()
+        if organization:
+            queryset = queryset.filter(department__organization=organization)
+            
+        # Optimization
+        queryset = queryset.select_related(
             'department',
             'parent_directory'
         ).prefetch_related('subdirectories', 'documents')
+
+        # Trash filtering logic
+        in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
+        if in_trash:
+             queryset = queryset.filter(deleted_at__isnull=False)
+        else:
+             queryset = queryset.filter(deleted_at__isnull=True)
+             
+        return queryset
     
     def perform_create(self, serializer):
         """Override to set automatic fields on directory creation"""
@@ -259,6 +276,30 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
             created_by=self.request.user,
             updated_by=self.request.user
         )
+
+    def perform_destroy(self, instance):
+        """Soft delete the directory and its contents recursively"""
+        from django.utils import timezone
+        now = timezone.now()
+        user = self.request.user
+        
+        def soft_delete_recursive(directory):
+            # Soft delete all documents in this directory
+            # Note: We use update() for efficiency, bypassing signals
+            directory.documents.filter(deleted_at__isnull=True).update(
+                deleted_at=now
+            )
+            
+            # Recursively soft delete subdirectories
+            for subdirectory in directory.subdirectories.filter(deleted_at__isnull=True):
+                soft_delete_recursive(subdirectory)
+            
+            # Soft delete the directory itself
+            directory.deleted_at = now
+            directory.updated_by = user
+            directory.save()
+
+        soft_delete_recursive(instance)
     
     @action(detail=True, methods=['get'])
     def children(self, request, pk=None):
@@ -461,23 +502,41 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
         """Override to filter documents based on view type (Gmail-style) and user role"""
         from datetime import timedelta
         from django.utils import timezone
+        from django.db.models import Q
 
-        queryset = super().get_queryset()
+        # Start fresh to bypass BaseViewSet's forced soft-delete filter
+        queryset = Document.objects.all()
+
         user = self.request.user
         ordoc_user = self.get_current_ordoc_user()
+        
+        # Check for trash parameter (from frontend)
+        in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
         view_type = self.request.query_params.get('view', 'inbox')
-
-        # TODO: Implementar filtros baseados em role após popular banco de dados
-        # Por enquanto, todos veem todos os documentos da organização
 
         # Exclude documents hidden for this user
         queryset = queryset.exclude(hidden_for_users=user)
 
         # CRITICAL: Filter by current organization
-        # Document doesn't have a direct 'organization' field, so BaseViewSet filtering doesn't apply automatically
         organization = self.get_current_organization()
         if organization:
             queryset = queryset.filter(department__organization=organization)
+        
+        # Apply Query Optimizations Manually (since we bypassed super/Mixin)
+        if self.select_related_fields:
+            queryset = queryset.select_related(*self.select_related_fields)
+        if self.prefetch_related_fields:
+            queryset = queryset.prefetch_related(*self.prefetch_related_fields)
+
+        # Trash View Logic
+        if in_trash or view_type == 'trash':
+             queryset = queryset.filter(deleted_at__isnull=False)
+             # Optional: Filter by cutoff if desired, but user wants to see what was just deleted
+             # cutoff = timezone.now() - timedelta(days=30)
+             # queryset = queryset.filter(deleted_at__gte=cutoff)
+             return queryset
+
+        # Standard Views (Active Documents Only)
         
         # Apply view-specific filters
         if view_type == 'inbox' or view_type == 'files':
@@ -519,16 +578,10 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
                 deleted_at__isnull=True
             )
         
-        elif view_type == 'trash':
-            # Lixeira: deleted in last 30 days
-            cutoff = timezone.now() - timedelta(days=30)
-            queryset = queryset.filter(
-                deleted_at__isnull=False,
-                deleted_at__gte=cutoff
-            )
+        # Note: view_type='trash' is handled above
         
         # Filter by current versions only (unless specified)
-        show_all_versions = self.request.query_params.get('all_versions', 'false').lower() == 'true'
+        show_all_versions = str(self.request.query_params.get('all_versions', 'false')).lower() == 'true'
         if not show_all_versions:
             queryset = queryset.filter(is_current_version=True)
         

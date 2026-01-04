@@ -118,6 +118,7 @@ class DirectoryFilter(django_filters.FilterSet):
     is_root = django_filters.BooleanFilter(method='filter_is_root')
     has_children = django_filters.BooleanFilter(method='filter_has_children')
     has_documents = django_filters.BooleanFilter(method='filter_has_documents')
+    in_trash = django_filters.BooleanFilter(method='filter_in_trash')
     
     # Date filters
     created_after = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
@@ -125,7 +126,7 @@ class DirectoryFilter(django_filters.FilterSet):
     
     class Meta:
         model = Directory
-        fields = ['name', 'description', 'parent', 'department']
+        fields = ['name', 'description', 'parent', 'department', 'in_trash']
     
     def filter_is_root(self, queryset, name, value):
         """Filter root directories (no parent)"""
@@ -147,6 +148,12 @@ class DirectoryFilter(django_filters.FilterSet):
             return queryset.filter(documents__isnull=False, documents__deleted_at__isnull=True).distinct()
         else:
             return queryset.exclude(documents__isnull=False, documents__deleted_at__isnull=True)
+
+    def filter_in_trash(self, queryset, name, value):
+        """Filter directories in trash"""
+        if value:
+             return queryset.filter(deleted_at__isnull=False)
+        return queryset.filter(deleted_at__isnull=True)
 
 
 class OrganizationFilter(django_filters.FilterSet):

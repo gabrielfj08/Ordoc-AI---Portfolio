@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Q
-from ordoc_air.models import Document
+from ordoc_air.models import Document, Directory
 from ordoc_ai.authentication import get_current_organization
 
 
@@ -42,12 +42,15 @@ class DocumentFiltersView(APIView):
              return Response({
                 'type_filters': [],
                 'flag_filters': [],
-                'total_documents': 0
+                'total_documents': 0,
+                'trash_count': 0
              })
 
         # Filter documents by user's organization (through department)
+        # IMPORTANT: Only active documents for standard filters
         base_queryset = Document.objects.filter(
-            department__organization=organization
+            department__organization=organization,
+            deleted_at__isnull=True
         ).exclude(
             status='failed'
         )
@@ -145,12 +148,22 @@ class DocumentFiltersView(APIView):
                 'count': critical_count
             })
         
-        # 3. Get top tags (if tags field exists and is used)
-        # Note: This assumes tags is a ManyToMany or similar
-        # Adjust based on actual implementation
+        # 3. Calculate Trash Count (Documents + Directories)
+        deleted_docs_count = Document.objects.filter(
+            department__organization=organization,
+            deleted_at__isnull=False
+        ).count()
+        
+        deleted_dirs_count = Directory.objects.filter(
+            department__organization=organization,
+            deleted_at__isnull=False
+        ).count()
+        
+        trash_count = deleted_docs_count + deleted_dirs_count
         
         return Response({
             'type_filters': type_filters[:6],  # Top 6 types
             'flag_filters': flag_filters,
             'total_documents': base_queryset.count(),
+            'trash_count': trash_count
         })

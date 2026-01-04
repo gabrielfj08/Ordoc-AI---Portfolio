@@ -21,6 +21,7 @@ export interface DocumentFilters {
     type_filters: DocumentTypeFilter[]
     flag_filters: FlagFilter[]
     total_documents: number
+    trash_count: number
 }
 
 interface UseDocumentFiltersReturn {

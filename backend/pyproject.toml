@@ -35,8 +35,8 @@ ollama = "^0.4.0"            # Local LLM client for Council and Extraction
 pyhanko = {extras = ["crypto"], version = "^0.32.0"}
 # XML Signing for NF-e/NFC-e
 lxml = "^5.0.0"              # XML processing
-signxml = "^3.2.2"           # XML-DSig signatures
-pyOpenSSL = "^24.0.0"        # Required by signxml
+signxml = "^4.0.0"           # XML-DSig signatures (Compatible with pyOpenSSL 24+)
+pyOpenSSL = "^24.0.0"        # Required by other modules
 zeep = "^4.2.1"              # SOAP client for SEFAZ Web Services
 # WebSocket support
 channels = "^4.0.0"

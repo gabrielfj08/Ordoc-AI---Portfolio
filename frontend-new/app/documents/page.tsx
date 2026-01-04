@@ -63,7 +63,9 @@ import { CreateFolderDialog } from "./components/create-folder-dialog"
 import { UploadDocumentDialog } from "./components/upload-document-dialog"
 import { RenameDocumentDialog } from "./components/rename-document-dialog"
 import { DocumentActionsMenu } from "./components/document-actions-menu"
-import { Document, documentsApi } from "@/services/documents-api"
+import { FolderActionsMenu } from "./components/folder-actions-menu"
+import { RenameFolderDialog } from "./components/rename-folder-dialog"
+import { Document, Directory, documentsApi } from "@/services/documents-api"
 import { cn } from "@/lib/utils"
 
 export default function DocumentsPage() {
@@ -76,6 +78,8 @@ export default function DocumentsPage() {
   const [uploadDocumentOpen, setUploadDocumentOpen] = useState(false)
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const [documentToRename, setDocumentToRename] = useState<Document | null>(null)
+  const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false)
+  const [folderToRename, setFolderToRename] = useState<Directory | null>(null)
 
   // Directory Navigation
   const [currentDirectory, setCurrentDirectory] = useState<string | undefined>(undefined)
@@ -113,7 +117,7 @@ export default function DocumentsPage() {
   }
 
   // Fetch dynamic filters
-  const { filters, loading: filtersLoading } = useDocumentFilters()
+  const { filters, loading: filtersLoading, refetch: refetchFilters } = useDocumentFilters()
 
   const { documents, directories, loading, error, total, refetch } = useDocuments({
     directory: currentDirectory,
@@ -384,6 +388,7 @@ export default function DocumentsPage() {
                     >
                       <Trash2 className="size-4 shrink-0" />
                       <span className={cn("flex-1 text-left transition-all duration-300 overflow-hidden whitespace-nowrap text-sm font-medium", isCollapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100")}>Lixeira</span>
+                      {!isCollapsed && <Badge variant="secondary" className="rounded-full text-[10px] h-4 min-w-4 flex items-center justify-center ml-auto mr-0">{filters?.trash_count || 0}</Badge>}
                     </Button>
                   </div>
 
@@ -542,9 +547,26 @@ export default function DocumentsPage() {
                                   <div className="border rounded-lg p-3 flex items-center gap-3 bg-background hover:bg-muted/50 transition-colors hover:shadow-sm">
                                     <Folder className="size-5 text-gray-500 fill-gray-500/20" />
                                     <span className="text-sm font-medium truncate flex-1">{dir.name}</span>
-                                    <Button variant="ghost" size="icon" className="size-6 opacity-0 group-hover:opacity-100">
-                                      <MoreVertical className="size-3" />
-                                    </Button>
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <FolderActionsMenu
+                                        directory={dir}
+                                        onRefresh={refetch}
+                                        onRename={(d) => {
+                                          setFolderToRename(d)
+                                          setRenameFolderDialogOpen(true)
+                                        }}
+                                        onDelete={async (d) => {
+                                          try {
+                                            await documentsApi.deleteDirectory(d.id)
+                                            toast.success("Pasta movida para lixeira")
+                                            refetch()
+                                            refetchFilters && refetchFilters()
+                                          } catch (error) {
+                                            toast.error("Erro ao excluir pasta")
+                                          }
+                                        }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                               ))}
@@ -579,7 +601,10 @@ export default function DocumentsPage() {
                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <DocumentActionsMenu
                                         document={doc}
-                                        onRefresh={refetch}
+                                        onRefresh={() => {
+                                          refetch()
+                                          refetchFilters && refetchFilters()
+                                        }}
                                         onRename={(d) => {
                                           setDocumentToRename(d)
                                           setRenameDialogOpen(true)
@@ -830,6 +855,20 @@ export default function DocumentsPage() {
         onSuccess={refetch}
         currentDirectory={currentDirectory}
       />
+      <RenameDocumentDialog
+        document={documentToRename}
+        open={renameDialogOpen}
+        onOpenChange={setRenameDialogOpen}
+        onSuccess={refetch}
+      />
+
+      <RenameFolderDialog
+        directory={folderToRename}
+        open={renameFolderDialogOpen}
+        onOpenChange={setRenameFolderDialogOpen}
+        onSuccess={refetch}
+      />
+
       <UploadDocumentDialog
         open={uploadDocumentOpen}
         onOpenChange={setUploadDocumentOpen}

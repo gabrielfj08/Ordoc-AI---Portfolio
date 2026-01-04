@@ -56,8 +56,13 @@ export function useDocuments(options: UseDocumentsOptions = {}): UseDocumentsRet
                 }),
                 // Only fetch directories if not searching and not in special filters (like trash/shared)
                 // or if explicitly navigating a directory
-                (!options.search && !options.in_trash && !options.is_shared && !options.is_favorite && !options.is_favorited)
-                    ? documentsApi.listDirectories({ parent: options.directory })
+                // Fetch directories if not searching/filtering (except trash)
+                // or if explicitly navigating a directory
+                (!options.search && !options.is_shared && !options.is_favorite && !options.is_favorited) || options.in_trash
+                    ? documentsApi.listDirectories({
+                        parent: options.directory,
+                        in_trash: options.in_trash
+                    })
                     : Promise.resolve({ results: [], count: 0 })
             ])
 

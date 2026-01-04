@@ -122,12 +122,30 @@ export const documentsApi = {
     /**
      * List directories
      */
-    listDirectories: async (params?: { parent?: string, department?: string }) => {
+    listDirectories: async (params?: { parent?: string, department?: string, in_trash?: boolean }) => {
         const response = await apiClient.get<PaginatedResponse<Directory>>(
             `${BASE_URL}/directories/`,
             { params }
         )
         return response.data
+    },
+
+    /**
+     * Update directory
+     */
+    updateDirectory: async (id: string, data: Partial<Directory>) => {
+        const response = await apiClient.patch<Directory>(
+            `${BASE_URL}/directories/${id}/`,
+            data
+        )
+        return response.data
+    },
+
+    /**
+     * Delete directory
+     */
+    deleteDirectory: async (id: string) => {
+        await apiClient.delete(`${BASE_URL}/directories/${id}/`)
     },
 
     /**
