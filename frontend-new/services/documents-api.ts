@@ -270,10 +270,30 @@ export const documentsApi = {
     },
 
     /**
-     * Remove documento
+     * Remove documento (hard delete - apenas se já estiver na lixeira)
      */
     delete: async (id: string) => {
         await apiClient.delete(`${BASE_URL}/documents/${id}/`)
+    },
+
+    /**
+     * Move documento para lixeira (soft delete)
+     */
+    trash: async (id: string) => {
+        const response = await apiClient.post<{ message: string; deleted_at: string }>(
+            `${BASE_URL}/documents/${id}/trash/`
+        )
+        return response.data
+    },
+
+    /**
+     * Restaura documento da lixeira
+     */
+    restore: async (id: string) => {
+        const response = await apiClient.post<{ message: string; status: string }>(
+            `${BASE_URL}/documents/${id}/restore/`
+        )
+        return response.data
     },
 
     /**

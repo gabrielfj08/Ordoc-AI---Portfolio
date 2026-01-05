@@ -90,19 +90,36 @@ export function useUpdateDocument() {
   })
 }
 
-// Hook para deletar documento
+// Hook para mover documento para lixeira (soft delete)
 export function useDeleteDocument() {
   const queryClient = useQueryClient()
-  
+
+  return useMutation({
+    mutationFn: (id: string) => documentsApi.trash(id),
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: documentsKeys.detail(id) })
+      queryClient.invalidateQueries({ queryKey: documentsKeys.lists() })
+      toast.success('Documento movido para lixeira!')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Erro ao mover documento para lixeira')
+    },
+  })
+}
+
+// Hook para deletar permanentemente (hard delete - apenas de documentos já na lixeira)
+export function usePermanentDeleteDocument() {
+  const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: (id: string) => documentsApi.delete(id),
     onSuccess: (_, id) => {
       queryClient.removeQueries({ queryKey: documentsKeys.detail(id) })
       queryClient.invalidateQueries({ queryKey: documentsKeys.lists() })
-      toast.success('Documento removido!')
+      toast.success('Documento removido permanentemente!')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Erro ao remover documento')
+      toast.error(error.response?.data?.message || 'Erro ao remover documento permanentemente')
     },
   })
 }
