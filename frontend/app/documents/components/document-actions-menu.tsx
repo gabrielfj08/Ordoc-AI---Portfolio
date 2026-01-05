@@ -49,12 +49,28 @@ export function DocumentActionsMenu({ document, onRename, onRefresh }: DocumentA
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation()
+
+        // Confirmação do usuário
+        const confirmed = window.confirm(
+            `Tem certeza que deseja mover "${document.name}" para a lixeira?\n\n` +
+            `Você poderá recuperá-lo da lixeira em até 30 dias.`
+        )
+
+        if (!confirmed) return
+
         try {
-            await documentsApi.delete(document.id)
+            await documentsApi.trash(document.id)
             toast.success("Documento movido para lixeira")
             onRefresh()
-        } catch (error) {
-            toast.error("Erro ao excluir documento")
+        } catch (error: any) {
+            console.error('Erro ao mover para lixeira:', error)
+            if (error.response?.status === 400) {
+                toast.error(error.response.data.detail || "Erro ao mover documento para lixeira")
+            } else if (error.response?.status === 403) {
+                toast.error("Você não tem permissão para excluir este documento")
+            } else {
+                toast.error("Erro ao mover documento para lixeira")
+            }
         }
     }
 

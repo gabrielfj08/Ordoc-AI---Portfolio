@@ -1302,7 +1302,92 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
             'starred': False,
             'message': 'Documento removido dos favoritos'
         })
-    
+
+    @action(detail=True, methods=['post'])
+    def trash(self, request, pk=None):
+        """
+        Move single document to trash (soft delete).
+        Similar to DirectoryViewSet.perform_destroy but for single document via action.
+        """
+        from django.utils import timezone
+        from rest_framework.exceptions import ValidationError
+
+        document = self.get_object()
+
+        # Check for legal hold protection
+        if hasattr(document, 'legal_holds'):
+            active_holds = document.legal_holds.filter(is_released=False).count()
+            if active_holds > 0:
+                raise ValidationError({
+                    "detail": f"Cannot delete document under legal hold. Release {active_holds} hold(s) first."
+                })
+
+        # Perform soft delete
+        now = timezone.now()
+        document.deleted_at = now
+        document.deleted_by = request.user
+        document.document_status = 'trashed'
+        document.save()  # Triggers post_save signal for Intelligence
+
+        # Log for audit
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='trash_document',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+                metadata={
+                    'file_size': document.file_size,
+                    'mime_type': document.mime_type
+                }
+            )
+
+        return Response({
+            'message': f'Documento "{document.name}" movido para lixeira',
+            'deleted_at': document.deleted_at
+        })
+
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        """Restore single document from trash."""
+        from django.utils import timezone
+
+        # Note: This will find the document even if deleted
+        # because should_show_deleted() returns True when in_trash=true
+        document = self.get_object()
+
+        if document.deleted_at is None:
+            return Response(
+                {'error': 'Document is not in trash'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Restore document
+        document.deleted_at = None
+        document.deleted_by = None
+        document.document_status = 'active'
+        document.save()  # Triggers post_save signal for Intelligence
+
+        # Log for audit
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='restore_document',
+                entity_type='document',
+                entity_id=document.id,
+                entity_name=document.name,
+                user=request.user,
+                organization=org,
+            )
+
+        return Response({
+            'message': f'Documento "{document.name}" restaurado da lixeira',
+            'status': document.document_status
+        })
+
     @action(detail=False, methods=['post'])
     def delete_batch(self, request):
         """Delete multiple documents with validation (Gmail-style)"""
@@ -1569,6 +1654,57 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
                 }
             }
         })
+
+    def perform_destroy(self, instance):
+        """
+        Prevent hard delete of documents - require trash first.
+        Similar to DirectoryViewSet.perform_destroy validation.
+
+        For hard delete, user must:
+        1. First move to trash using trash() action
+        2. Then call DELETE after document is in trash
+
+        This ensures:
+        - All deletes are audited
+        - Intelligence module monitors deletions
+        - 30-day recovery window is enforced
+        """
+        from rest_framework.exceptions import ValidationError
+
+        # Check if document is already in trash
+        if instance.deleted_at is None:
+            raise ValidationError({
+                "error": "invalid_action",
+                "message": "Documento deve ser enviado para lixeira antes da exclusão permanente."
+            })
+
+        # Check for legal hold protection
+        if hasattr(instance, 'legal_holds'):
+            active_holds = instance.legal_holds.filter(is_released=False).count()
+            if active_holds > 0:
+                raise ValidationError({
+                    "detail": f"Cannot permanently delete document under legal hold. Release {active_holds} hold(s) first."
+                })
+
+        # Log permanent deletion for audit
+        org = self.get_current_organization()
+        if org:
+            ActivityLog.log(
+                action='permanent_delete_document',
+                entity_type='document',
+                entity_id=instance.id,
+                entity_name=instance.name,
+                user=self.request.user,
+                organization=org,
+                metadata={
+                    'file_size': instance.file_size,
+                    'mime_type': instance.mime_type,
+                    'trashed_at': str(instance.deleted_at) if instance.deleted_at else None
+                }
+            )
+
+        # Perform hard delete
+        instance.delete()
 
     # ========== Certificados Digitais e Validação SEFAZ ==========
     # Integração com módulos de autenticação de documentos
