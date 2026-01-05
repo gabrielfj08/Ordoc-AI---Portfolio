@@ -409,58 +409,44 @@ const handleSummarize = (e: React.MouseEvent) => {
 
 ---
 
-### **6. SISTEMA DE DRAG AND DROP NÃO IMPLEMENTADO**
+### **6. SISTEMA DE DRAG AND DROP PARCIALMENTE IMPLEMENTADO**
 
-**Localização:** Commit message menciona "clic e arraste" mas não há código
+**Localização:**
+- ✅ `frontend-new/app/documents/components/upload-document-dialog.tsx:35-42` - Upload com drag-and-drop
+- ❌ Falta: Drag-and-drop para mover documentos entre pastas
 
-**Evidência:**
-```bash
-$ grep -r "onDrag\|drag\|drop\|DnD" frontend-new/app/documents/
-# Nenhum resultado encontrado!
+**Status:**
+- ✅ **Upload de arquivos** com drag-and-drop **FUNCIONA**
+- ❌ **Mover documentos entre pastas** com drag-and-drop **NÃO EXISTE**
 
-$ grep -r "useDropzone\|react-dropzone" frontend-new/app/documents/
-# Nenhum resultado encontrado!
+**Código Existente (Upload):**
+```typescript
+const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        const selectedFile = e.dataTransfer.files[0]
+        setFile(selectedFile)
+        setName(selectedFile.name)
+    }
+}
+
+// ... na div:
+onDragOver={(e) => e.preventDefault()}
+onDrop={handleDrop}
 ```
 
 **Problema:**
-- Commit diz: "Atualizaçãos aplicadas a opção de Decumentos permitindo ao usuário criar, excluir docuemntos e pastas **para controles**"
-- Menção de "clique e arraste" mas **NENHUMA implementação** encontrada
-- Upload de documento existe mas não usa drag-and-drop
-- Não há como arrastar documentos entre pastas
+- Upload funciona, mas commit menciona "clique e arraste **para controles**"
+- Usuário não pode arrastar documento de uma pasta para outra
+- Funcionalidade comum em gestores de documentos (Google Drive, Dropbox, etc)
 
 **Impacto:**
-- Feature anunciada não existe
-- Usuário espera poder arrastar arquivos mas não consegue
+- UX limitada - usuário precisa usar menu "Mover" ao invés de drag-and-drop
+- Feature parcialmente implementada
 
 **Correção Necessária:**
 
-**1. Implementar Upload via Drag-and-Drop:**
-```bash
-# Já existe react-dropzone no package.json
-npm install react-dropzone  # Verificar se já está instalado
-```
-
-```typescript
-// Em upload-document-dialog.tsx
-import { useDropzone } from 'react-dropzone'
-
-const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: (acceptedFiles) => {
-        // Handle file upload
-        acceptedFiles.forEach(file => {
-            documentsApi.upload({ file, directory: currentDirectory })
-        })
-    },
-    accept: {
-        'application/pdf': ['.pdf'],
-        'image/*': ['.png', '.jpg', '.jpeg'],
-        'application/msword': ['.doc', '.docx'],
-        // etc
-    }
-})
-```
-
-**2. Implementar Drag-and-Drop de Documentos Entre Pastas:**
+**Implementar Drag-and-Drop de Documentos Entre Pastas:**
 ```typescript
 // Usar HTML5 Drag and Drop API
 const handleDragStart = (e: React.DragEvent, doc: Document) => {
