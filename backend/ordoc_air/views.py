@@ -221,10 +221,15 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
         # Trash filtering logic
         in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
         if in_trash:
-             queryset = queryset.filter(deleted_at__isnull=False)
+             from django.conf import settings
+             cutoff = timezone.now() - timedelta(days=settings.TRASH_RETENTION_DAYS)
+             queryset = queryset.filter(
+                 deleted_at__isnull=False,
+                 deleted_at__gte=cutoff
+             ).order_by('-deleted_at')  # Most recent first
         else:
              queryset = queryset.filter(deleted_at__isnull=True)
-             
+
         return queryset
     
     def perform_create(self, serializer):
@@ -277,29 +282,93 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
             updated_by=self.request.user
         )
 
+    def _count_items_recursive(self, directory):
+        """Count documents and subdirectories recursively"""
+        count = {'documents': 0, 'directories': 0}
+
+        # Count documents in this directory
+        count['documents'] += directory.documents.filter(deleted_at__isnull=True).count()
+
+        # Recursively count subdirectories
+        for subdirectory in directory.subdirectories.filter(deleted_at__isnull=True):
+            count['directories'] += 1
+            subcount = self._count_items_recursive(subdirectory)
+            count['documents'] += subcount['documents']
+            count['directories'] += subcount['directories']
+
+        return count
+
+    def _soft_delete_recursive_with_signals(self, directory, now, user):
+        """
+        Soft delete WITH signals (proper way).
+        This ensures Intelligence module monitors all deletions.
+        """
+        # Delete documents one by one to trigger signals
+        for document in directory.documents.filter(deleted_at__isnull=True):
+            document.deleted_at = now
+            document.updated_by = user
+            document.save()  # Triggers post_save signal for Intelligence
+
+        # Recursively delete subdirectories
+        for subdirectory in directory.subdirectories.filter(deleted_at__isnull=True):
+            self._soft_delete_recursive_with_signals(subdirectory, now, user)
+
+        # Delete the directory itself
+        directory.deleted_at = now
+        directory.updated_by = user
+        directory.save()
+
     def perform_destroy(self, instance):
-        """Soft delete the directory and its contents recursively"""
+        """
+        Soft delete the directory and its contents recursively.
+        Includes safety checks and proper signal triggering.
+        """
         from django.utils import timezone
+        from rest_framework.exceptions import ValidationError
+
+        # Count items before deleting
+        count_info = self._count_items_recursive(instance)
+        total_items = count_info['documents'] + count_info['directories']
+
+        # Check for legal hold protection
+        if hasattr(instance, 'legal_holds'):
+            active_holds = instance.legal_holds.filter(is_released=False).count()
+            if active_holds > 0:
+                raise ValidationError({
+                    "detail": f"Cannot delete directory under legal hold. Release {active_holds} hold(s) first."
+                })
+
+        # Set limit to prevent abuse (configurable)
+        max_bulk_delete = 1000
+        if total_items > max_bulk_delete:
+            raise ValidationError({
+                "detail": f"Cannot delete more than {max_bulk_delete} items at once. "
+                          f"This directory contains {total_items} items. "
+                          f"Please organize into smaller folders first."
+            })
+
+        # Perform soft delete WITH signals
         now = timezone.now()
         user = self.request.user
-        
-        def soft_delete_recursive(directory):
-            # Soft delete all documents in this directory
-            # Note: We use update() for efficiency, bypassing signals
-            directory.documents.filter(deleted_at__isnull=True).update(
-                deleted_at=now
-            )
-            
-            # Recursively soft delete subdirectories
-            for subdirectory in directory.subdirectories.filter(deleted_at__isnull=True):
-                soft_delete_recursive(subdirectory)
-            
-            # Soft delete the directory itself
-            directory.deleted_at = now
-            directory.updated_by = user
-            directory.save()
+        self._soft_delete_recursive_with_signals(instance, now, user)
 
-        soft_delete_recursive(instance)
+        # Log the operation for audit
+        org = self.get_current_organization()
+        if org:
+            from ordoc_air.models import ActivityLog
+            ActivityLog.log(
+                action='delete_directory_recursive',
+                entity_type='directory',
+                entity_id=instance.id,
+                entity_name=instance.name,
+                user=user,
+                organization=org,
+                metadata={
+                    'documents_deleted': count_info['documents'],
+                    'directories_deleted': count_info['directories'],
+                    'total_items': total_items
+                }
+            )
     
     @action(detail=True, methods=['get'])
     def children(self, request, pk=None):
@@ -530,10 +599,12 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
 
         # Trash View Logic
         if in_trash or view_type == 'trash':
-             queryset = queryset.filter(deleted_at__isnull=False)
-             # Optional: Filter by cutoff if desired, but user wants to see what was just deleted
-             # cutoff = timezone.now() - timedelta(days=30)
-             # queryset = queryset.filter(deleted_at__gte=cutoff)
+             from django.conf import settings
+             cutoff = timezone.now() - timedelta(days=settings.TRASH_RETENTION_DAYS)
+             queryset = queryset.filter(
+                 deleted_at__isnull=False,
+                 deleted_at__gte=cutoff
+             ).order_by('-deleted_at')  # Most recent first
              return queryset
 
         # Standard Views (Active Documents Only)

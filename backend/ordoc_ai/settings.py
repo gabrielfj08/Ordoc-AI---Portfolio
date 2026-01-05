@@ -282,6 +282,10 @@ SOLR_PASSWORD = config('SOLR_PASSWORD', default=None)
 # Frontend URL for notifications
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
+# Trash Retention Settings
+# Documents/directories in trash older than this will be permanently deleted
+TRASH_RETENTION_DAYS = config('TRASH_RETENTION_DAYS', default=30, cast=int)
+
 # ==============================================================================
 # LOGGING CONFIGURATION (Structured JSON Logging)
 # ==============================================================================

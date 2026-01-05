@@ -38,25 +38,41 @@ export function FolderActionsMenu({ directory, onRename, onDelete, onRefresh }: 
 
     const handleDelete = async (e: React.MouseEvent) => {
         e.stopPropagation()
-        // Implementação futura de exclusão de diretório na API
-        // Por enquanto apenas emite evento ou toast
-        if (onDelete) {
-            onDelete(directory)
-        } else {
-            toast.info("Funcionalidade de exclusão de pasta em desenvolvimento")
+
+        // Confirmação do usuário
+        const confirmed = window.confirm(
+            `Tem certeza que deseja mover "${directory.name}" para a lixeira?\n\n` +
+            `Esta ação irá mover TODOS os documentos e subpastas contidos nela.\n\n` +
+            `Você poderá recuperá-los da lixeira em até 30 dias.`
+        )
+
+        if (!confirmed) return
+
+        try {
+            await documentsApi.deleteDirectory(directory.id)
+            toast.success(`Pasta "${directory.name}" movida para a lixeira`)
+            onRefresh()
+        } catch (error: any) {
+            console.error('Erro ao excluir pasta:', error)
+
+            if (error.response?.status === 400) {
+                toast.error(error.response.data.detail || "Erro ao excluir pasta")
+            } else if (error.response?.status === 403) {
+                toast.error("Você não tem permissão para excluir esta pasta")
+            } else {
+                toast.error("Erro ao excluir pasta. Tente novamente.")
+            }
         }
     }
 
     const handleDownload = (e: React.MouseEvent) => {
         e.stopPropagation()
-        toast.info("Preparando download do pacote...")
-        // Implementar lógica de download de pasta (zip)
+        toast.info("Funcionalidade em desenvolvimento. Disponível em breve!")
     }
 
     const handleSummarize = (e: React.MouseEvent) => {
         e.stopPropagation()
-        toast.info("IA analisando conteúdo da pasta...")
-        // Trigger AI summary
+        toast.info("Funcionalidade em desenvolvimento. Disponível em breve!")
     }
 
     return (
@@ -67,11 +83,7 @@ export function FolderActionsMenu({ directory, onRename, onDelete, onRefresh }: 
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuItem onClick={handleDownload}>
-                    <Download className="size-4 mr-2" />
-                    Baixar
-                </DropdownMenuItem>
-
+                {/* Funcionalidades implementadas */}
                 <DropdownMenuItem onClick={(e) => {
                     e.stopPropagation();
                     if (onRename) onRename(directory);
@@ -81,53 +93,55 @@ export function FolderActionsMenu({ directory, onRename, onDelete, onRefresh }: 
                     <span className="ml-auto text-xs text-muted-foreground">Ctrl+Alt+E</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem onClick={handleSummarize} className="text-primary focus:text-primary font-medium">
-                    <Sparkles className="size-4 mr-2" />
-                    Resuma esta pasta
-                    <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1 bg-blue-100 text-blue-700 hover:bg-blue-100">
-                        Novo
+                <DropdownMenuSeparator />
+
+                {/* Funcionalidades em desenvolvimento */}
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Em desenvolvimento</DropdownMenuLabel>
+
+                <DropdownMenuItem disabled onClick={handleDownload} className="opacity-60">
+                    <Download className="size-4 mr-2" />
+                    Baixar
+                    <Badge variant="outline" className="ml-auto text-[10px] h-4 px-1">
+                        Em breve
                     </Badge>
                 </DropdownMenuItem>
 
-                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled onClick={handleSummarize} className="opacity-60">
+                    <Sparkles className="size-4 mr-2" />
+                    Resuma esta pasta
+                    <Badge variant="outline" className="ml-auto text-[10px] h-4 px-1">
+                        Em breve
+                    </Badge>
+                </DropdownMenuItem>
 
                 <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
+                    <DropdownMenuSubTrigger disabled className="opacity-60">
                         <Share2 className="size-4 mr-2" />
                         Compartilhar
+                        <Badge variant="outline" className="ml-1 text-[10px] h-4 px-1">
+                            Em breve
+                        </Badge>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                        <DropdownMenuItem>Copiar link</DropdownMenuItem>
-                        <DropdownMenuItem>Gerenciar acesso</DropdownMenuItem>
-                    </DropdownMenuSubContent>
                 </DropdownMenuSub>
 
                 <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
+                    <DropdownMenuSubTrigger disabled className="opacity-60">
                         <FolderInput className="size-4 mr-2" />
                         Organizar
+                        <Badge variant="outline" className="ml-1 text-[10px] h-4 px-1">
+                            Em breve
+                        </Badge>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                        <DropdownMenuItem>
-                            <Move className="size-4 mr-2" />
-                            Mover
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                            <Palette className="size-4 mr-2" />
-                            Alterar cor
-                        </DropdownMenuItem>
-                    </DropdownMenuSubContent>
                 </DropdownMenuSub>
 
                 <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
+                    <DropdownMenuSubTrigger disabled className="opacity-60">
                         <Info className="size-4 mr-2" />
-                        Informações da pasta
+                        Informações
+                        <Badge variant="outline" className="ml-1 text-[10px] h-4 px-1">
+                            Em breve
+                        </Badge>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                        <DropdownMenuItem>Atividade</DropdownMenuItem>
-                        <DropdownMenuItem>Detalhes</DropdownMenuItem>
-                    </DropdownMenuSubContent>
                 </DropdownMenuSub>
 
                 <DropdownMenuSeparator />
