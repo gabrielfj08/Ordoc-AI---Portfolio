@@ -199,37 +199,47 @@ class DirectoryViewSet(TreeQueryOptimizationMixin, BaseViewSet):
     tree_parent_field = 'parent_directory'
     tree_children_field = 'subdirectories'
 
+    def should_show_deleted(self):
+        """
+        Override BaseViewSet to show deleted items when in_trash=true
+        """
+        in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
+        return in_trash
+
     def get_queryset(self):
         """
-        Optimized queryset with manual organization and trash filtering.
-        Overrides BaseViewSet to allow accessing soft-deleted records.
+        Optimized queryset with trash filtering and 30-day retention.
+        Properly calls super() to use BaseViewSet's security and soft-delete filtering.
         """
-        # Start fresh to bypass BaseViewSet's forced soft-delete filter
-        queryset = Directory.objects.all()
-        
-        # Manual organization filtering via Department (since Directory lacks organization field)
+        # Call BaseViewSet.get_queryset() to apply automatic deleted_at filtering
+        # based on should_show_deleted() return value
+        queryset = super().get_queryset()
+
+        # Manual organization filtering via Department
+        # (Directory model doesn't have direct organization field)
         organization = self.get_current_organization()
         if organization:
             queryset = queryset.filter(department__organization=organization)
-            
+
         # Optimization
         queryset = queryset.select_related(
             'department',
             'parent_directory'
         ).prefetch_related('subdirectories', 'documents')
 
-        # Trash filtering logic
-        in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
-        if in_trash:
+        # Apply trash retention policy (30 days)
+        # BaseViewSet already skipped deleted_at filtering because should_show_deleted() = True
+        if self.should_show_deleted():
              from django.conf import settings
+             from datetime import timedelta
+             from django.utils import timezone
              cutoff = timezone.now() - timedelta(days=settings.TRASH_RETENTION_DAYS)
              queryset = queryset.filter(
                  deleted_at__isnull=False,
                  deleted_at__gte=cutoff
              ).order_by('-deleted_at')  # Most recent first
-        else:
-             queryset = queryset.filter(deleted_at__isnull=True)
 
+        # Note: For non-trash views, BaseViewSet already filtered deleted_at__isnull=True
         return queryset
     
     def perform_create(self, serializer):
@@ -567,38 +577,50 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
         })
         return context
     
+    def should_show_deleted(self):
+        """
+        Override BaseViewSet to show deleted items when in_trash=true or view=trash
+        """
+        in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
+        view_type = self.request.query_params.get('view', 'inbox')
+        return in_trash or view_type == 'trash'
+
     def get_queryset(self):
-        """Override to filter documents based on view type (Gmail-style) and user role"""
+        """
+        Override to filter documents based on view type (Gmail-style) and user role.
+        Properly calls super() to use BaseViewSet's security and soft-delete filtering.
+        """
         from datetime import timedelta
         from django.utils import timezone
         from django.db.models import Q
 
-        # Start fresh to bypass BaseViewSet's forced soft-delete filter
-        queryset = Document.objects.all()
+        # Call BaseViewSet.get_queryset() to apply automatic deleted_at filtering
+        # based on should_show_deleted() return value
+        queryset = super().get_queryset()
 
         user = self.request.user
         ordoc_user = self.get_current_ordoc_user()
-        
-        # Check for trash parameter (from frontend)
-        in_trash = str(self.request.query_params.get('in_trash', 'false')).lower() == 'true'
+
         view_type = self.request.query_params.get('view', 'inbox')
 
         # Exclude documents hidden for this user
         queryset = queryset.exclude(hidden_for_users=user)
 
-        # CRITICAL: Filter by current organization
+        # Manual organization filtering via Department
+        # (Document model doesn't have direct organization field)
         organization = self.get_current_organization()
         if organization:
             queryset = queryset.filter(department__organization=organization)
-        
-        # Apply Query Optimizations Manually (since we bypassed super/Mixin)
+
+        # Apply Query Optimizations
         if self.select_related_fields:
             queryset = queryset.select_related(*self.select_related_fields)
         if self.prefetch_related_fields:
             queryset = queryset.prefetch_related(*self.prefetch_related_fields)
 
-        # Trash View Logic
-        if in_trash or view_type == 'trash':
+        # Trash View Logic (with 30-day retention)
+        # BaseViewSet already skipped deleted_at filtering because should_show_deleted() = True
+        if self.should_show_deleted():
              from django.conf import settings
              cutoff = timezone.now() - timedelta(days=settings.TRASH_RETENTION_DAYS)
              queryset = queryset.filter(
@@ -608,46 +630,36 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
              return queryset
 
         # Standard Views (Active Documents Only)
-        
+        # BaseViewSet already filtered deleted_at__isnull=True, so we don't need to add it again
+
         # Apply view-specific filters
         if view_type == 'inbox' or view_type == 'files':
-            # Meu Drive: active documents, not deleted
-            queryset = queryset.filter(
-                document_status='active',
-                deleted_at__isnull=True
-            )
-        
+            # Meu Drive: active documents
+            queryset = queryset.filter(document_status='active')
+
         elif view_type == 'starred':
             # Prioridades: documents favorited by current user
             queryset = queryset.filter(
                 document_status='active',
-                favorited_by=user,
-                deleted_at__isnull=True
+                favorited_by=user
             )
-        
+
         elif view_type == 'pending':
             # Pendentes: unread or needs signature
-            queryset = queryset.filter(
-                document_status='active',
-                deleted_at__isnull=True
-            ).filter(
+            queryset = queryset.filter(document_status='active').filter(
                 Q(unread=True) | Q(needs_signature=True)
             )
-        
+
         elif view_type == 'shared':
             # Compartilhados: shared documents
             queryset = queryset.filter(
                 document_status='active',
-                is_shared=True,
-                deleted_at__isnull=True
+                is_shared=True
             )
-        
+
         elif view_type == 'templates':
             # Templates: draft status
-            queryset = queryset.filter(
-                document_status='draft',
-                deleted_at__isnull=True
-            )
+            queryset = queryset.filter(document_status='draft')
         
         # Note: view_type='trash' is handled above
         
