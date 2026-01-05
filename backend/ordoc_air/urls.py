@@ -17,6 +17,7 @@ from .views import (
     DocumentTemplateViewSet,
     RetentionScheduleViewSet,
     LegalHoldViewSet,
+    TrashViewSet,
 )
 from .filter_views import DocumentFiltersView
 
@@ -39,6 +40,7 @@ router.register(r'document-templates', DocumentTemplateViewSet, basename='docume
 # Compliance (e-ARQ Brasil + Legal Hold)
 router.register(r'compliance/retention-schedules', RetentionScheduleViewSet, basename='retentionschedule')
 router.register(r'compliance/legal-holds', LegalHoldViewSet, basename='legalhold')
+router.register(r'trash', TrashViewSet, basename='trash')
 
 app_name = 'ordoc_air'
 

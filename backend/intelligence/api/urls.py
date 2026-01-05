@@ -14,6 +14,7 @@ from .views import (
     LanguageModelStatusView,
     ValidateComplianceView
 )
+from .activity_views import ActivityFeedView
 
 app_name = 'intelligence'
 
@@ -27,7 +28,8 @@ router.register(r'ranking', RankingViewSet, basename='ranking')
 urlpatterns = [
     path('analyze/', AnalyzeDocumentView.as_view(), name='analyze'),
     path('extract/', QuickExtractView.as_view(), name='extract'),
-    path('status/', LanguageModelStatusView.as_view(), name='status'),
     path('validate-compliance/', ValidateComplianceView.as_view(), name='validate-compliance'),
+    path('activity-feed/', ActivityFeedView.as_view(), name='activity-feed'),
+    path('status/', LanguageModelStatusView.as_view(), name='status'),
     path('', include(router.urls)),
 ]
