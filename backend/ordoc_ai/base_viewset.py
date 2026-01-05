@@ -129,21 +129,40 @@ class BaseViewSet(viewsets.ModelViewSet):
         # This can be enhanced later
         return None
 
+    def should_show_deleted(self):
+        """
+        Override in subclasses to control soft-delete filtering.
+        By default, hides deleted items.
+
+        Example:
+            def should_show_deleted(self):
+                # Show deleted items when in_trash=true
+                return self.request.query_params.get('in_trash', 'false').lower() == 'true'
+        """
+        return False
+
     def get_queryset(self):
         """
-        Override to filter by organization if available
+        Override to filter by organization if available.
+        Automatically filters soft-deleted records unless should_show_deleted() returns True.
         """
         queryset = super().get_queryset()
-        
+
         # Filter by organization if model has organization field
         organization = self.get_current_organization()
         if organization and hasattr(queryset.model, 'organization'):
             queryset = queryset.filter(organization=organization)
-        
-        # Filter out soft-deleted records if model has deleted_at field
+
+        # Filter soft-deleted records (can be overridden by subclasses)
         if hasattr(queryset.model, 'deleted_at'):
-            queryset = queryset.filter(deleted_at__isnull=True)
-        
+            if self.should_show_deleted():
+                # Subclass wants to show deleted items (e.g., trash view)
+                # Don't filter deleted_at
+                pass
+            else:
+                # Default: hide deleted items
+                queryset = queryset.filter(deleted_at__isnull=True)
+
         return queryset
     
     def perform_create(self, serializer):
