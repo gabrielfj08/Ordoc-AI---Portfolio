@@ -763,6 +763,16 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
         if view_type == 'inbox' or view_type == 'files':
             # Meu Drive: active documents
             queryset = queryset.filter(document_status='active')
+            
+            # Default to root directory if not searching and not specifying directory
+            # This ensures Hierarchical View instead of Flat View
+            is_searching = (
+                self.request.query_params.get('search') or 
+                self.request.query_params.get('q') or
+                self.request.query_params.get('tags')
+            )
+            if not self.request.query_params.get('directory') and not is_searching:
+                 queryset = queryset.filter(directory__isnull=True)
 
         elif view_type == 'starred':
             # Prioridades: documents favorited by current user
@@ -1160,7 +1170,7 @@ class DocumentViewSet(QueryOptimizationMixin, BaseViewSet):
 
         # Check for legal hold protection
         if hasattr(document, 'legal_holds'):
-            active_holds = document.legal_holds.filter(is_released=False).count()
+            active_holds = document.legal_holds.filter(status='active').count()
             if active_holds > 0:
                 raise ValidationError({
                     "detail": f"Cannot delete document under legal hold. Release {active_holds} hold(s) first."

@@ -1,0 +1,85 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║           🚀 CORREÇÕES DO MÓDULO DOCUMENTOS - COMECE AQUI! 🚀              ║
+║                                                                            ║
+║                      5 de janeiro de 2026                                 ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 O QUE FOI FEITO?
+
+  Foram implementadas 4 correções críticas que resolvem bugs e redundância:
+
+  ✅ 1. Fix: Scroll independente (ResizablePanel)
+  ✅ 2. Fix: Fetching eficiente (shouldFetchDirectories)
+  ✅ 3. Fix: Estado redundante → URL params
+  ✅ 4. Fix: Código morto removido (selectedItemIds)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTAÇÃO GERADA
+
+  👉 README_CORREÇÕES.md ⭐ COMECE AQUI
+     - Guia rápido (5 min)
+     - Como testar (5 min)
+     - Tudo que você precisa saber
+
+  📖 CORREÇÕES_IMPLEMENTADAS.md
+     - Detalhes técnicos de cada correção
+     - Exemplos de código antes/depois
+     - Como testar cada uma
+
+  🧪 CHECKLIST_TESTES.md
+     - Testes funcionais prontos para copy-paste
+     - Testes de regressão
+     - Checklist de verificação
+
+  📊 RESUMO_CORREÇÕES.json
+     - Dados em JSON (CI/CD friendly)
+
+  📋 ANALISE_REFATORAMENTO_MODULO_DOCUMENTOS.md
+     - Análise completa do módulo
+     - 10 problemas identificados
+     - 12 bugs com checklist
+     - 5 fases de refatoramento
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ PRÓXIMOS PASSOS (RECOMENDADO)
+
+  1. Leia: README_CORREÇÕES.md (5 min)
+  2. Teste: Siga seção "Como Testar" (5-10 min)
+  3. Review: Mostre para o time
+  4. Deploy: Quando aprovado
+  5. Continue: PHASE 3 (próxima semana)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 IMPACTO
+
+  Bugs Corrigidos:              4
+  Arquivos Modificados:         3
+  Linhas Adicionadas:          +65
+  Linhas Removidas:            -15
+
+  Benefícios:
+  • Performance (menos re-renders, menos requests)
+  • UX (URLs compartilháveis, back/forward funciona)
+  • Maintainability (código limpo, lógica clara)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ STATUS
+
+  ✅ PHASE 1: Fix Critical Bugs (COMPLETO)
+  ✅ PHASE 2: Consolidate State (COMPLETO)
+  ⏳ PHASE 3: Component Refactor (Próximo)
+  ⏳ PHASE 4: Hooks & Data (Próximo)
+  ⏳ PHASE 5: Testing & Polish (Próximo)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 COMECE AGORA
+
+  Abra: README_CORREÇÕES.md
+
