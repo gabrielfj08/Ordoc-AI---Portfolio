@@ -1,13 +1,22 @@
 "use client";
 
-import { Users, Crown, Shield, Eye, Edit, Loader2, AlertCircle } from "lucide-react";
+import { Users, Crown, Shield, Eye, Edit, Loader2, AlertCircle, Search, Filter, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { useUsers } from "@/hooks/queries/useUsers";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { InviteUserDialog } from "./InviteUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import { AssignRoleDialog } from "./AssignRoleDialog";
 import { UserActivityDialog } from "./UserActivityDialog";
+import { BulkImportDialog } from "./BulkImportDialog";
 import { OrdocUser } from "@/services/users";
 
 // Mapa de cores para avatares
@@ -45,14 +54,49 @@ export const TeamHierarchy = () => {
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [showRoleDialog, setShowRoleDialog] = useState(false);
     const [showActivityDialog, setShowActivityDialog] = useState(false);
+    const [showBulkImportDialog, setShowBulkImportDialog] = useState(false);
     const [selectedUser, setSelectedUser] = useState<OrdocUser | null>(null);
 
+    // Filtros
+    const [searchTerm, setSearchTerm] = useState("");
+    const [roleFilter, setRoleFilter] = useState<string>("");
+    const [statusFilter, setStatusFilter] = useState<string>("");
+
     // Buscar usuários da organização
-    const { data, isLoading, error } = useUsers({
-        page_size: 50,
+    const { data, isLoading, error, refetch } = useUsers({
+        page_size: 100,
     });
 
-    const users = data?.results || [];
+    const allUsers = data?.results || [];
+
+    // Filtrar usuários baseado nos filtros aplicados
+    const users = useMemo(() => {
+        let filtered = [...allUsers];
+
+        // Filtro de busca
+        if (searchTerm) {
+            const search = searchTerm.toLowerCase();
+            filtered = filtered.filter(
+                (user) =>
+                    user.first_name.toLowerCase().includes(search) ||
+                    user.last_name.toLowerCase().includes(search) ||
+                    user.email.toLowerCase().includes(search) ||
+                    user.username.toLowerCase().includes(search)
+            );
+        }
+
+        // Filtro de role
+        if (roleFilter) {
+            filtered = filtered.filter((user) => user.current_role?.code === roleFilter);
+        }
+
+        // Filtro de status
+        if (statusFilter) {
+            filtered = filtered.filter((user) => user.status === statusFilter);
+        }
+
+        return filtered;
+    }, [allUsers, searchTerm, roleFilter, statusFilter]);
 
     // Função para gerar iniciais do avatar
     const getInitials = (firstName: string, lastName: string) => {
@@ -94,17 +138,89 @@ export const TeamHierarchy = () => {
                 <div>
                     <h3 className="text-lg font-black text-foreground">Hierarquia de Confiança</h3>
                     <p className="text-xs text-muted-foreground">
-                        Níveis de acesso ao cérebro da IA e aos documentos. {users.length} membros
+                        Níveis de acesso ao cérebro da IA e aos documentos. {users.length} de {allUsers.length} membros
                     </p>
                 </div>
-                <Button
-                    size="sm"
-                    className="bg-orange-600 hover:bg-orange-700 text-white text-xs"
-                    onClick={() => setShowInviteDialog(true)}
-                >
-                    <Users size={14} className="mr-2" />
-                    Convidar Membro
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs"
+                        onClick={() => setShowBulkImportDialog(true)}
+                    >
+                        <Upload size={14} className="mr-2" />
+                        Importar CSV
+                    </Button>
+                    <Button
+                        size="sm"
+                        className="bg-orange-600 hover:bg-orange-700 text-white text-xs"
+                        onClick={() => setShowInviteDialog(true)}
+                    >
+                        <Users size={14} className="mr-2" />
+                        Convidar Membro
+                    </Button>
+                </div>
+            </div>
+
+            {/* Filtros */}
+            <div className="mb-6 space-y-3">
+                <div className="flex items-center gap-2">
+                    <Filter size={14} className="text-muted-foreground" />
+                    <span className="text-xs font-semibold text-foreground">Filtros</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* Busca */}
+                    <div className="relative">
+                        <Search
+                            size={14}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <Input
+                            type="text"
+                            placeholder="Buscar por nome ou email..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 text-sm"
+                        />
+                    </div>
+
+                    {/* Filtro por Role */}
+                    <Select value={roleFilter} onValueChange={setRoleFilter}>
+                        <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Todas as funções" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">Todas as funções</SelectItem>
+                            <SelectItem value="admin">Administrador</SelectItem>
+                            <SelectItem value="organization_manager">
+                                Gestor da Organização
+                            </SelectItem>
+                            <SelectItem value="organization_member">
+                                Membro da Organização
+                            </SelectItem>
+                            <SelectItem value="department_manager">
+                                Gestor de Departamento
+                            </SelectItem>
+                            <SelectItem value="department_member">
+                                Membro de Departamento
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    {/* Filtro por Status */}
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Todos os status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">Todos os status</SelectItem>
+                            <SelectItem value="active">Ativo</SelectItem>
+                            <SelectItem value="pending">Pendente</SelectItem>
+                            <SelectItem value="inactive">Inativo</SelectItem>
+                            <SelectItem value="blocked">Bloqueado</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {users.length === 0 ? (
@@ -229,6 +345,14 @@ export const TeamHierarchy = () => {
                 open={showActivityDialog}
                 onOpenChange={setShowActivityDialog}
                 user={selectedUser}
+            />
+            <BulkImportDialog
+                open={showBulkImportDialog}
+                onOpenChange={setShowBulkImportDialog}
+                onImportComplete={() => {
+                    refetch();
+                    setShowBulkImportDialog(false);
+                }}
             />
         </div>
     );
