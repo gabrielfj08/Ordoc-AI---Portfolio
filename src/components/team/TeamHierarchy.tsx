@@ -4,6 +4,11 @@ import { Users, Crown, Shield, Eye, Edit, Loader2, AlertCircle } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { useUsers } from "@/hooks/queries/useUsers";
 import { useState } from "react";
+import { InviteUserDialog } from "./InviteUserDialog";
+import { EditUserDialog } from "./EditUserDialog";
+import { AssignRoleDialog } from "./AssignRoleDialog";
+import { UserActivityDialog } from "./UserActivityDialog";
+import { OrdocUser } from "@/services/users";
 
 // Mapa de cores para avatares
 const avatarColors = [
@@ -37,6 +42,10 @@ const accessLevelMap: Record<string, string> = {
 
 export const TeamHierarchy = () => {
     const [showInviteDialog, setShowInviteDialog] = useState(false);
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [showRoleDialog, setShowRoleDialog] = useState(false);
+    const [showActivityDialog, setShowActivityDialog] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<OrdocUser | null>(null);
 
     // Buscar usuários da organização
     const { data, isLoading, error } = useUsers({
@@ -167,8 +176,8 @@ export const TeamHierarchy = () => {
                                         variant="ghost"
                                         className="text-xs"
                                         onClick={() => {
-                                            // TODO: Navegar para página de atividades do usuário
-                                            console.log('Ver atividade:', member.id);
+                                            setSelectedUser(member);
+                                            setShowActivityDialog(true);
                                         }}
                                     >
                                         <Eye size={14} className="mr-1" />
@@ -179,8 +188,20 @@ export const TeamHierarchy = () => {
                                         variant="ghost"
                                         className="text-xs"
                                         onClick={() => {
-                                            // TODO: Abrir modal de edição
-                                            console.log('Editar usuário:', member.id);
+                                            setSelectedUser(member);
+                                            setShowRoleDialog(true);
+                                        }}
+                                    >
+                                        <Shield size={14} className="mr-1" />
+                                        Funções
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-xs"
+                                        onClick={() => {
+                                            setSelectedUser(member);
+                                            setShowEditDialog(true);
                                         }}
                                     >
                                         <Edit size={14} className="mr-1" />
@@ -193,7 +214,22 @@ export const TeamHierarchy = () => {
                 </div>
             )}
 
-            {/* TODO: Adicionar InviteUserDialog */}
+            <InviteUserDialog open={showInviteDialog} onOpenChange={setShowInviteDialog} />
+            <EditUserDialog
+                open={showEditDialog}
+                onOpenChange={setShowEditDialog}
+                user={selectedUser}
+            />
+            <AssignRoleDialog
+                open={showRoleDialog}
+                onOpenChange={setShowRoleDialog}
+                user={selectedUser}
+            />
+            <UserActivityDialog
+                open={showActivityDialog}
+                onOpenChange={setShowActivityDialog}
+                user={selectedUser}
+            />
         </div>
     );
 };
