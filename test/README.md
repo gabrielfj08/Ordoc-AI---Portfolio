@@ -1,350 +1,270 @@
-# Testes OrdocAI
+# Testes Frontend - Ordoc-AI
 
-Infraestrutura completa de testes para a plataforma OrdocAI.
+Este diretório contém todos os testes do frontend da aplicação Ordoc-AI.
 
-## 📁 Estrutura
+## 📁 Estrutura de Diretórios
 
 ```
 test/
-├── README.md                 # Este arquivo
-├── backend/                  # Testes backend (pytest)
-│   ├── README.md            # Documentação backend
-│   ├── pytest.ini           # Configuração pytest
-│   ├── conftest.py          # Fixtures globais (17 fixtures)
-│   ├── factories/           # Factory Boy (dados fake)
-│   │   ├── user_factory.py
-│   │   └── organization_factory.py
-│   ├── unit/                # Testes unitários
-│   │   └── test_models.py  # Models: Document, Procedure, User
-│   ├── integration/         # Testes de integração
-│   │   ├── test_fsm.py     # FSM - 100% coverage ⚠️
-│   │   └── test_api_auth.py # APIs de autenticação
-│   └── e2e/                 # Testes end-to-end
-│
-├── frontend/                # Testes frontend (Jest)
-│   ├── README.md           # Documentação frontend
-│   ├── unit/               # Testes de componentes
-│   │   ├── skeleton.test.tsx
-│   │   ├── cards-skeleton.test.tsx
-│   │   └── table-skeleton.test.tsx
-│   ├── integration/        # Testes de features
-│   └── __mocks__/          # Mocks globais
-│
-└── [arquivos legados]      # Testes antigos (raiz)
-    ├── test_auth_ordocflow.py
-    ├── test_ordoc_air_advanced.py
-    └── ... (a migrar)
+├── unit/                      # Testes unitários
+│   ├── components/           # Testes de componentes
+│   │   ├── ui/              # Componentes UI base
+│   │   ├── analytics/       # Componentes de analytics
+│   │   ├── documents/       # Componentes de documentos
+│   │   └── processes/       # Componentes de processos
+│   ├── store/               # Testes de stores Zustand
+│   ├── hooks/               # Testes de hooks customizados
+│   └── services/            # Testes de serviços/API
+├── integration/              # Testes de integração
+├── accessibility/            # Testes de acessibilidade
+└── utils/                    # Utilitários de teste
+    ├── test-utils.tsx       # Funções helper para testes
+    └── mocks.ts             # Dados mock reutilizáveis
+
+cypress/
+├── e2e/                      # Testes E2E
+│   ├── auth.cy.ts           # Testes de autenticação
+│   └── documents.cy.ts      # Testes de documentos
+└── support/                  # Arquivos de suporte do Cypress
+    ├── commands.ts          # Comandos customizados
+    ├── e2e.ts              # Setup E2E
+    └── component.ts         # Setup de componentes
 ```
 
-## 🚀 Executar Testes
+## 🚀 Executando os Testes
 
-### Backend (pytest)
-
-```bash
-# Instalar dependências
-cd backend
-poetry install --with dev
-
-# Rodar todos os testes
-poetry run pytest
-
-# Com coverage report
-poetry run pytest --cov
-
-# Apenas testes rápidos
-poetry run pytest -m fast
-
-# Apenas testes FSM (crítico - 100% coverage)
-poetry run pytest -m fsm
-
-# Testes específicos
-poetry run pytest test/backend/integration/test_fsm.py
-poetry run pytest test/backend/unit/test_models.py::TestDocumentModel
-
-# Ver coverage HTML
-open test/backend/htmlcov/index.html
-```
-
-### Frontend (Jest)
+### Testes Unitários (Jest)
 
 ```bash
-# Instalar dependências
-cd frontend-new
-pnpm install
-
-# Rodar todos os testes
+# Executar todos os testes
 pnpm test
 
-# Watch mode (desenvolvimento)
+# Executar em modo watch
 pnpm test:watch
 
-# Com coverage
+# Gerar relatório de cobertura
 pnpm test:coverage
 
-# Ver coverage HTML
-open frontend-new/coverage/lcov-report/index.html
+# Executar testes específicos
+pnpm test button.test.tsx
+pnpm test -- --testPathPattern=analytics
 ```
 
-### E2E (Playwright)
+### Testes E2E (Cypress)
 
 ```bash
-cd frontend-new
-
-# Rodar testes E2E
+# Abrir interface do Cypress
 pnpm test:e2e
 
-# Modo UI interativo
-pnpm test:e2e:ui
+# Executar em modo headless
+pnpm test:e2e:headless
 
-# Com browser visível
-pnpm test:e2e:headed
+# Executar todos os testes
+pnpm test:all
 ```
 
-## 📊 Metas de Cobertura
+## 📝 Convenções de Nomenclatura
 
-### Backend (pytest)
+### Arquivos de Teste
 
-| Categoria | Meta | Status |
-|-----------|------|--------|
-| **Geral** | 75%+ | ⚠️ Obrigatório |
-| **FSM** | 100% | ⚠️ CRÍTICO |
-| **Models** | 80%+ | ✅ Recomendado |
-| **ViewSets** | 70%+ | ✅ Recomendado |
-| **Utils** | 60%+ | ℹ️ Desejável |
+- **Testes unitários**: `*.test.tsx` ou `*.test.ts`
+- **Testes E2E**: `*.cy.ts`
+- Localização: Espelhar a estrutura de `src/` dentro de `test/unit/`
 
-### Frontend (Jest)
+### Estrutura de Testes
 
-| Categoria | Meta | Status |
-|-----------|------|--------|
-| **Geral** | 60%+ | ⚠️ Obrigatório |
-| **Componentes UI** | 70%+ | ✅ Recomendado |
-| **Hooks** | 80%+ | ✅ Recomendado |
-| **Utils** | 75%+ | ✅ Recomendado |
-| **Stores** | 65%+ | ℹ️ Desejável |
-
-## 🛠️ Ferramentas
-
-### Backend
-
-- **pytest**: Framework de testes
-- **pytest-django**: Integração Django
-- **pytest-cov**: Coverage reports (v8)
-- **pytest-mock**: Mocking capabilities
-- **factory-boy**: Factories para modelos
-- **faker**: Dados fake em pt_BR
-
-### Frontend
-
-- **Jest**: Framework de testes
-- **@testing-library/react**: Testing utilities
-- **@testing-library/jest-dom**: Matchers customizados
-- **@testing-library/user-event**: Simulação de eventos
-- **@playwright/test**: Testes E2E
-
-## 📝 Convenções
-
-### Backend
-
-```python
-# Nome de arquivos: test_*.py
-# Nome de classes: Test*
-# Nome de funções: test_*
-
-@pytest.mark.django_db  # Para testes que usam DB
-@pytest.mark.fast       # Testes rápidos
-@pytest.mark.fsm        # Testes FSM (100% coverage)
-class TestDocumentModel:
-    def test_document_creation(self):
-        doc = DocumentFactory()
-        assert doc.id is not None
-```
-
-### Frontend
-
-```tsx
-// Nome de arquivos: *.test.tsx ou *.spec.tsx
-// Describe blocks para agrupamento
-
-describe('CardsSkeleton', () => {
-  it('renders correct number of skeleton cards', () => {
-    render(<CardsSkeleton count={3} />)
-    const skeletons = screen.getAllByRole('generic')
-    expect(skeletons).toHaveLength(3)
+```typescript
+describe('ComponentName', () => {
+  describe('Feature/Behavior', () => {
+    it('should do something specific', () => {
+      // Arrange
+      // Act
+      // Assert
+    })
   })
 })
 ```
 
-## ⚠️ Testes Críticos
+## 🛠️ Utilitários de Teste
 
-### FSM (Finite State Machines) - 100% Coverage Obrigatório
+### Custom Render
 
-Os testes FSM em `test/backend/integration/test_fsm.py` **DEVEM** ter 100% de cobertura pois testam transições de estado críticas do sistema:
+Use `render` de `test-utils.tsx` em vez do React Testing Library padrão:
 
-- **Procedure FSM**: archived ↔ draft ↔ running ↔ started → finished
-- **Task FSM**: draft → running → started → finished / refused
-- **GroupRequester FSM**: inactive ↔ active
+```typescript
+import { render, screen } from '../../utils/test-utils'
 
-Qualquer mudança nos modelos FSM **DEVE** ser acompanhada de testes.
-
-## 🔍 Fixtures Disponíveis
-
-### Backend (conftest.py)
-
-```python
-# Clients
-api_client              # DRF API client
-authenticated_api_client # DRF + JWT
-
-# Users
-user                    # Usuário comum
-admin_user              # Usuário admin
-user_password           # Senha padrão: testpass123
-
-# Organizations
-organization            # Organização de teste
-user_with_organization  # User + Organization vinculados
-
-# JWT
-jwt_tokens              # {'access': '...', 'refresh': '...'}
-auth_headers            # {'HTTP_AUTHORIZATION': 'Bearer ...'}
-
-# Mocks
-mock_celery_task        # Mock Celery
-mock_redis_cache        # Mock Redis
-mock_s3_storage         # Mock S3
-mock_solr               # Mock Solr
-
-# Helpers
-assert_response_keys    # Validar keys em JSON
-create_test_file        # Criar arquivos fake
+test('renders component', () => {
+  render(<MyComponent />)
+  expect(screen.getByText('Hello')).toBeInTheDocument()
+})
 ```
 
-### Factories
+### Mocks
 
-```python
-from test.backend.factories import UserFactory, OrganizationFactory
+Dados mock reutilizáveis estão disponíveis em `test/utils/mocks.ts`:
 
-# Criar usuário
-user = UserFactory()
-user = UserFactory(email='custom@example.com', password='custom123')
+```typescript
+import { mockDocument, mockUser, mockChartData } from '../../utils/mocks'
 
-# Criar admin
-admin = AdminUserFactory()
-
-# Criar organização
-org = OrganizationFactory()
-org = OrganizationFactory(subdomain='my-org')
+test('displays document', () => {
+  render(<DocumentCard document={mockDocument} />)
+})
 ```
 
-## 🐛 Debugging
+### User Events
 
-### Backend
+Para simular interações do usuário:
+
+```typescript
+import userEvent from '@testing-library/user-event'
+
+test('handles click', async () => {
+  const user = userEvent.setup()
+  render(<Button onClick={handleClick}>Click</Button>)
+  
+  await user.click(screen.getByRole('button'))
+  expect(handleClick).toHaveBeenCalled()
+})
+```
+
+## 🎯 Boas Práticas
+
+### 1. Testes Unitários
+
+- **Teste comportamento, não implementação**
+- Use `screen.getByRole()` em vez de `getByTestId()` quando possível
+- Teste casos de sucesso e erro
+- Mantenha testes independentes e isolados
+
+```typescript
+// ✅ Bom
+test('shows error message when form is invalid', async () => {
+  render(<LoginForm />)
+  await user.click(screen.getByRole('button', { name: /submit/i }))
+  expect(screen.getByText(/email is required/i)).toBeInTheDocument()
+})
+
+// ❌ Evite
+test('calls handleSubmit', () => {
+  const handleSubmit = jest.fn()
+  render(<LoginForm onSubmit={handleSubmit} />)
+  // Testa implementação interna
+})
+```
+
+### 2. Testes de Acessibilidade
+
+- Use `jest-axe` para validar acessibilidade
+- Teste navegação por teclado
+- Verifique ARIA labels e roles
+
+```typescript
+import { axe, toHaveNoViolations } from 'jest-axe'
+
+expect.extend(toHaveNoViolations)
+
+test('should not have accessibility violations', async () => {
+  const { container } = render(<MyComponent />)
+  const results = await axe(container)
+  expect(results).toHaveNoViolations()
+})
+```
+
+### 3. Testes E2E
+
+- Use comandos customizados do Cypress
+- Teste fluxos completos de usuário
+- Use `data-testid` para seletores estáveis
+
+```typescript
+// Usar comando customizado
+cy.login('test@example.com', 'password123')
+
+// Testar fluxo completo
+cy.visit('/documents')
+cy.uploadFile('test.pdf', 'application/pdf')
+cy.contains(/upload.*sucesso/i).should('be.visible')
+```
+
+### 4. Cobertura de Testes
+
+Metas de cobertura configuradas em `jest.config.js`:
+
+- **Branches**: 70%
+- **Functions**: 70%
+- **Lines**: 70%
+- **Statements**: 70%
+
+## 🔍 Debugging
+
+### Jest
 
 ```bash
-# Rodar teste específico com print statements
-poetry run pytest test/backend/unit/test_models.py::TestDocumentModel::test_document_creation -s
+# Executar com debug
+node --inspect-brk node_modules/.bin/jest --runInBand
 
-# Ver SQL queries
-poetry run pytest --ds=ordoc_ai.settings_test -v --tb=short
+# Ver output detalhado
+pnpm test -- --verbose
 
-# Debug com breakpoint
-# Adicionar breakpoint() no código
-poetry run pytest --pdb
+# Executar apenas testes que falharam
+pnpm test -- --onlyFailures
 ```
 
-### Frontend
+### Cypress
 
 ```bash
-# Debug específico com watch
-pnpm test -- --watch skeleton.test.tsx
+# Abrir DevTools
+cy.debug()
 
-# Ver queries DOM
-# Use screen.debug() no teste
-pnpm test
+# Pausar execução
+cy.pause()
 
-# CI mode (sem watch)
-CI=true pnpm test
+# Log de informações
+cy.log('Debug info')
 ```
 
-## 📈 CI/CD
+## 📊 Relatórios de Cobertura
 
-### GitHub Actions (Sprint 4)
+Após executar `pnpm test:coverage`, o relatório estará disponível em:
 
-```yaml
-# .github/workflows/tests.yml
-name: Tests
+- **HTML**: `coverage/lcov-report/index.html`
+- **Terminal**: Resumo exibido após execução
 
-on: [push, pull_request]
+## 🔗 Recursos Adicionais
 
-jobs:
-  backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run pytest
-        run: |
-          cd backend
-          poetry install --with dev
-          poetry run pytest --cov --cov-fail-under=75
+- [Jest Documentation](https://jestjs.io/)
+- [React Testing Library](https://testing-library.com/react)
+- [Cypress Documentation](https://docs.cypress.io/)
+- [jest-axe](https://github.com/nickcolley/jest-axe)
+- [Testing Best Practices](https://kentcdodds.com/blog/common-mistakes-with-react-testing-library)
 
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run Jest
-        run: |
-          cd frontend-new
-          pnpm install
-          pnpm test:coverage
-```
+## 🆘 Problemas Comuns
 
-## 🔧 Troubleshooting
+### Erro: "Cannot find module"
 
-### Backend
-
-**Erro: ModuleNotFoundError**
 ```bash
-# Verificar PYTHONPATH
-cd backend
-poetry run python -c "import sys; print(sys.path)"
-
-# Instalar modo editable
-poetry install
+# Limpar cache do Jest
+pnpm test -- --clearCache
 ```
 
-**Erro: Database locked**
+### Testes lentos
+
 ```bash
-# Usar SQLite in-memory (settings_test.py já configurado)
-# Ou deletar test database
-rm db.sqlite3
+# Executar em paralelo
+pnpm test -- --maxWorkers=4
 ```
 
-### Frontend
+### Cypress não abre
 
-**Erro: Cannot find module '@/...'**
 ```bash
-# Verificar tsconfig.json e jest.config.ts
-# Ambos devem ter alias '@' configurado
+# Verificar instalação
+npx cypress verify
+
+# Reinstalar
+pnpm add -D cypress
 ```
 
-**Erro: Next.js router mock**
-```bash
-# jest.setup.ts já tem mocks do next/navigation
-# Verificar se está sendo importado
-```
+## 📞 Suporte
 
-## 📚 Recursos
-
-- [Pytest Docs](https://docs.pytest.org/)
-- [Django Testing](https://docs.djangoproject.com/en/5.2/topics/testing/)
-- [Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
-- [Jest Docs](https://jestjs.io/docs/getting-started)
-- [Playwright Docs](https://playwright.dev/)
-
----
-
-**Última atualização:** Sprint 3 - Parte 2 (Dez/2025)
-**Cobertura atual:**
-- Backend: ~30% (meta: 75%+) ⚠️ Implementar mais testes
-- Frontend: ~15% (meta: 60%+) ⚠️ Implementar mais testes
-- FSM: 100% ✅ Crítico coberto
+Para dúvidas ou problemas com os testes, consulte a documentação ou entre em contato com a equipe de desenvolvimento.
