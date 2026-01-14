@@ -61,6 +61,8 @@ yarn-error.log*
 
 # Local env files
 .env*.local
+frontend/.env.local
+frontend/.next/
 
 # Vercel
 .vercel
@@ -100,8 +102,11 @@ coverage/
 .nyc_output
 
 # Dependency directories
+frontend/node_modules/
+frontend/jspm_packages/
+frontend/.next/
 node_modules/
-jspm_packages/
+
 
 # Optional npm cache directory
 .npm
