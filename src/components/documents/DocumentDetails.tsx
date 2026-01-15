@@ -5,7 +5,8 @@ import * as React from "react";
 import {
   ShieldCheck, AlertTriangle, XCircle, Zap,
   RefreshCcw, FileSignature, ShieldAlert, History, X,
-  Folder, FileText, User, Calendar, Shield, HardDrive, LucideIcon, Sparkles, Clock, Tag, Edit3
+  Folder, FileText, User, Calendar, Shield, HardDrive, LucideIcon, Sparkles, Clock, Tag, Edit3,
+  Brain, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,12 @@ import { DocumentItem } from "./DocumentList";
 import { VersionHistoryModal } from "./VersionHistoryModal";
 import { MetadataEditor } from "./MetadataEditor";
 import { ICPCertificateInfo } from "./ICPCertificateInfo";
+import { DocumentAnalysisView } from "@/components/intelligence/DocumentAnalysisView";
+import {
+  useDocumentAnalysisComplete,
+  useAnalyzeDocument,
+} from "@/hooks/queries/useIntelligence";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface DocumentDetailsProps {
   item: DocumentItem | null;
@@ -21,9 +28,22 @@ interface DocumentDetailsProps {
 }
 
 export const DocumentDetails = ({ item, onClose, onGenerateSummary }: DocumentDetailsProps) => {
-  const [activeTab, setActiveTab] = useState<"detalhes" | "atividades">("detalhes");
+  const [activeTab, setActiveTab] = useState<"detalhes" | "atividades" | "analise-ia">("detalhes");
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showMetadataEditor, setShowMetadataEditor] = useState(false);
+
+  // Hooks de IA (apenas para files, não folders)
+  const isFile = item?.type === 'file';
+  const documentId = item?.id;
+
+  const {
+    analysis,
+    alerts,
+    isLoading: isLoadingAnalysis,
+    isError: isAnalysisError,
+  } = useDocumentAnalysisComplete(isFile && documentId ? documentId : '');
+
+  const { mutate: reanalyze, isPending: isReanalyzing } = useAnalyzeDocument();
 
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300 bg-white border-l border-slate-100">
@@ -42,6 +62,20 @@ export const DocumentDetails = ({ item, onClose, onGenerateSummary }: DocumentDe
           >
             Atividades
           </button>
+          {isFile && (
+            <button
+              onClick={() => setActiveTab("analise-ia")}
+              className={`pb-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${activeTab === "analise-ia" ? "border-purple-600 text-purple-600" : "border-transparent text-slate-500"}`}
+            >
+              <Brain size={16} />
+              Análise de IA
+              {alerts && alerts.length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
+                  {alerts.length}
+                </Badge>
+              )}
+            </button>
+          )}
         </div>
         {onClose && (
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 mb-2 text-slate-500 hover:bg-slate-50">
@@ -199,7 +233,7 @@ export const DocumentDetails = ({ item, onClose, onGenerateSummary }: DocumentDe
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "atividades" ? (
           /* Conteúdo da Aba Atividades */
           <div className="space-y-6">
             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registos de Atividade</h4>
@@ -211,7 +245,176 @@ export const DocumentDetails = ({ item, onClose, onGenerateSummary }: DocumentDe
               )}
             </div>
           </div>
-        )}
+        ) : activeTab === "analise-ia" ? (
+          /* Conteúdo da Aba Análise de IA */
+          <div className="space-y-6">
+            {/* Header com botão de re-análise */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Brain className="h-5 w-5 text-purple-600" />
+                  Análise de Inteligência Artificial
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Deliberação do Conselho de IA multi-modelo
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  if (documentId) {
+                    reanalyze({
+                      document_id: documentId,
+                      document_content: '',
+                      analysis_depth: 'full',
+                    });
+                  }
+                }}
+                disabled={isReanalyzing}
+                size="sm"
+                variant="outline"
+                className="gap-2 text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                {isReanalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analisando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCcw className="h-4 w-4" />
+                    Re-analisar
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Loading State */}
+            {isLoadingAnalysis && (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Loader2 className="h-12 w-12 mx-auto mb-4 text-purple-600 animate-spin" />
+                  <p className="text-sm font-medium text-slate-700">Carregando análise...</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Consultando o Conselho de IA
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Error State */}
+            {isAnalysisError && !isLoadingAnalysis && (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <XCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                  <p className="text-sm font-medium text-slate-700">Erro ao carregar análise</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Não foi possível carregar a análise deste documento
+                  </p>
+                  <Button
+                    onClick={() => {
+                      if (documentId) {
+                        reanalyze({
+                          document_id: documentId,
+                          document_content: '',
+                          analysis_depth: 'full',
+                        });
+                      }
+                    }}
+                    className="mt-4"
+                    variant="outline"
+                    size="sm"
+                  >
+                    Tentar novamente
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Empty State - Documento não analisado ainda */}
+            {!isLoadingAnalysis && !isAnalysisError && !analysis && (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Brain className="h-12 w-12 mx-auto mb-4 text-purple-300" />
+                  <p className="text-sm font-medium text-slate-700">Documento ainda não analisado</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Clique em "Re-analisar" para iniciar uma análise completa
+                  </p>
+                  <Button
+                    onClick={() => {
+                      if (documentId) {
+                        reanalyze({
+                          document_id: documentId,
+                          document_content: '',
+                          analysis_depth: 'full',
+                        });
+                      }
+                    }}
+                    className="mt-4 bg-purple-600 hover:bg-purple-700 text-white"
+                    size="sm"
+                  >
+                    <Brain className="h-4 w-4 mr-2" />
+                    Analisar documento
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Análise Completa */}
+            {analysis && !isLoadingAnalysis && (
+              <DocumentAnalysisView analysis={analysis} />
+            )}
+
+            {/* Alertas Específicos */}
+            {alerts && alerts.length > 0 && (
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    Alertas Identificados
+                  </CardTitle>
+                  <CardDescription>
+                    A IA identificou {alerts.length} alerta{alerts.length > 1 ? 's' : ''} neste documento
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="p-3 bg-white rounded-lg border border-amber-200"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="text-sm font-medium text-slate-800">{alert.title}</p>
+                        <Badge
+                          variant={
+                            alert.severity === 'critical' ? 'destructive' :
+                            alert.severity === 'high' ? 'default' : 'secondary'
+                          }
+                          className="text-xs"
+                        >
+                          {alert.severity}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-600">{alert.message}</p>
+                      {alert.suggested_actions && alert.suggested_actions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-amber-100">
+                          <p className="text-xs font-medium text-amber-700 mb-1">Ações sugeridas:</p>
+                          <ul className="space-y-1">
+                            {alert.suggested_actions.map((action, idx) => (
+                              <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
+                                <span className="text-amber-600">•</span>
+                                <span>{action}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* Version History Modal */}
