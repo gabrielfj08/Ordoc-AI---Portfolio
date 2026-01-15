@@ -7,6 +7,7 @@ import { ProcessStatus } from "@/components/my-day/ProcessStatus";
 import { StorageCard } from "@/components/my-day/StorageCard";
 import { Agenda } from "@/components/my-day/Agenda";
 import { IARecommendations } from "@/components/my-day/IARecommendations";
+import { AIInsightsCard } from "@/components/my-day/AIInsightsCard";
 import { TeamView } from "@/components/my-day/TeamView";
 import { FeaturedDocuments } from "@/components/my-day/FeaturedDocuments";
 import { LGPDCompliance } from "@/components/my-day/LGPDCompliance";
@@ -46,9 +47,10 @@ export default function MyDayPage() {
       
       {/* CONTEÚDO PRINCIPAL EM DUAS COLUNAS */}
       <div className="flex flex-col xl:flex-row gap-8 items-start w-full mt-10">
-        
+
         {/* Coluna Esquerda: Fluxo de Trabalho, Documentos e IA (Expansível) */}
         <div className="flex-1 space-y-8 w-full text-foreground">
+            <AIInsightsCard />
             <ProcessStatus />
             <FeaturedDocuments />
 
