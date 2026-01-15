@@ -8,6 +8,7 @@ export interface UseDirectoriesOptions {
     page?: number;
     pageSize?: number;
     parentDirectory?: string;
+    inTrash?: boolean;
     enabled?: boolean;
 }
 
@@ -16,15 +17,17 @@ export function useDirectories(options: UseDirectoriesOptions = {}) {
         page = 1,
         pageSize = 100,
         parentDirectory,
+        inTrash = false,
         enabled = true,
     } = options;
 
     const query = useQuery<PaginatedResponse<Directory>>({
-        queryKey: ['directories', { page, pageSize, parentDirectory }],
+        queryKey: ['directories', { page, pageSize, parentDirectory, inTrash }],
         queryFn: () => documentService.listDirectories({
             page,
             page_size: pageSize,
             parent_directory: parentDirectory,
+            in_trash: inTrash,
         }),
         enabled,
         staleTime: 60000, // 1 minuto

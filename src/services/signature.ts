@@ -43,15 +43,15 @@ class SignatureService {
      * Listar documentos para assinatura
      */
     async list(): Promise<SignatureDocument[]> {
-        const response = await apiClient.get<SignatureDocument[]>('/signature/documents');
-        return response.data;
+        const response = await apiClient.get<any>('/ordoc-sign/requests/'); // Requests hold the documents
+        return response.data.results;
     }
 
     /**
      * Obter documento por ID
      */
     async getById(id: string): Promise<SignatureDocument> {
-        const response = await apiClient.get<SignatureDocument>(`/signature/documents/${id}`);
+        const response = await apiClient.get<SignatureDocument>(`/ordoc-sign/requests/${id}/`);
         return response.data;
     }
 
@@ -60,10 +60,10 @@ class SignatureService {
      */
     async create(file: File, signers: Signer[]): Promise<SignatureDocument> {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('original_file', file);
         formData.append('signers', JSON.stringify(signers));
 
-        const response = await apiClient.post<SignatureDocument>('/signature/documents', formData, {
+        const response = await apiClient.post<SignatureDocument>('/ordoc-sign/requests/', formData, {
             headers: {
                 'Content-Type': 'multipart/form-data',
             },
@@ -76,7 +76,8 @@ class SignatureService {
      * Selar documento
      */
     async seal(id: string): Promise<SealedDocument> {
-        const response = await apiClient.post<SealedDocument>(`/signature/${id}/seal`);
+        // Mapeando para finalizar ou selar (dependendo da implementação backend, assumindo endpoint customizado ou finish)
+        const response = await apiClient.post<SealedDocument>(`/ordoc-sign/requests/${id}/finish/`);
         return response.data;
     }
 
@@ -84,15 +85,15 @@ class SignatureService {
      * Obter signatários de um documento
      */
     async getSigners(id: string): Promise<Signer[]> {
-        const response = await apiClient.get<Signer[]>(`/signature/${id}/signers`);
-        return response.data;
+        const response = await apiClient.get<any>(`/ordoc-sign/signers/`, { params: { request: id } });
+        return response.data.results;
     }
 
     /**
      * Adicionar signatário
      */
     async addSigner(id: string, signer: Omit<Signer, 'id' | 'status'>): Promise<Signer> {
-        const response = await apiClient.post<Signer>(`/signature/${id}/signers`, signer);
+        const response = await apiClient.post<Signer>(`/ordoc-sign/signers/`, { ...signer, request: id });
         return response.data;
     }
 
@@ -100,7 +101,11 @@ class SignatureService {
      * Assinar documento
      */
     async sign(id: string, signerId: string, signature: string): Promise<void> {
-        await apiClient.post(`/signature/${id}/sign`, { signerId, signature });
+        await apiClient.post(`/ordoc-sign/signatures/`, {
+            request: id,
+            signer: signerId,
+            signature_data: signature
+        });
     }
 }
 

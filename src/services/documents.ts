@@ -32,6 +32,7 @@ export interface Document {
         first_name: string;
         last_name: string;
     };
+    created_by_name?: string;
     updated_by?: {
         id: string;
         email: string;
@@ -194,6 +195,15 @@ export interface BulkOperationResult {
         status: 'success' | 'error';
         message?: string;
     }[];
+    requires_confirmation?: boolean;
+    confirmation_message?: string;
+    warnings?: {
+        shared_count?: number;
+        not_owned_count?: number;
+        folder_count?: number;
+        shared_docs?: Array<{ id: string; name: string; owner: string }>;
+        not_owned_docs?: Array<{ id: string; name: string; owner: string }>;
+    };
 }
 
 export interface ShareableLinkData {
@@ -260,6 +270,7 @@ class DocumentService {
     ): Promise<Document> {
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('name', file.name); // Required by backend
         if (directoryId) {
             formData.append('directory', directoryId);
         }
@@ -352,9 +363,10 @@ class DocumentService {
         page_size?: number;
         parent?: string;
         parent_directory?: string;
+        is_root?: boolean;
         in_trash?: boolean;
     }): Promise<DirectoryListResponse> {
-        const response = await apiClient.get<DirectoryListResponse>('/ordoc-air/directories/', { params });
+        const response = await apiClient.get<DirectoryListResponse>('/ordoc-air/folders/', { params });
         return response.data;
     }
 
@@ -362,7 +374,7 @@ class DocumentService {
      * Obter árvore de diretórios
      */
     async getDirectoryTree(): Promise<Directory[]> {
-        const response = await apiClient.get<Directory[]>('/ordoc-air/directories/tree/');
+        const response = await apiClient.get<Directory[]>('/ordoc-air/folders/tree/');
         return response.data;
     }
 
@@ -374,7 +386,7 @@ class DocumentService {
         parent_directory?: string;
         description?: string;
     }): Promise<Directory> {
-        const response = await apiClient.post<Directory>('/ordoc-air/directories/', data);
+        const response = await apiClient.post<Directory>('/ordoc-air/folders/', data);
         return response.data;
     }
 
@@ -382,7 +394,7 @@ class DocumentService {
      * Atualizar diretório
      */
     async updateDirectory(id: string, data: Partial<Directory>): Promise<Directory> {
-        const response = await apiClient.patch<Directory>(`/ordoc-air/directories/${id}/`, data);
+        const response = await apiClient.patch<Directory>(`/ordoc-air/folders/${id}/`, data);
         return response.data;
     }
 
@@ -390,14 +402,14 @@ class DocumentService {
      * Deletar diretório
      */
     async deleteDirectory(id: string): Promise<void> {
-        await apiClient.delete(`/ordoc-air/directories/${id}/`);
+        await apiClient.delete(`/ordoc-air/folders/${id}/`);
     }
 
     /**
      * Restaurar diretório
      */
     async restoreDirectory(id: string): Promise<Directory> {
-        const response = await apiClient.post<Directory>(`/ordoc-air/directories/${id}/restore/`);
+        const response = await apiClient.post<Directory>(`/ordoc-air/folders/${id}/restore/`);
         return response.data;
     }
 
@@ -533,10 +545,25 @@ class DocumentService {
     /**
      * Mover múltiplos documentos para lixeira
      */
-    async bulkTrash(documentIds: string[]): Promise<BulkOperationResult> {
+    async bulkTrash(documentIds: string[], confirmed: boolean = false): Promise<BulkOperationResult> {
         const response = await apiClient.post<BulkOperationResult>(
-            '/ordoc-air/documents/bulk-trash/',
-            { document_ids: documentIds }
+            '/ordoc-air/documents/delete-batch/',
+            {
+                document_ids: documentIds,
+                confirmed
+            }
+        );
+        return response.data;
+    }
+
+    /**
+     * Criação de Pastas em Lote
+     * Retorna um mapa de caminhos relativos -> IDs das pastas criadas
+     */
+    async bulkCreateFolders(paths: string[], parentId?: string): Promise<{ folder_map: Record<string, string> }> {
+        const response = await apiClient.post<{ folder_map: Record<string, string> }>(
+            '/ordoc-air/folders/bulk-create/',
+            { paths, parent_id: parentId }
         );
         return response.data;
     }

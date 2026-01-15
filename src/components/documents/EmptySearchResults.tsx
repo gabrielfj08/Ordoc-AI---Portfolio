@@ -7,13 +7,8 @@ import { Button } from "@/components/ui/button";
 export const EmptySearchResults = ({ onDeepSearch, isExtended }: { onDeepSearch: () => void, isExtended: boolean }) => {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in duration-500">
-      <div className="w-64 h-48 mb-6 relative">
-        <NextImage
-          src={isExtended ? "/vercel.svg" : "/next.svg"} // Substitua pelos seus SVGs de ilustração
-          alt="Nenhum resultado"
-          fill
-          className="object-contain opacity-20"
-        />
+      <div className="w-64 h-48 mb-6 relative flex items-center justify-center bg-slate-50 rounded-full">
+        <Search size={80} className="text-slate-200" />
       </div>
 
       <h3 className="text-xl text-slate-800 mb-2 font-medium">

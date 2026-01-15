@@ -16,13 +16,13 @@ export function RealTimeMonitor() {
             id: '1',
             type: 'success',
             message: 'Processo "Contrato XYZ" concluído com sucesso',
-            timestamp: new Date().toLocaleTimeString()
+            timestamp: '09:47:00'
         },
         {
             id: '2',
             type: 'warning',
             message: 'SLA do processo "Licitação 042" atingindo 80%',
-            timestamp: new Date().toLocaleTimeString()
+            timestamp: '09:45:30'
         }
     ]);
 

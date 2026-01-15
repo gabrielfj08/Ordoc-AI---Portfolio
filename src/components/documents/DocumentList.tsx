@@ -66,6 +66,7 @@ interface DocumentListProps {
   onMoveRequest: (id: string) => void;
   onShareRequest: (id: string) => void;
   onNavigate?: (folderId: string) => void;
+  onDelete?: (id: string) => void;
 
   // DnD Props
   draggedId?: string | null;
@@ -83,6 +84,7 @@ export const DocumentList = ({
   onMoveRequest,
   onShareRequest,
   onNavigate,
+  onDelete,
   // DnD Props
   draggedId,
   dropTargetId,
@@ -127,6 +129,7 @@ export const DocumentList = ({
               onNavigate={onNavigate}
               onMoveRequest={onMoveRequest}
               onShareRequest={onShareRequest}
+              onDelete={onDelete}
               folderColors={folderColors}
               onPreview={() => setPreviewDoc(item)}
               dndHandlers={{
@@ -162,6 +165,7 @@ interface DocumentRowProps {
   onNavigate?: (id: string) => void;
   onMoveRequest: (id: string) => void;
   onShareRequest: (id: string) => void;
+  onDelete?: (id: string) => void;
   folderColors: string[];
   onPreview?: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,6 +182,7 @@ const DocumentRow = ({
   onNavigate,
   onMoveRequest,
   onShareRequest,
+  onDelete,
   folderColors,
   onPreview,
   dndHandlers
@@ -406,7 +411,7 @@ const DocumentRow = ({
               <DropdownMenuItem disabled={!canEdit} className="text-red-600 gap-3 py-2 flex justify-between group cursor-pointer font-bold hover:bg-red-50"
                 onClick={(e) => {
                   e.stopPropagation();
-                  console.log("Mover para lixeira", item.id);
+                  onDelete?.(item.id);
                 }}
               >
                 <div className="flex items-center gap-3"><Trash2 size={18} className="text-red-500" /> Mover para lixeira</div>

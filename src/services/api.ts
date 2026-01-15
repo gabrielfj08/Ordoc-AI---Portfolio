@@ -56,7 +56,7 @@ apiClient.interceptors.response.use(
                     console.error('Erro interno do servidor');
                     break;
                 default:
-                    console.error(`Erro ${status}:`, error.response.data);
+                    console.error(`Erro ${status}:`, JSON.stringify(error.response.data, null, 2));
             }
         } else if (error.request) {
             // Requisição foi feita mas não houve resposta

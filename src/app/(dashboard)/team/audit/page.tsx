@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 
 // Mapa de tradução de ações
 const actionTranslation: Record<string, string> = {
-    user_login: "Login de usuário",
+    login: "Login de usuário",
     user_create: "Usuário criado",
     user_update: "Usuário atualizado",
     user_delete: "Usuário excluído",
@@ -38,22 +38,22 @@ const actionTranslation: Record<string, string> = {
     role_remove: "Função removida",
     policy_create: "Política criada",
     policy_update: "Política atualizada",
-    document_upload: "Documento enviado",
-    document_sign: "Documento assinado",
+    // document_upload: "Documento enviado", // Removido temporariamente: não suportado no backend
+    // document_sign: "Documento assinado", // Removido temporariamente: não suportado no backend
     "2fa_enable": "2FA habilitado",
     "2fa_disable": "2FA desabilitado",
 };
 
 // Mapa de cores para tipos de ação
 const actionColors: Record<string, string> = {
-    user_login: "bg-blue-500",
+    login: "bg-blue-500",
     user_create: "bg-green-500",
     user_update: "bg-yellow-500",
     user_delete: "bg-red-500",
     user_block: "bg-red-600",
     user_unlock: "bg-green-600",
-    document_upload: "bg-purple-500",
-    document_sign: "bg-orange-500",
+    // document_upload: "bg-purple-500",
+    // document_sign: "bg-orange-500",
     policy_create: "bg-indigo-500",
     role_assign: "bg-pink-500",
     default: "bg-gray-500",
@@ -61,11 +61,11 @@ const actionColors: Record<string, string> = {
 
 export default function AuditPage() {
     const router = useRouter();
-    const [actionFilter, setActionFilter] = useState<string>("");
+    const [actionFilter, setActionFilter] = useState<string>("all");
     const [searchTerm, setSearchTerm] = useState("");
 
     const { data: auditData, isLoading } = useAuditLogs({
-        action: actionFilter || undefined,
+        action: actionFilter && actionFilter !== "all" ? actionFilter : undefined,
         search: searchTerm || undefined,
     });
 
@@ -179,7 +179,7 @@ export default function AuditPage() {
                                     <SelectValue placeholder="Todas as ações" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Todas as ações</SelectItem>
+                                    <SelectItem value="all">Todas as ações</SelectItem>
                                     {Object.entries(actionTranslation).map(([code, name]) => (
                                         <SelectItem key={code} value={code}>
                                             {name}
@@ -215,10 +215,10 @@ export default function AuditPage() {
                     <div className="bg-blue-50 rounded-2xl border border-blue-200 p-4">
                         <p className="text-xs text-muted-foreground mb-1">Logins</p>
                         <p className="text-2xl font-black text-blue-600">
-                            {auditLogs.filter((l) => l.action === "user_login").length}
+                            {auditLogs.filter((l) => l.action === "login").length}
                         </p>
                     </div>
-                    <div className="bg-purple-50 rounded-2xl border border-purple-200 p-4">
+                    {/* <div className="bg-purple-50 rounded-2xl border border-purple-200 p-4">
                         <p className="text-xs text-muted-foreground mb-1">Documentos</p>
                         <p className="text-2xl font-black text-purple-600">
                             {
@@ -227,7 +227,7 @@ export default function AuditPage() {
                                 ).length
                             }
                         </p>
-                    </div>
+                    </div> */}
                     <div className="bg-orange-50 rounded-2xl border border-orange-200 p-4">
                         <p className="text-xs text-muted-foreground mb-1">Usuários Alterados</p>
                         <p className="text-2xl font-black text-orange-600">

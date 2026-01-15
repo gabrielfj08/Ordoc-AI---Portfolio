@@ -59,8 +59,8 @@ export const TeamHierarchy = () => {
 
     // Filtros
     const [searchTerm, setSearchTerm] = useState("");
-    const [roleFilter, setRoleFilter] = useState<string>("");
-    const [statusFilter, setStatusFilter] = useState<string>("");
+    const [roleFilter, setRoleFilter] = useState<string>("all");
+    const [statusFilter, setStatusFilter] = useState<string>("all");
 
     // Buscar usuários da organização
     const { data, isLoading, error, refetch } = useUsers({
@@ -86,12 +86,12 @@ export const TeamHierarchy = () => {
         }
 
         // Filtro de role
-        if (roleFilter) {
+        if (roleFilter && roleFilter !== "all") {
             filtered = filtered.filter((user) => user.current_role?.code === roleFilter);
         }
 
         // Filtro de status
-        if (statusFilter) {
+        if (statusFilter && statusFilter !== "all") {
             filtered = filtered.filter((user) => user.status === statusFilter);
         }
 
@@ -190,7 +190,7 @@ export const TeamHierarchy = () => {
                             <SelectValue placeholder="Todas as funções" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Todas as funções</SelectItem>
+                            <SelectItem value="all">Todas as funções</SelectItem>
                             <SelectItem value="admin">Administrador</SelectItem>
                             <SelectItem value="organization_manager">
                                 Gestor da Organização
@@ -213,7 +213,7 @@ export const TeamHierarchy = () => {
                             <SelectValue placeholder="Todos os status" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">Todos os status</SelectItem>
+                            <SelectItem value="all">Todos os status</SelectItem>
                             <SelectItem value="active">Ativo</SelectItem>
                             <SelectItem value="pending">Pendente</SelectItem>
                             <SelectItem value="inactive">Inativo</SelectItem>

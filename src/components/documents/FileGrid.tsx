@@ -32,11 +32,12 @@ interface FileGridProps {
   onMoveRequest: (id: string) => void;
   onShareRequest: (id: string) => void;
   onMoveItems?: (sourceIds: string[], targetId: string) => void;
+  onDelete?: (id: string) => void;
   draggedId?: string | null;
   handleDragStart?: (e: React.DragEvent, id: string) => void;
 }
 
-export const FileGrid = ({ items, onSelect, selectedId, onMoveRequest, onShareRequest, draggedId, handleDragStart }: FileGridProps) => {
+export const FileGrid = ({ items, onSelect, selectedId, onMoveRequest, onShareRequest, draggedId, handleDragStart, onDelete }: FileGridProps) => {
   const router = useRouter();
   const { setSelectedFile, setStep, sealedDocuments } = useSignatureStore();
   const files = items.filter(item => item.type === 'file');
@@ -246,7 +247,7 @@ export const FileGrid = ({ items, onSelect, selectedId, onMoveRequest, onShareRe
                       <DropdownMenuSeparator />
 
                       <DropdownMenuItem className="text-red-600 gap-3 py-2 flex justify-between group cursor-pointer font-bold hover:bg-red-50"
-                        onClick={(e) => { e.stopPropagation(); console.log("Mover para lixeira", file.id); }}
+                        onClick={(e) => { e.stopPropagation(); onDelete?.(file.id); }}
                       >
                         <div className="flex items-center gap-3"><Trash2 size={18} className="text-red-500" /> Mover para lixeira</div>
                         <span className="text-[10px] text-red-400 group-hover:text-red-600 font-bold uppercase">Delete</span>

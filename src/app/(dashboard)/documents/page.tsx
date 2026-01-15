@@ -23,6 +23,8 @@ import {
   UserPlus, Download, FolderInput, Trash2, Zap, Upload
 } from "lucide-react";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
+import { processDropItems } from '@/utils/file-upload';
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 // Componente DropZoneOverlay
 const DropZoneOverlay = ({ isVisible }: { isVisible: boolean }) => {
@@ -146,7 +148,77 @@ const initialItems: DocumentItem[] = [
   },
 ];
 
+import { toast } from "sonner";
+import { documentService } from "@/services/documents";
+
+import { useQueryClient } from "@tanstack/react-query";
+
 export default function DocumentsPage() {
+  const queryClient = useQueryClient();
+  // Estados para Modal de Confirmação
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    data: any;
+    ids: string[];
+  }>({
+    isOpen: false,
+    data: null,
+    ids: []
+  });
+
+  // Função de Deleção
+  const handleDelete = async (id: string, confirmed: boolean = false) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+      if (item.type === 'folder') {
+        await documentService.deleteDirectory(id);
+      } else {
+        const result = await documentService.bulkTrash([id], confirmed);
+
+        // Verifica se precisa de confirmação (shared/non-owned)
+        if (result && result.requires_confirmation) {
+          setConfirmationModal({
+            isOpen: true,
+            data: result,
+            ids: [id]
+          });
+          return;
+        }
+      }
+
+      toast.success(`${item.type === 'folder' ? 'Pasta' : 'Arquivo'} movido para lixeira`);
+
+      // Invalidar queries para atualizar a lista
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['directories'] });
+      queryClient.invalidateQueries({ queryKey: ['directory-tree'] });
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao mover para lixeira");
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (confirmationModal.ids.length > 0) {
+      try {
+        // Re-tenta a deleção com confirmed=true
+        // Supondo que seja arquivo (folder delete nao tem confirmacao implementada no front ainda)
+        await documentService.bulkTrash(confirmationModal.ids, true);
+
+        toast.success("Itens movidos para lixeira");
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+        queryClient.invalidateQueries({ queryKey: ['directories'] });
+
+        setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+      } catch (error) {
+        console.error(error);
+        toast.error("Erro ao confirmar exclusão");
+      }
+    }
+  };
   // Estados de UI
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
@@ -171,10 +243,13 @@ export default function DocumentsPage() {
     search: searchQuery || undefined,
     page: 1,
     pageSize: 100,
+    // Fix: use inTrash instead of status='trashed' which caused 400 errors
+    inTrash: activeContext === 'trash',
   });
 
   const { directories, isLoading: isLoadingDirs } = useDirectories({
     parentDirectory: currentFolderId || undefined,
+    inTrash: activeContext === 'trash',
   });
 
   // Combinar documentos e diretórios no formato esperado pelos componentes
@@ -193,14 +268,14 @@ export default function DocumentsPage() {
     ...documents.map(doc => ({
       id: doc.id,
       name: doc.name,
-      owner: doc.uploaded_by?.first_name || "Desconhecido",
-      ownerId: doc.uploaded_by?.id || 'unknown',
+      owner: doc.created_by?.first_name || doc.created_by_name || "Sistema", // Use created_by or fallback
+      ownerId: doc.created_by?.id || 'system',
       date: new Date(doc.created_at).toLocaleDateString('pt-BR'),
       size: `${(doc.file_size / 1024).toFixed(1)} KB`,
       type: 'file' as const,
       parentId: doc.directory || null,
       permissions: ['edit'] as ('read' | 'edit' | 'admin')[],
-      tags: doc.tags,
+      tags: doc.tags?.map(t => t.name) || [], // Map Tag objects to strings
       is_favorited: doc.is_favorited,
     })),
   ];
@@ -253,19 +328,20 @@ export default function DocumentsPage() {
     }
 
     // 2. Filtro por Contexto
+    // 2. Filtro por Contexto
     if (activeContext === 'my-drive') {
-      if (item.ownerId !== 'u1') return false; // Apenas meus arquivos
+      // Backend já filtra por view='inbox' (active)
       // Navegação Hierárquica: Se não há busca, respeita a pasta atual
       return item.parentId === (currentFolderId || null);
     }
 
     if (activeContext === 'shared-with-me') {
-      return item.ownerId !== 'u1'; // Arquivos compartilhados (Flat view por enquanto)
+      // Backend já filtra por view='shared'
+      return true;
     }
 
     if (activeContext === 'trash') {
-      // Placeholder para lixeira
-      return false;
+      return true;
     }
 
     // Default catch-all
@@ -312,6 +388,8 @@ export default function DocumentsPage() {
     }
   };
 
+
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -322,11 +400,19 @@ export default function DocumentsPage() {
       setIsDraggingFile(false);
       dragCounter.current = 0;
 
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length > 0) {
-        console.log("Arquitetura de Processo: Iniciando upload de", files.length, "arquivos.");
-        files.forEach(file => {
-          uploadFile(file);
+      // Use recursive processor for folders and files
+      if (e.dataTransfer.items) {
+        processDropItems(e.dataTransfer.items, currentFolderId || null, async (file: File, parentId?: string) => {
+          await uploadFile(file, parentId);
+        }).then(() => {
+          // Invalidate queries to refresh list
+          queryClient.invalidateQueries({ queryKey: ['documents'] });
+          queryClient.invalidateQueries({ queryKey: ['directories'] });
+        });
+      } else {
+        // Fallback for older browsers (unlikely)
+        Array.from(e.dataTransfer.files).forEach(file => {
+          uploadFile(file, currentFolderId || undefined);
         });
       }
     }
@@ -362,9 +448,31 @@ export default function DocumentsPage() {
   };
 
   // Handler para Drag and Drop (Movimentação direta)
-  const handleMoveItems = (sourceIds: string[], targetId: string) => {
+  const handleMoveItems = async (sourceIds: string[], targetId: string) => {
+    // Caso 1: Mover para lixeira
+    if (targetId === 'trash') {
+      try {
+        // Processa um por um para reutilizar handleDelete (que já tem toast e invalidate)
+        // Idealmente faríamos um bulkDelete aqui se sourceIds for array
+        for (const id of sourceIds) {
+          await handleDelete(id);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+      return;
+    }
+
+    // Caso 2: Mover para outra pasta
     console.log(`[Page] Drag & Drop Move Request: ${sourceIds.join(', ')} -> ${targetId}`);
-    // TODO: Implementar com useDocumentActions.move()
+    try {
+      // TODO: Implementar bulkMove no service
+      // Por enquanto, apenas log, pois requires backend support for move
+      toast.info("Movimentação de pasta em desenvolvimento");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao mover itens");
+    }
   };
 
   const {
@@ -398,6 +506,7 @@ export default function DocumentsPage() {
               handleDragOver={handleItemDragOver}
               handleDragLeave={handleItemDragLeave}
               handleDrop={handleItemDrop}
+              onUploadFile={uploadFile}
             />
           </aside>
 
@@ -532,6 +641,7 @@ export default function DocumentsPage() {
                       onMoveRequest={(id) => { const item = items.find(i => i.id === id); if (item) openMoveModal(item); }}
                       onShareRequest={(id) => { const item = items.find(i => i.id === id); if (item) openShareModal(item); }}
                       onNavigate={handleNavigate}
+                      onDelete={handleDelete}
                       draggedId={itemDraggedId}
                       dropTargetId={itemDropTargetId}
                       handleDragStart={handleItemDragStart}
@@ -602,6 +712,15 @@ export default function DocumentsPage() {
           onGenerateAnalysis={(documents) => {
             console.log('Análise gerada para:', documents);
           }}
+        />
+
+        <ConfirmationModal
+          isOpen={confirmationModal.isOpen}
+          onClose={() => setConfirmationModal(prev => ({ ...prev, isOpen: false }))}
+          onConfirm={handleConfirmDelete}
+          title="Atenção Necessária"
+          description={confirmationModal.data?.confirmation_message || "Existem restrições para esta ação."}
+          warnings={confirmationModal.data?.warnings}
         />
       </div>
     </MainContainer>

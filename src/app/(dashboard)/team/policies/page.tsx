@@ -133,21 +133,19 @@ export default function PoliciesPage() {
                             return (
                                 <div
                                     key={policy.id}
-                                    className={`bg-background rounded-[40px] border-2 ${
-                                        isAllow
+                                    className={`bg-background rounded-[40px] border-2 ${isAllow
                                             ? "border-green-200 bg-green-50/30"
                                             : "border-red-200 bg-red-50/30"
-                                    } p-6 ${!isActive ? "opacity-60" : ""}`}
+                                        } p-6 ${!isActive ? "opacity-60" : ""}`}
                                 >
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex items-start gap-4 flex-1">
                                             {/* Ícone */}
                                             <div
-                                                className={`p-3 rounded-2xl ${
-                                                    isAllow
+                                                className={`p-3 rounded-2xl ${isAllow
                                                         ? "bg-green-100 border border-green-200"
                                                         : "bg-red-100 border border-red-200"
-                                                }`}
+                                                    }`}
                                             >
                                                 {isAllow ? (
                                                     <CheckCircle
@@ -166,11 +164,10 @@ export default function PoliciesPage() {
                                                         {policy.name}
                                                     </h3>
                                                     <span
-                                                        className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                                            isAllow
+                                                        className={`px-3 py-1 rounded-full text-xs font-bold ${isAllow
                                                                 ? "bg-green-600 text-white"
                                                                 : "bg-red-600 text-white"
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {policy.effect_display}
                                                     </span>
@@ -220,13 +217,13 @@ export default function PoliciesPage() {
                                                 </div>
 
                                                 {/* Recursos e Ações */}
-                                                {policy.resource && policy.resource.length > 0 && (
+                                                {policy.resource && (
                                                     <div className="mt-3">
                                                         <p className="text-xs text-muted-foreground mb-1">
                                                             Recursos:
                                                         </p>
                                                         <div className="flex flex-wrap gap-1">
-                                                            {policy.resource.map((res, idx) => (
+                                                            {(Array.isArray(policy.resource) ? policy.resource : [policy.resource]).map((res, idx) => (
                                                                 <span
                                                                     key={idx}
                                                                     className="px-2 py-0.5 bg-background border border-border rounded text-xs font-mono"
@@ -238,13 +235,13 @@ export default function PoliciesPage() {
                                                     </div>
                                                 )}
 
-                                                {policy.actions && policy.actions.length > 0 && (
+                                                {policy.actions && (
                                                     <div className="mt-2">
                                                         <p className="text-xs text-muted-foreground mb-1">
                                                             Ações:
                                                         </p>
                                                         <div className="flex flex-wrap gap-1">
-                                                            {policy.actions.map((action, idx) => (
+                                                            {(Array.isArray(policy.actions) ? policy.actions : [policy.actions]).map((action, idx) => (
                                                                 <span
                                                                     key={idx}
                                                                     className="px-2 py-0.5 bg-background border border-border rounded text-xs font-mono"

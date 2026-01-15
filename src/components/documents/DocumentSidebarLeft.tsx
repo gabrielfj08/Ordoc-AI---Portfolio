@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Users2, Clock, Star,
   Trash2, HardDrive, Plus, Share2,
@@ -15,7 +15,9 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CreateFolderDialog } from './CreateFolderDialog';
-import { useFileUpload } from '@/hooks/useFileUpload';
+// Removed unused useFileUpload import since we use prop now
+import { processInputFiles } from '@/utils/file-upload';
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SidebarProps {
   activeContext?: string;
@@ -28,6 +30,9 @@ interface SidebarProps {
   handleDragOver?: (e: React.DragEvent, targetId: string, isFolder: boolean) => void;
   handleDragLeave?: (e: React.DragEvent) => void;
   handleDrop?: (e: React.DragEvent, targetId: string) => void;
+
+  // Upload Prop
+  onUploadFile?: (file: File, parentId?: string) => Promise<void>;
 }
 
 const menuItems = [
@@ -47,18 +52,28 @@ export const DocumentSidebarLeft = ({
   dropTargetId,
   handleDragOver,
   handleDragLeave,
-  handleDrop
+  handleDrop,
+  onUploadFile
 }: SidebarProps) => {
   const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const { uploadFile } = useFileUpload();
+  // Removed local useFileUpload
+  const queryClient = useQueryClient();
+
+  // Force webkitdirectory attribute (React support is inconsistent)
+  useEffect(() => {
+    if (folderInputRef.current) {
+      folderInputRef.current.setAttribute("webkitdirectory", "");
+      folderInputRef.current.setAttribute("directory", "");
+    }
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       Array.from(files).forEach(file => {
-        uploadFile(file, currentFolderId || undefined);
+        if (onUploadFile) onUploadFile(file, currentFolderId || undefined);
       });
     }
     // Reset input
@@ -69,9 +84,16 @@ export const DocumentSidebarLeft = ({
 
   const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        uploadFile(file, currentFolderId || undefined);
+    console.log('[Sidebar] Files selected:', files);
+    if (files && files.length > 0) {
+      console.log(`[Sidebar] Processing ${files.length} files from input...`);
+      // Use processInputFiles to handle recursion and filtering
+      processInputFiles(files, currentFolderId || undefined, async (file, parentId) => {
+        if (onUploadFile) await onUploadFile(file, parentId);
+      }).then(() => {
+        // Invalidate queries to refresh list
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+        queryClient.invalidateQueries({ queryKey: ['directories'] });
       });
     }
     // Reset input

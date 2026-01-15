@@ -13,6 +13,7 @@ export interface UseDocumentsOptions {
     status?: string;
     isFavorited?: boolean;
     isArchived?: boolean;
+    inTrash?: boolean;
     enabled?: boolean;
 }
 
@@ -39,7 +40,8 @@ export function useDocuments(options: UseDocumentsOptions = {}) {
         tags,
         status,
         isFavorited,
-        isArchived
+        isArchived,
+        inTrash: options.inTrash
     }];
 
     const query = useQuery<PaginatedResponse<Document>>({
@@ -54,6 +56,7 @@ export function useDocuments(options: UseDocumentsOptions = {}) {
             status,
             is_favorited: isFavorited,
             is_archived: isArchived,
+            in_trash: options.inTrash,
         }),
         enabled,
         staleTime: 30000, // 30 segundos

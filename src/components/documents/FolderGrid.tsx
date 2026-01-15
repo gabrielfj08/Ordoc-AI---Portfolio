@@ -21,6 +21,7 @@ interface FolderGridProps {
   onMoveRequest: (id: string) => void;
   onShareRequest: (id: string) => void;
   onNavigate?: (folderId: string) => void;
+  onDelete?: (id: string) => void;
 
   // DnD Props
   draggedId?: string | null;
@@ -41,6 +42,7 @@ const FolderCard = ({
   onNavigate,
   onMoveRequest,
   onShareRequest,
+  onDelete,
   dndHandlers
 }: {
   folder: DocumentItem,
@@ -51,6 +53,7 @@ const FolderCard = ({
   onNavigate?: (id: string) => void;
   onMoveRequest: (id: string) => void;
   onShareRequest: (id: string) => void;
+  onDelete?: (id: string) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dndHandlers: Record<string, any>;
 }) => {
@@ -188,7 +191,12 @@ const FolderCard = ({
               </DropdownMenuSub>
 
               <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={!canEdit} className="text-red-600 gap-3 py-2 flex justify-between font-bold hover:bg-red-50">
+              <DropdownMenuItem disabled={!canEdit} className="text-red-600 gap-3 py-2 flex justify-between font-bold hover:bg-red-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(folder.id);
+                }}
+              >
                 <div className="flex items-center gap-3"><Trash2 size={18} className="text-red-500" /> Mover para lixeira</div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -209,6 +217,7 @@ export const FolderGrid = ({
   onMoveRequest,
   onShareRequest,
   onNavigate,
+  onDelete,
   // DnD Props
   draggedId,
   dropTargetId,
@@ -223,7 +232,7 @@ export const FolderGrid = ({
   if (folders.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4">
       {folders.map((folder) => {
         const isSelected = selectedId === folder.id;
         const isDraggingMe = draggedId === folder.id;
@@ -248,6 +257,7 @@ export const FolderGrid = ({
             onNavigate={onNavigate}
             onMoveRequest={onMoveRequest}
             onShareRequest={onShareRequest}
+            onDelete={onDelete}
             dndHandlers={dndHandlers}
           />
         );
