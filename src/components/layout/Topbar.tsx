@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { VaultSelector } from "./VaultSelector";
 import { NotificationCenter } from "@/components/processes/NotificationCenter";
+import { AlertsIndicator } from "@/components/intelligence/AlertsIndicator";
 
 const TopbarContent = () => {
   const searchParams = useSearchParams();
@@ -85,6 +86,14 @@ const TopbarContent = () => {
           >
             Análises
           </a>
+
+          <a
+            href="/insights"
+            className={`px-3 py-1.5 rounded-full transition-colors ${pathname === "/insights" ? "bg-orange-50 text-orange-600 font-bold" : "hover:border hover:border-orange-400"
+              }`}
+          >
+            IA
+          </a>
         </div>
       </div>
 
@@ -118,6 +127,9 @@ const TopbarContent = () => {
 
       {/* Direita: Ícones e Perfil */}
       <div className="flex items-center gap-0 shrink-0 pl-2">
+        {/* Indicador de Alertas de IA */}
+        <AlertsIndicator />
+
         {/* Temporariamente desabilitado até backend estar conectado */}
         {/* <VaultSelector /> */}
         {/* <NotificationCenter /> */}
