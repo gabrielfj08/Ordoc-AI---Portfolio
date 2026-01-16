@@ -130,9 +130,11 @@ const TopbarContent = () => {
         {/* Indicador de Alertas de IA */}
         <AlertsIndicator />
 
+        {/* Central de Notificações - Assinaturas Pendentes */}
+        <NotificationCenter />
+
         {/* Temporariamente desabilitado até backend estar conectado */}
         {/* <VaultSelector /> */}
-        {/* <NotificationCenter /> */}
 
         {/* Menu Ajuda */}
         <div className="relative group">
