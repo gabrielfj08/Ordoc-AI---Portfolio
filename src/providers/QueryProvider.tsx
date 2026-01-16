@@ -2,7 +2,8 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
+import { setupCacheSync } from '@/lib/cache';
 
 interface QueryProviderProps {
     children: ReactNode;
@@ -21,6 +22,11 @@ export function QueryProvider({ children }: QueryProviderProps) {
                 },
             })
     );
+
+    // Setup cross-module cache synchronization
+    useEffect(() => {
+        setupCacheSync(queryClient);
+    }, [queryClient]);
 
     return (
         <QueryClientProvider client={queryClient}>
