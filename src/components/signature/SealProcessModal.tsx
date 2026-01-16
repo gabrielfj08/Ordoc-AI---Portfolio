@@ -11,11 +11,12 @@ import {
     Lock,
     ArrowRight
 } from "lucide-react";
-// import { Dialog, DialogContent } from "@/components/ui/dialog"; // Assuming Dialog exists, if not I'll use simple input
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useSignatureStore } from "@/store/signatureStore";
-import { useToast } from "@/components/ui/toast-context";
+import { useCreateSignatureRequest } from "@/hooks/queries/useSignature";
+import { useUploadDocument } from "@/hooks/queries/useDocuments";
+import { toast } from "sonner";
 
 interface SealProcessModalProps {
     isOpen: boolean;
@@ -25,9 +26,33 @@ interface SealProcessModalProps {
 
 export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessModalProps) => {
     const { fields, signers, selectedFile, addSealedDocument } = useSignatureStore();
-    const { addToast } = useToast();
-    const [step, setStep] = useState<'summary' | 'processing' | 'success'>('summary');
+    const [step, setStep] = useState<'summary' | 'uploading' | 'creating' | 'success'>('summary');
     const [progress, setProgress] = useState(0);
+    const [uploadedDocumentId, setUploadedDocumentId] = useState<string | null>(null);
+
+    const uploadDocumentMutation = useUploadDocument();
+    const createSignatureRequest = useCreateSignatureRequest({
+        onSuccess: (data) => {
+            toast.success('Solicitação de assinatura criada com sucesso!');
+            setStep('success');
+
+            // Salvar no store local para histórico
+            addSealedDocument({
+                id: data.id,
+                name: selectedFile?.name || "Documento",
+                status: data.status as any,
+                progress: data.progress_percentage || 0,
+                health: 'healthy',
+                signers: signers,
+                date: new Date()
+            });
+        },
+        onError: (error) => {
+            toast.error('Erro ao criar solicitação de assinatura');
+            console.error(error);
+            setStep('summary');
+        },
+    });
 
     const totalFields = fields.length;
     const totalSigners = signers.length;
@@ -37,55 +62,63 @@ export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessMod
         if (isOpen && step === 'success') {
             setStep('summary');
             setProgress(0);
+            setUploadedDocumentId(null);
         }
     }, [isOpen]);
 
-    const startSealing = () => {
-        setStep('processing');
-        setProgress(0);
+    const startSealing = async () => {
+        if (!selectedFile) {
+            toast.error('Nenhum arquivo selecionado');
+            return;
+        }
 
-        // Simula processo de hash e selagem
-        const interval = setInterval(() => {
-            setProgress((prev) => {
-                if (prev >= 100) {
-                    clearInterval(interval);
+        if (signers.length === 0) {
+            toast.error('Adicione pelo menos um signatário');
+            return;
+        }
 
-                    // Executa side-effects no próximo tick para evitar "update while rendering"
-                    setTimeout(() => {
-                        // Salva no store global
-                        addSealedDocument({
-                            id: crypto.randomUUID(),
-                            name: selectedFile?.name || "Documento Sem Nome.pdf",
-                            status: 'in_progress', // Começa em progresso pois precisa assinatura
-                            progress: 0,
-                            health: 'healthy',
-                            signers: signers,
-                            date: new Date()
-                        });
+        try {
+            // Passo 1: Upload do documento
+            setStep('uploading');
+            setProgress(0);
 
-                        setStep('success');
+            const progressInterval = setInterval(() => {
+                setProgress((prev) => Math.min(prev + 10, 90));
+            }, 200);
 
-                        // UX Polish: Toast Notification
-                        addToast({
-                            title: "Contrato selado com sucesso!",
-                            description: "Hash: e3b0c442...855 registrado na blockchain interna.",
-                            type: "success",
-                            duration: 5000
-                        });
-                    }, 0);
-
-                    return 100;
-                }
-                // Avança rápido no começo, desacelera no fim pra dar tensão
-                const increment = prev < 80 ? Math.random() * 15 : Math.random() * 5;
-                return Math.min(prev + increment, 100);
+            const uploadedDoc = await uploadDocumentMutation.mutateAsync({
+                file: selectedFile,
             });
-        }, 300);
-    };
 
-    // Fallback simple modal overlay if Dialog is not available yet in UI components list (I didn't see it in logic list but assuming standard shadcn structure usually has it. If not, I will use fixed div).
-    // The previous `list_dir` showed avatar, badge, button, calendar, card, dropdown-menu, input, progress. 
-    // Dialog is MISSING. I will implement a custom simple overlay for now to avoid blocking.
+            clearInterval(progressInterval);
+            setProgress(95);
+
+            if (!uploadedDoc || !uploadedDoc.id) {
+                throw new Error('Falha no upload do documento');
+            }
+
+            setUploadedDocumentId(uploadedDoc.id);
+
+            // Passo 2: Criar solicitação de assinatura
+            setStep('creating');
+            setProgress(100);
+
+            await createSignatureRequest.mutateAsync({
+                document_id: uploadedDoc.id,
+                signers: signers.map((signer, index) => ({
+                    email: signer.email,
+                    name: signer.name,
+                    order: index + 1,
+                })),
+                message: `Por favor, assine o documento: ${selectedFile.name}`,
+            });
+
+        } catch (error) {
+            console.error('Erro no processo de selagem:', error);
+            toast.error('Erro ao processar documento');
+            setStep('summary');
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -101,13 +134,15 @@ export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessMod
                     <div>
                         <h2 className="text-lg font-bold text-slate-800">
                             {step === 'summary' && "Revisão e Selagem"}
-                            {step === 'processing' && "Processando Integridade"}
+                            {step === 'uploading' && "Enviando Documento"}
+                            {step === 'creating' && "Criando Solicitação"}
                             {step === 'success' && "Documento Pronto!"}
                         </h2>
                         <p className="text-xs text-slate-500">
                             {step === 'summary' && "Confirme os dados antes de finalizar."}
-                            {step === 'processing' && "Calculando hash SHA-256 e vinculando metadados..."}
-                            {step === 'success' && "Seu documento foi selado com segurança."}
+                            {step === 'uploading' && "Fazendo upload seguro do documento..."}
+                            {step === 'creating' && "Configurando fluxo de assinatura..."}
+                            {step === 'success' && "Seu documento foi preparado com sucesso."}
                         </p>
                     </div>
                 </div>
@@ -132,17 +167,42 @@ export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessMod
                                 </div>
                             </div>
 
+                            {signers.length === 0 && (
+                                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                                    <p className="text-xs text-red-700">
+                                        ⚠️ Adicione pelo menos um signatário antes de finalizar
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3">
                                 <Lock size={16} className="text-blue-500 shrink-0 mt-0.5" />
                                 <p className="text-xs text-blue-700 leading-relaxed">
-                                    Ao confirmar, um <strong>Hash SHA-256</strong> único será gerado. Qualquer alteração futura, mesmo de 1 pixel, invalidará este selo de integridade.
+                                    Ao confirmar, o documento será enviado ao backend de forma segura e uma solicitação de assinatura será criada.
                                 </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold text-slate-600">Signatários:</p>
+                                <div className="space-y-1">
+                                    {signers.map((signer, index) => (
+                                        <div key={signer.id} className="flex items-center gap-2 text-xs text-slate-600">
+                                            <div
+                                                className="w-2 h-2 rounded-full"
+                                                style={{ backgroundColor: signer.color }}
+                                            />
+                                            <span>
+                                                {index + 1}. {signer.name} ({signer.email})
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
 
 
-                    {step === 'processing' && (
+                    {(step === 'uploading' || step === 'creating') && (
                         <div className="py-8 space-y-6">
                             <div className="relative w-24 h-24 mx-auto">
                                 <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
@@ -151,13 +211,19 @@ export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessMod
                                     style={{ animationDuration: '1.5s' }}
                                 ></div>
                                 <div className="absolute inset-0 flex items-center justify-center text-orange-600">
-                                    <Fingerprint size={40} className="animate-pulse" />
+                                    {step === 'uploading' ? (
+                                        <FileText size={40} className="animate-pulse" />
+                                    ) : (
+                                        <Fingerprint size={40} className="animate-pulse" />
+                                    )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs font-medium text-slate-600">
-                                    <span>Gerando Prova de Integridade...</span>
+                                    <span>
+                                        {step === 'uploading' ? 'Enviando documento...' : 'Criando solicitação...'}
+                                    </span>
                                     <span>{Math.round(progress)}%</span>
                                 </div>
                                 <Progress value={progress} className="h-2 bg-slate-100" />
@@ -167,11 +233,12 @@ export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessMod
 
                     {step === 'success' && (
                         <div className="text-center py-4 space-y-4">
-                            <div className="inline-block px-4 py-2 bg-green-50 rounded-full border border-green-100 text-green-700 text-xs font-mono">
-                                SHA-256: e3b0c442...855
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 rounded-full border border-green-100 text-green-700 text-xs">
+                                <CheckCircle2 size={16} />
+                                <span className="font-medium">Solicitação criada com sucesso!</span>
                             </div>
                             <p className="text-sm text-slate-600 leading-relaxed">
-                                O envelope de assinatura foi criado e está pronto para ser distribuído aos signatários.
+                                O documento foi enviado e a solicitação de assinatura foi criada. Os signatários serão notificados em breve.
                             </p>
                         </div>
                     )}
@@ -181,18 +248,28 @@ export const SealProcessModal = ({ isOpen, onClose, onComplete }: SealProcessMod
                 <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
                     {step === 'summary' && (
                         <>
-                            <Button variant="ghost" onClick={onClose} className="text-slate-500 hover:text-slate-700">Cancelar</Button>
-                            <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-2" onClick={startSealing}>
+                            <Button
+                                variant="ghost"
+                                onClick={onClose}
+                                className="text-slate-500 hover:text-slate-700"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="bg-orange-600 hover:bg-orange-700 text-white gap-2"
+                                onClick={startSealing}
+                                disabled={signers.length === 0 || !selectedFile}
+                            >
                                 <Lock size={16} />
-                                Selar e Finalizar
+                                Finalizar e Enviar
                             </Button>
                         </>
                     )}
 
-                    {step === 'processing' && (
+                    {(step === 'uploading' || step === 'creating') && (
                         <Button disabled className="w-full bg-slate-200 text-slate-400 cursor-not-allowed">
                             <Loader2 size={16} className="animate-spin mr-2" />
-                            Processando...
+                            {step === 'uploading' ? 'Enviando...' : 'Criando...'}
                         </Button>
                     )}
 

@@ -8,7 +8,7 @@ export interface SignatureField {
     label?: string; // Para exibição na UI
 }
 
-export type EditorStep = 'list' | 'upload' | 'prepare';
+export type EditorStep = 'list' | 'upload' | 'prepare' | 'view-request';
 
 export interface SignatureDocument {
     id: string;
