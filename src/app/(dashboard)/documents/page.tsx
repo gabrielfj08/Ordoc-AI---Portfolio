@@ -155,6 +155,8 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function DocumentsPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+
   // Estados para Modal de Confirmação
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
@@ -229,12 +231,21 @@ export default function DocumentsPage() {
   const [activeContext, setActiveContext] = useState<string>('my-drive');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
+  // Deep Link: Selecionar item via URL (?id=...)
+  const highlightedId = searchParams.get("id");
+
+  React.useEffect(() => {
+    if (highlightedId) {
+      setSelectedItem(highlightedId);
+      setIsDetailsOpen(true);
+    }
+  }, [highlightedId]);
+
   // Multi-selection and Intelligence Panel
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [showIntelligencePanel, setShowIntelligencePanel] = useState(false);
 
   // Filtro de Busca
-  const searchParams = useSearchParams();
   const searchQuery = searchParams.get("q")?.toLowerCase() || "";
 
   // **INTEGRAÇÃO REAL COM BACKEND**

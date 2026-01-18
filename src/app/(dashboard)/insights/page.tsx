@@ -167,12 +167,17 @@ export default function InsightsPage() {
 
     // Queries
     const { data: alertCounts } = useAlertSeverityCounts();
-    const { data: documentRanking } = useRanking('document_types', { period: selectedPeriod, limit: 5 });
-    const { data: userRanking } = useRanking('most_active_users', { period: selectedPeriod, limit: 5 });
-    const { data: alertTypeRanking } = useRanking('alert_types', { period: selectedPeriod, limit: 5 });
+    const { data: documentRankingRaw } = useRanking('document', { limit: 5 });
+    const { data: taskRankingRaw } = useRanking('task', { limit: 5 });
+    const { data: procedureRankingRaw } = useRanking('procedure', { limit: 5 });
     const { data: status } = useIntelligenceStatus();
     const { data: patternsData } = usePatternsList({ is_active: true, page_size: 10 });
     const { data: analysesData } = useAnalysesList({ status: 'completed', page_size: 10 });
+
+    // Mapping for UI
+    const documentRanking = documentRankingRaw?.map(item => ({ name: `Doc: ${item.entity_id.slice(0, 8)}`, count: Math.round(item.score * 10) / 10 })) || [];
+    const taskRanking = taskRankingRaw?.map(item => ({ name: `Tarefa: ${item.entity_id.slice(0, 8)}`, count: Math.round(item.score * 10) / 10 })) || [];
+    const procedureRanking = procedureRankingRaw?.map(item => ({ name: `Proc: ${item.entity_id.slice(0, 8)}`, count: Math.round(item.score * 10) / 10 })) || [];
 
     const totalAlerts = alertCounts ? Object.values(alertCounts).reduce((a, b) => a + b, 0) : 0;
     const criticalAlerts = alertCounts?.critical || 0;
@@ -313,19 +318,19 @@ export default function InsightsPage() {
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <RankingCard
-                            title="Tipos de Documentos"
-                            data={documentRanking || []}
+                            title="Documentos Relevantes"
+                            data={documentRanking}
                             icon={FileText}
                         />
                         <RankingCard
-                            title="Usuários Mais Ativos"
-                            data={userRanking || []}
-                            icon={Users}
+                            title="Tarefas Prioritárias"
+                            data={taskRanking}
+                            icon={CheckCircle2}
                         />
                         <RankingCard
-                            title="Tipos de Alertas"
-                            data={alertTypeRanking || []}
-                            icon={AlertTriangle}
+                            title="Procedimentos Comuns"
+                            data={procedureRanking}
+                            icon={Users}
                         />
                     </div>
                 </TabsContent>
