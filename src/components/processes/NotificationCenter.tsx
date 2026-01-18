@@ -17,7 +17,8 @@ export const NotificationCenter = () => {
     const router = useRouter();
     const { data: pendingRequests, isLoading } = usePendingSignatureRequests();
 
-    const notifications = pendingRequests || [];
+    // Garantir que notifications seja sempre um array
+    const notifications = pendingRequests?.results || [];
     const hasNotifications = notifications.length > 0;
 
     const handleNotificationClick = (requestId: string) => {
@@ -84,7 +85,7 @@ export const NotificationCenter = () => {
                                             {request.title || request.document_name || 'Solicitação de Assinatura'}
                                         </p>
                                         <p className="text-[10px] text-slate-500 mt-1 leading-tight line-clamp-2">
-                                            {request.message || request.description || 'Documento aguardando sua assinatura'}
+                                            {request.description || 'Documento aguardando sua assinatura'}
                                         </p>
                                         <div className="flex items-center gap-1 mt-2 text-[10px] text-slate-400">
                                             <Clock size={10} />

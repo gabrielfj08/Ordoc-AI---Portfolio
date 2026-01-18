@@ -38,8 +38,8 @@ export const SignatureDashboard = ({ onNew, onViewRequest }: SignatureDashboardP
     });
 
     // Dados agregados
-    const myRequests = myRequestsData || [];
-    const pendingRequests = pendingData || [];
+    const myRequests = myRequestsData?.results || [];
+    const pendingRequests = pendingData?.results || [];
     const allRequests = allRequestsData?.results || [];
 
     // Estatísticas calculadas
@@ -51,7 +51,7 @@ export const SignatureDashboard = ({ onNew, onViewRequest }: SignatureDashboardP
             const completedDate = new Date(r.completed_at);
             const now = new Date();
             return completedDate.getMonth() === now.getMonth() &&
-                   completedDate.getFullYear() === now.getFullYear();
+                completedDate.getFullYear() === now.getFullYear();
         }).length,
         totalSealed: allRequests.filter(r => r.status === 'completed').length,
     };
@@ -173,8 +173,8 @@ export const SignatureDashboard = ({ onNew, onViewRequest }: SignatureDashboardP
                                     className="rounded-full"
                                     onClick={() => {
                                         const newFilter = statusFilter === 'all' ? 'pending' :
-                                                         statusFilter === 'pending' ? 'in_progress' :
-                                                         statusFilter === 'in_progress' ? 'completed' : 'all';
+                                            statusFilter === 'pending' ? 'in_progress' :
+                                                statusFilter === 'in_progress' ? 'completed' : 'all';
                                         setStatusFilter(newFilter);
                                     }}
                                 >
