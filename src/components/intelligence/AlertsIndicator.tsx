@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
     Bell,
@@ -92,7 +92,7 @@ function AlertItem({ alert }: { alert: ProactiveAlert }) {
                         <Badge
                             variant={
                                 alert.severity === 'critical' ? 'destructive' :
-                                alert.severity === 'high' ? 'default' : 'secondary'
+                                    alert.severity === 'high' ? 'default' : 'secondary'
                             }
                             className="text-xs"
                         >
@@ -110,6 +110,11 @@ function AlertItem({ alert }: { alert: ProactiveAlert }) {
 
 export function AlertsIndicator() {
     const [isOpen, setIsOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Buscar apenas alertas não lidos para o badge
     const { data: unreadData } = useUnreadAlerts();
@@ -133,11 +138,11 @@ export function AlertsIndicator() {
                 >
                     <Brain size={22} strokeWidth={2.5} className={cn(
                         "size-[22px]",
-                        hasCritical && "text-red-600 animate-pulse",
-                        !hasCritical && hasUnread && "text-amber-600"
+                        mounted && hasCritical && "text-red-600 animate-pulse",
+                        mounted && !hasCritical && hasUnread && "text-amber-600"
                     )} />
 
-                    {hasUnread && (
+                    {mounted && hasUnread && (
                         <span className={cn(
                             "absolute top-0 right-0 h-5 w-5 rounded-full text-[10px] font-bold flex items-center justify-center",
                             hasCritical ? "bg-red-600 text-white" : "bg-amber-500 text-white"

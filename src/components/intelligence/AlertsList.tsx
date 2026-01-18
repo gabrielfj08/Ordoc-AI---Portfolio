@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAlertsList, useMarkAlertAsRead, useDismissAlert } from '@/hooks/queries/useIntelligence';
 import { ProactiveAlert } from '@/services/intelligence';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const SEVERITY_CONFIG = {
     critical: {
@@ -92,6 +93,13 @@ const ALERT_TYPE_CONFIG = {
     },
 };
 
+// Map backend keys to existing config
+const getSeverityConfig = (severity: string) => {
+    if (severity === 'error') return SEVERITY_CONFIG.critical;
+    if (severity === 'warning') return SEVERITY_CONFIG.high;
+    return (SEVERITY_CONFIG as any)[severity] || SEVERITY_CONFIG.info;
+};
+
 interface AlertCardProps {
     alert: ProactiveAlert;
     onDismiss?: (id: string) => void;
@@ -101,8 +109,8 @@ interface AlertCardProps {
 function AlertCard({ alert, onDismiss, onMarkAsRead }: AlertCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const severityConfig = SEVERITY_CONFIG[alert.severity];
-    const typeConfig = ALERT_TYPE_CONFIG[alert.alert_type];
+    const severityConfig = getSeverityConfig(alert.severity);
+    const typeConfig = ALERT_TYPE_CONFIG[alert.alert_type as keyof typeof ALERT_TYPE_CONFIG] || ALERT_TYPE_CONFIG.warning;
     const SeverityIcon = severityConfig.icon;
     const TypeIcon = typeConfig.icon;
 
@@ -144,6 +152,18 @@ function AlertCard({ alert, onDismiss, onMarkAsRead }: AlertCardProps) {
                     </div>
 
                     <div className="flex items-center gap-1">
+                        {alert.document_id && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                asChild
+                                title="Ver no documento"
+                            >
+                                <Link href={`/documents?id=${alert.document_id}`}>
+                                    <Eye className="h-4 w-4 text-blue-600" />
+                                </Link>
+                            </Button>
+                        )}
                         {!alert.is_read && (
                             <Button
                                 size="sm"
@@ -151,7 +171,7 @@ function AlertCard({ alert, onDismiss, onMarkAsRead }: AlertCardProps) {
                                 onClick={() => onMarkAsRead?.(alert.id!)}
                                 title="Marcar como lido"
                             >
-                                <Eye className="h-4 w-4" />
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
                             </Button>
                         )}
                         <Button
@@ -174,7 +194,7 @@ function AlertCard({ alert, onDismiss, onMarkAsRead }: AlertCardProps) {
                             {alert.suggested_actions.map((action, idx) => (
                                 <li key={idx} className="text-sm flex items-start gap-2">
                                     <span className="text-muted-foreground">•</span>
-                                    <span>{action}</span>
+                                    <span>{action.label}</span>
                                 </li>
                             ))}
                         </ul>
@@ -194,10 +214,13 @@ function AlertCard({ alert, onDismiss, onMarkAsRead }: AlertCardProps) {
                     </Button>
 
                     {isExpanded && (
-                        <div className="mt-2 p-3 bg-muted rounded-lg">
-                            <pre className="text-xs overflow-x-auto">
-                                {JSON.stringify(alert.details, null, 2)}
-                            </pre>
+                        <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            {Object.entries(alert.details || {}).map(([key, value]) => (
+                                <div key={key} className="text-[11px] mb-1">
+                                    <span className="font-semibold text-slate-500 uppercase tracking-tight mr-2">{key.replace(/_/g, ' ')}:</span>
+                                    <span className="text-slate-700">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </CardContent>
@@ -226,8 +249,8 @@ export function AlertsList() {
     // Selecionar dados baseado na tab ativa
     const currentQuery =
         activeTab === 'all' ? allAlerts :
-        activeTab === 'unread' ? unreadAlerts :
-        criticalAlerts;
+            activeTab === 'unread' ? unreadAlerts :
+                criticalAlerts;
 
     const alerts = currentQuery.data?.results || [];
     const isLoading = currentQuery.isLoading;
