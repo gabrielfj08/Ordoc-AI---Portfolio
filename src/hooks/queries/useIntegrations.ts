@@ -79,10 +79,10 @@ export function useCreateIntegrationService(options?: UseMutationOptions<Integra
         mutationFn: (data) => integrationService.createService(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.services() });
-            toast.success('Serviço de integração criado com sucesso');
+            toast.success('Servio de integrao criado com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao criar serviço');
+            toast.error(error?.response?.data?.message || 'Erro ao criar servio');
         },
         ...options,
     });
@@ -96,10 +96,10 @@ export function useUpdateIntegrationService(options?: UseMutationOptions<Integra
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.service(variables.id) });
             queryClient.invalidateQueries({ queryKey: integrationKeys.services() });
-            toast.success('Serviço atualizado com sucesso');
+            toast.success('Servio atualizado com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao atualizar serviço');
+            toast.error(error?.response?.data?.message || 'Erro ao atualizar servio');
         },
         ...options,
     });
@@ -112,10 +112,10 @@ export function useDeleteIntegrationService(options?: UseMutationOptions<void, E
         mutationFn: (id) => integrationService.deleteService(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.services() });
-            toast.success('Serviço deletado com sucesso');
+            toast.success('Servio deletado com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao deletar serviço');
+            toast.error(error?.response?.data?.message || 'Erro ao deletar servio');
         },
         ...options,
     });
@@ -129,7 +129,7 @@ export function useToggleIntegrationServiceStatus(options?: UseMutationOptions<I
         onSuccess: (_, id) => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.service(id) });
             queryClient.invalidateQueries({ queryKey: integrationKeys.services() });
-            toast.success('Status do serviço alterado');
+            toast.success('Status do servio alterado');
         },
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Erro ao alterar status');
@@ -246,7 +246,7 @@ export function useExecuteIntegration(options?: UseMutationOptions<IntegrationEx
             queryClient.invalidateQueries({ queryKey: integrationKeys.requests() });
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao executar integração');
+            toast.error(error?.response?.data?.message || 'Erro ao executar integrao');
         },
         ...options,
     });
@@ -260,9 +260,9 @@ export function useValidateCPF(options?: UseMutationOptions<CPFValidationRespons
         onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.requests() });
             if (result.valid) {
-                toast.success('CPF válido');
+                toast.success('CPF vlido');
             } else {
-                toast.error('CPF inválido');
+                toast.error('CPF invlido');
             }
         },
         onError: (error: any) => {
@@ -280,9 +280,9 @@ export function useValidateCNPJ(options?: UseMutationOptions<CNPJValidationRespo
         onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.requests() });
             if (result.valid) {
-                toast.success('CNPJ válido');
+                toast.success('CNPJ vlido');
             } else {
-                toast.error('CNPJ inválido');
+                toast.error('CNPJ invlido');
             }
         },
         onError: (error: any) => {
@@ -299,10 +299,10 @@ export function useCheckCredit(options?: UseMutationOptions<CreditCheckResponse,
         mutationFn: (request) => integrationService.checkCredit(request),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: integrationKeys.requests() });
-            toast.success('Consulta de crédito realizada');
+            toast.success('Consulta de crdito realizada');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao consultar crédito');
+            toast.error(error?.response?.data?.message || 'Erro ao consultar crdito');
         },
         ...options,
     });

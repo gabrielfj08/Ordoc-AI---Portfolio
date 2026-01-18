@@ -1,10 +1,10 @@
 /**
  * Signature Hooks - React Query hooks para OrdocSign (Digital Signature)
  *
- * Gerencia estado, cache e invalidação para:
- * - Solicitações de assinatura (Signature Requests)
+ * Gerencia estado, cache e invalidao para:
+ * - Solicitaes de assinatura (Signature Requests)
  * - Assinaturas (Document Signatures)
- * - Signatários (Signers)
+ * - Signatrios (Signers)
  * - Certificados digitais
  * - Templates de assinatura
  * - Lotes de assinatura (Batches)
@@ -110,7 +110,7 @@ export function useSignatureRequest(
 }
 
 export function useMySignatureRequests(
-    options?: Omit<UseQueryOptions<SignatureRequest[]>, 'queryKey' | 'queryFn'>
+    options?: Omit<UseQueryOptions<PaginatedResponse<SignatureRequest>>, 'queryKey' | 'queryFn'>
 ) {
     return useQuery({
         queryKey: signatureKeys.myRequests(),
@@ -120,7 +120,7 @@ export function useMySignatureRequests(
 }
 
 export function usePendingSignatureRequests(
-    options?: Omit<UseQueryOptions<SignatureRequest[]>, 'queryKey' | 'queryFn'>
+    options?: Omit<UseQueryOptions<PaginatedResponse<SignatureRequest>>, 'queryKey' | 'queryFn'>
 ) {
     return useQuery({
         queryKey: signatureKeys.pendingRequests(),
@@ -225,7 +225,7 @@ export function useCertificates(
 }
 
 export function useMyCertificates(
-    options?: Omit<UseQueryOptions<DigitalCertificate[]>, 'queryKey' | 'queryFn'>
+    options?: Omit<UseQueryOptions<PaginatedResponse<DigitalCertificate>>, 'queryKey' | 'queryFn'>
 ) {
     return useQuery({
         queryKey: signatureKeys.myCertificates(),
@@ -384,10 +384,10 @@ export function useCreateSignatureRequest(
             queryClient.invalidateQueries({ queryKey: signatureKeys.requests() });
             queryClient.invalidateQueries({ queryKey: signatureKeys.myRequests() });
 
-            toast.success('Solicitação de assinatura criada');
+            toast.success('Solicitao de assinatura criada');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao criar solicitação');
+            toast.error(error?.response?.data?.message || 'Erro ao criar solicitao');
         },
         ...options,
     });
@@ -405,10 +405,10 @@ export function useCancelSignatureRequest(
             queryClient.invalidateQueries({ queryKey: signatureKeys.requests() });
             queryClient.invalidateQueries({ queryKey: signatureKeys.pendingRequests() });
 
-            toast.success('Solicitação cancelada');
+            toast.success('Solicitao cancelada');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao cancelar solicitação');
+            toast.error(error?.response?.data?.message || 'Erro ao cancelar solicitao');
         },
         ...options,
     });
@@ -422,7 +422,7 @@ export function useRemindSigners(
     return useMutation({
         mutationFn: (requestId: string) => signatureService.remindSigners(requestId),
         onSuccess: () => {
-            toast.success('Lembretes enviados aos signatários');
+            toast.success('Lembretes enviados aos signatrios');
         },
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Erro ao enviar lembretes');

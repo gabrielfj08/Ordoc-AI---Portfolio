@@ -27,6 +27,12 @@ import intelligenceService, {
     PaginatedResponse,
 } from '@/services/intelligence';
 
+// Helper para verificar autenticação
+const isAuthenticated = () => {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem('access_token');
+};
+
 // ============================================================================
 // QUERY KEYS FACTORY
 // ============================================================================
@@ -54,9 +60,8 @@ export const intelligenceKeys = {
     feedbacks: () => [...intelligenceKeys.all, 'feedbacks'] as const,
     feedbacksList: (filters?: Record<string, any>) => [...intelligenceKeys.feedbacks(), 'list', filters] as const,
 
-    // Ranking
-    ranking: (type: string, params?: Record<string, any>) =>
-        [...intelligenceKeys.all, 'ranking', type, params] as const,
+    ranking: (type?: string, params?: Record<string, any>) =>
+        [...intelligenceKeys.all, 'ranking', type || 'all', params] as const,
 
     // Activity Feed
     activityFeed: (filters?: Record<string, any>) => [...intelligenceKeys.all, 'activity', filters] as const,
@@ -99,6 +104,7 @@ export function useAnalysesList(
     return useQuery({
         queryKey: intelligenceKeys.analysesList(filters),
         queryFn: () => intelligenceService.listAnalyses(filters),
+        enabled: isAuthenticated(),
         ...options,
     });
 }
@@ -193,6 +199,7 @@ export function useAlertsList(
     return useQuery({
         queryKey: intelligenceKeys.alertsList(filters),
         queryFn: () => intelligenceService.listAlerts(filters),
+        enabled: isAuthenticated(),
         ...options,
     });
 }
@@ -221,6 +228,7 @@ export function useAlertSeverityCounts(
     return useQuery({
         queryKey: intelligenceKeys.alertCounts(),
         queryFn: () => intelligenceService.getAlertSeverityCounts(),
+        enabled: isAuthenticated(),
         ...options,
     });
 }
@@ -286,6 +294,7 @@ export function usePatternsList(
     return useQuery({
         queryKey: intelligenceKeys.patternsList(filters),
         queryFn: () => intelligenceService.listPatterns(filters),
+        enabled: isAuthenticated(),
         ...options,
     });
 }
@@ -357,19 +366,29 @@ export function useSubmitFeedback() {
  * Hook para obter ranking
  */
 export function useRanking(
-    rankingType: 'most_analyzed' | 'most_active_users' | 'document_types' | 'alert_types',
+    entityType?: 'document' | 'task' | 'procedure',
     params?: {
-        period?: 'day' | 'week' | 'month' | 'year';
+        view_mode?: 'personal' | 'team';
         limit?: number;
     },
     options?: Omit<
-        UseQueryOptions<Array<{ name: string; count: number; metadata?: Record<string, any> }>>,
+        UseQueryOptions<Array<{
+            entity_type: string;
+            entity_id: string;
+            score: number;
+            personal_score: number;
+            department_score: number;
+            organization_score: number;
+            sector_score: number;
+            last_updated: string;
+        }>>,
         'queryKey' | 'queryFn'
     >
 ) {
     return useQuery({
-        queryKey: intelligenceKeys.ranking(rankingType, params),
-        queryFn: () => intelligenceService.getRanking({ ranking_type: rankingType, ...params }),
+        queryKey: intelligenceKeys.ranking(entityType, params),
+        queryFn: () => intelligenceService.getRanking({ entity_type: entityType, ...params }),
+        enabled: isAuthenticated(),
         ...options,
     });
 }
@@ -393,6 +412,7 @@ export function useActivityFeed(
     return useQuery({
         queryKey: intelligenceKeys.activityFeed(filters),
         queryFn: () => intelligenceService.getActivityFeed(filters),
+        enabled: isAuthenticated(),
         // Refresh automaticamente a cada 30 segundos para feed em tempo real
         refetchInterval: 30000,
         ...options,

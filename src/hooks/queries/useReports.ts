@@ -229,10 +229,10 @@ export function useGenerateReport(options?: UseMutationOptions<Report, Error, Re
         mutationFn: (data) => reportService.generateReport(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reportKeys.reports() });
-            toast.success('Relatório sendo gerado...');
+            toast.success('Relatrio sendo gerado...');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao gerar relatório');
+            toast.error(error?.response?.data?.message || 'Erro ao gerar relatrio');
         },
         ...options,
     });
@@ -245,10 +245,10 @@ export function useDeleteReport(options?: UseMutationOptions<void, Error, string
         mutationFn: (id) => reportService.deleteReport(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reportKeys.reports() });
-            toast.success('Relatório deletado com sucesso');
+            toast.success('Relatrio deletado com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao deletar relatório');
+            toast.error(error?.response?.data?.message || 'Erro ao deletar relatrio');
         },
         ...options,
     });
@@ -262,10 +262,10 @@ export function useRetryReport(options?: UseMutationOptions<Report, Error, strin
         onSuccess: (_, id) => {
             queryClient.invalidateQueries({ queryKey: reportKeys.report(id) });
             queryClient.invalidateQueries({ queryKey: reportKeys.reports() });
-            toast.success('Relatório sendo reprocessado...');
+            toast.success('Relatrio sendo reprocessado...');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao reprocessar relatório');
+            toast.error(error?.response?.data?.message || 'Erro ao reprocessar relatrio');
         },
         ...options,
     });
@@ -456,10 +456,10 @@ export function useCreateReportMetric(options?: UseMutationOptions<ReportMetric,
         mutationFn: (data) => reportService.createMetric(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reportKeys.metrics() });
-            toast.success('Métrica criada com sucesso');
+            toast.success('Mtrica criada com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao criar métrica');
+            toast.error(error?.response?.data?.message || 'Erro ao criar mtrica');
         },
         ...options,
     });
@@ -473,10 +473,10 @@ export function useUpdateReportMetric(options?: UseMutationOptions<ReportMetric,
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: reportKeys.metric(variables.id) });
             queryClient.invalidateQueries({ queryKey: reportKeys.metrics() });
-            toast.success('Métrica atualizada com sucesso');
+            toast.success('Mtrica atualizada com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao atualizar métrica');
+            toast.error(error?.response?.data?.message || 'Erro ao atualizar mtrica');
         },
         ...options,
     });
@@ -489,10 +489,10 @@ export function useDeleteReportMetric(options?: UseMutationOptions<void, Error, 
         mutationFn: (id) => reportService.deleteMetric(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reportKeys.metrics() });
-            toast.success('Métrica deletada com sucesso');
+            toast.success('Mtrica deletada com sucesso');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Erro ao deletar métrica');
+            toast.error(error?.response?.data?.message || 'Erro ao deletar mtrica');
         },
         ...options,
     });
