@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import {
     X, Zap, ArrowLeft, Copy, Check,
-    ListTodo, Mail, Sparkles, Wand2
+    ListTodo, Mail, Sparkles, Wand2, Brain
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DocumentItem } from "./DocumentList";
+
+import { useDocumentAnalysis } from "@/hooks/queries/useIntelligence";
 
 interface AIInsightsPanelProps {
     item: DocumentItem;
@@ -15,50 +17,18 @@ interface AIInsightsPanelProps {
 }
 
 export const AIInsightsPanel = ({ item, onClose, onBack }: AIInsightsPanelProps) => {
-    const [content, setContent] = useState("");
-    const [isGenerating, setIsGenerating] = useState(true);
+    const { data: analysis, isLoading, isError } = useDocumentAnalysis(item.id);
     const [copied, setCopied] = useState(false);
 
-    // Simulação de conteúdo gerado
-    const fullContent = `
-## Resumo Executivo: ${item.name}
-
-Este documento parece ser um registro técnico importante. Aqui estão os pontos principais identificados pela nossa IA:
-
-1. **Contexto Principal**: O arquivo trata de especificações detalhadas de engenharia de dados, focando em escalabilidade.
-2. **Datas Críticas**: Foram encontradas referências a prazos em Q4 2024 e entregas para Janeiro de 2026.
-3. **Pessoas Envolvidas**: O texto cita Pedro Henrique e a equipe de Backend.
-
-### ✨ Sugestões de Ação:
-*   **Revisão**: Agendar uma reunião de revisão com os stakeholders citados.
-*   **Compliance**: Verificar se os anexos técnicos estão em conformidade com a ISO 27001.
-
-*Gerado automaticamente pelo Ordoc AI em ${new Date().toLocaleDateString()}.*
-  `.trim();
-
-    // Efeito de Digitação (Streaming)
-    useEffect(() => {
-        let index = 0;
-        const speed = 15; // ms por caractere
-
-        const interval = setInterval(() => {
-            setContent(fullContent.slice(0, index));
-            index++;
-
-            if (index > fullContent.length) {
-                setIsGenerating(false);
-                clearInterval(interval);
-            }
-        }, speed);
-
-        return () => clearInterval(interval);
-    }, [fullContent]);
-
     const handleCopy = () => {
-        navigator.clipboard.writeText(fullContent);
+        if (!analysis) return;
+        const textToCopy = `Análise de ${item.name}\n\nTipo: ${analysis.document_type}\n\nResumo:\n${JSON.stringify(analysis.extraction_result, null, 2)}`;
+        navigator.clipboard.writeText(textToCopy);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
+
+    const isGenerating = isLoading;
 
     return (
         <div className="w-80 bg-white border-l border-slate-100 h-full flex flex-col shadow-xl z-10">
@@ -100,12 +70,48 @@ Este documento parece ser um registro técnico importante. Aqui estão os pontos
             {/* Área de Conteúdo (Scrollable) */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
 
-                {/* Card de Streaming */}
+                {/* Card com Resultados Reais */}
                 <div className="prose prose-sm prose-orange max-w-none">
                     <div className="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed font-mono sm:font-sans">
-                        {content}
-                        {isGenerating && (
-                            <span className="inline-block w-2 H-4 bg-[#f97316] ml-1 animate-pulse align-middle">|</span>
+                        {analysis ? (
+                            <div className="space-y-4">
+                                <div>
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <Sparkles size={12} className="text-purple-500" />
+                                        Extração de Dados
+                                    </h3>
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 font-sans">
+                                        {Object.entries(analysis.extraction_result).map(([key, value]) => (
+                                            value && (
+                                                <div key={key} className="mb-1 text-xs">
+                                                    <span className="font-semibold text-slate-600">{key}:</span> {String(value)}
+                                                </div>
+                                            )
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {analysis.council_deliberation && (
+                                    <div>
+                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <Brain size={12} className="text-orange-500" />
+                                            Deliberação IA
+                                        </h3>
+                                        <div className="text-xs text-slate-700 bg-orange-50/30 p-3 rounded-lg border border-orange-100">
+                                            {(analysis.council_deliberation as any).summary || "Análise concluída com sucesso."}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : isError ? (
+                            <div className="text-red-500 text-xs p-4 bg-red-50 rounded-lg text-center font-sans">
+                                Erro ao carregar análise de inteligência.
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-10 gap-3">
+                                <Zap className="h-8 w-8 text-orange-200 animate-pulse" />
+                                <span className="text-xs text-slate-400 font-sans">Consultando Ordoc AI...</span>
+                            </div>
                         )}
                     </div>
                 </div>

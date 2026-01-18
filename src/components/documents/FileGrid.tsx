@@ -287,6 +287,7 @@ export const FileGrid = ({ items, onSelect, selectedId, onMoveRequest, onShareRe
         <DocumentPreviewModal
           isOpen={!!previewDoc}
           onClose={() => setPreviewDoc(null)}
+          docId={previewDoc.id}
           docName={previewDoc.name}
           docType={previewDoc.name.split('.').pop() || 'file'}
         />

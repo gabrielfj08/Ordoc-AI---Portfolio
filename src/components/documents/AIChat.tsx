@@ -7,48 +7,65 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface Message {
-    id: string;
-    role: 'ai' | 'user';
-    content: string;
-    timestamp: Date;
+import { intelligenceService, ChatMessage } from "@/services/intelligence";
+import { toast } from "sonner";
+
+interface AIChatProps {
+    documentId: string;
 }
 
-export const AIChat = () => {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            role: 'ai',
-            content: 'Olá! Analisei o contrato e a Cláusula 4.2 parece divergir do padrão da empresa. Gostaria de uma sugestão de redação mais segura?',
-            timestamp: new Date()
-        }
-    ]);
+export const AIChat = ({ documentId }: AIChatProps) => {
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
     const [inputValue, setInputValue] = useState("");
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const handleSendMessage = () => {
-        if (!inputValue.trim()) return;
+    // Inicializar conversa vinculada ao documento
+    useEffect(() => {
+        const initChat = async () => {
+            try {
+                // Tenta encontrar uma conversa existente ou cria uma nova
+                const response = await intelligenceService.createConversation({
+                    document_id: documentId,
+                    title: `Conversa sobre ${documentId}`
+                });
+                setConversationId(response.id);
 
-        const newUserMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: inputValue,
-            timestamp: new Date()
+                // Carregar mensagens se houver
+                const msgRes = await intelligenceService.getMessages(response.id);
+                setMessages(msgRes.messages);
+            } catch (error) {
+                console.error("Erro ao iniciar chat:", error);
+                toast.error("Não foi possível iniciar o chat inteligente.");
+            }
         };
 
-        setMessages(prev => [...prev, newUserMessage]);
-        setInputValue("");
+        if (documentId) {
+            initChat();
+        }
+    }, [documentId]);
 
-        // Mock AI Response
-        setTimeout(() => {
-            const aiResponse: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'ai',
-                content: "Entendido. Recomendaria alterar o prazo para 60 dias e incluir a necessidade de notificação por escrito para evitar renovações indesejadas.",
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiResponse]);
-        }, 1000);
+    const handleSendMessage = async () => {
+        if (!inputValue.trim() || !conversationId || isLoading) return;
+
+        const content = inputValue;
+        setInputValue("");
+        setIsLoading(true);
+
+        try {
+            const response = await intelligenceService.sendMessage(conversationId, {
+                content: content
+            });
+
+            // Adiciona mensagens (usuário e assistente) à lista
+            setMessages(prev => [...prev, response.user_message, response.assistant_message]);
+        } catch (error) {
+            console.error("Erro ao enviar mensagem:", error);
+            toast.error("Erro ao processar sua pergunta.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -70,13 +87,21 @@ export const AIChat = () => {
             {/* Messages Area */}
             <ScrollArea className="flex-1 p-4">
                 <div className="space-y-4">
+                    {messages.length === 0 && !isLoading && (
+                        <div className="text-center py-8">
+                            <Bot className="mx-auto text-slate-300 mb-2" size={32} />
+                            <p className="text-[10px] text-slate-400 font-medium">
+                                Nenhuma mensagem ainda. <br /> Comece perguntando algo sobre o documento.
+                            </p>
+                        </div>
+                    )}
                     {messages.map((msg) => (
                         <div
                             key={msg.id}
                             className={`flex gap-2 text-xs ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
                         >
                             <Avatar className="w-6 h-6 border border-slate-200">
-                                {msg.role === 'ai' ? (
+                                {msg.role !== 'user' ? (
                                     <>
                                         <div className="w-full h-full bg-indigo-600 flex items-center justify-center">
                                             <Bot size={12} className="text-white" />
@@ -91,7 +116,7 @@ export const AIChat = () => {
 
                             <div className={`
                                 p-3 rounded-xl max-w-[85%] leading-relaxed 
-                                ${msg.role === 'ai'
+                                ${msg.role !== 'user'
                                     ? 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
                                     : 'bg-indigo-600 text-white rounded-tr-none shadow-md'}
                             `}>
@@ -99,6 +124,23 @@ export const AIChat = () => {
                             </div>
                         </div>
                     ))}
+                    {isLoading && (
+                        <div className="flex gap-2 text-xs">
+                            <Avatar className="w-6 h-6 border border-slate-200">
+                                <div className="w-full h-full bg-indigo-600 flex items-center justify-center">
+                                    <Bot size={12} className="text-white animate-pulse" />
+                                </div>
+                            </Avatar>
+                            <div className="p-3 bg-white border border-slate-200 text-slate-400 rounded-xl rounded-tl-none shadow-sm italic flex items-center gap-2">
+                                <span className="flex gap-1">
+                                    <span className="w-1 h-1 bg-slate-300 rounded-full animate-bounce" />
+                                    <span className="w-1 h-1 bg-slate-300 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                    <span className="w-1 h-1 bg-slate-300 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                </span>
+                                Analisando contexto...
+                            </div>
+                        </div>
+                    )}
                     <div ref={scrollRef} />
                 </div>
             </ScrollArea>
@@ -107,9 +149,10 @@ export const AIChat = () => {
             <div className="p-3 bg-white border-t border-slate-200">
                 <div className="relative">
                     <Input
-                        placeholder="Pergunte sobre o documento..."
+                        placeholder={isLoading ? "IA está pensando..." : "Pergunte sobre o documento..."}
                         className="pr-10 h-10 text-xs bg-slate-50 border-slate-200 focus-visible:ring-indigo-500"
                         value={inputValue}
+                        disabled={isLoading}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                     />

@@ -73,25 +73,33 @@ export function DocumentPreview({ documentId, mimeType, className = '' }: Docume
     // Preview de imagem
     if (mimeType.startsWith('image/')) {
         return (
-            <div className={`flex items-center justify-center p-4 ${className}`}>
+            <div className={`w-full h-full flex items-center justify-center bg-slate-50 p-2 ${className}`}>
                 <img
                     src={previewUrl}
                     alt="Preview"
-                    className="max-w-full h-auto rounded-lg shadow-sm"
+                    className="max-w-full max-h-full object-contain shadow-2xl rounded-lg bg-white"
                 />
             </div>
         );
     }
 
-    // Preview de PDF
+    // Preview de PDF - Usando object para maior compatibilidade e visual limpo
     if (mimeType === 'application/pdf') {
+        const viewerUrl = `${previewUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`;
         return (
-            <iframe
-                src={previewUrl}
-                className={`w-full border-0 rounded-lg ${className}`}
-                style={{ minHeight: '600px' }}
-                title="PDF Preview"
-            />
+            <div className={`w-full h-full bg-white flex flex-col items-center justify-start ${className}`}>
+                <object
+                    data={viewerUrl}
+                    type="application/pdf"
+                    className="w-full h-full border-0"
+                >
+                    <iframe
+                        src={viewerUrl}
+                        className="w-full h-full border-0"
+                        title="PDF Preview"
+                    />
+                </object>
+            </div>
         );
     }
 

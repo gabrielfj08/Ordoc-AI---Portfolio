@@ -148,6 +148,7 @@ export const DocumentList = ({
         <DocumentPreviewModal
           isOpen={!!previewDoc}
           onClose={() => setPreviewDoc(null)}
+          docId={previewDoc.id}
           docName={previewDoc.name}
           docType={previewDoc.name.split('.').pop() || 'file'}
         />
