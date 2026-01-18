@@ -228,8 +228,8 @@ class SignatureService_Class {
     /**
      * Listar meus certificados
      */
-    async getMyCertificates(): Promise<DigitalCertificate[]> {
-        const response = await apiClient.get<DigitalCertificate[]>('/ordoc-sign/certificates/my_certificates/');
+    async getMyCertificates(): Promise<PaginatedResponse<DigitalCertificate>> {
+        const response = await apiClient.get<PaginatedResponse<DigitalCertificate>>('/ordoc-sign/certificates/my_certificates/');
         return response.data;
     }
 
@@ -393,16 +393,16 @@ class SignatureService_Class {
     /**
      * Minhas solicitações
      */
-    async getMySignatureRequests(): Promise<SignatureRequest[]> {
-        const response = await apiClient.get<SignatureRequest[]>('/ordoc-sign/requests/my_requests/');
+    async getMySignatureRequests(): Promise<PaginatedResponse<SignatureRequest>> {
+        const response = await apiClient.get<PaginatedResponse<SignatureRequest>>('/ordoc-sign/requests/my_requests/');
         return response.data;
     }
 
     /**
      * Solicitações pendentes
      */
-    async getPendingSignatureRequests(): Promise<SignatureRequest[]> {
-        const response = await apiClient.get<SignatureRequest[]>('/ordoc-sign/requests/pending/');
+    async getPendingSignatureRequests(): Promise<PaginatedResponse<SignatureRequest>> {
+        const response = await apiClient.get<PaginatedResponse<SignatureRequest>>('/ordoc-sign/requests/pending/');
         return response.data;
     }
 
@@ -501,8 +501,8 @@ class SignatureService_Class {
     /**
      * Minhas atribuições de assinatura
      */
-    async getMyAssignments(): Promise<SignatureRequestSigner[]> {
-        const response = await apiClient.get<SignatureRequestSigner[]>('/ordoc-sign/signers/my_assignments/');
+    async getMyAssignments(): Promise<PaginatedResponse<SignatureRequestSigner>> {
+        const response = await apiClient.get<PaginatedResponse<SignatureRequestSigner>>('/ordoc-sign/signers/my_assignments/');
         return response.data;
     }
 

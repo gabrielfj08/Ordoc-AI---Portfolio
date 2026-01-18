@@ -16,6 +16,14 @@ import apiClient from './api';
 // INTERFACES - Baseadas no backend intelligence module
 // ============================================================================
 
+export interface SuggestedAction {
+    action_type: string;
+    label: string;
+    description?: string;
+    auto_applicable?: boolean;
+    payload?: Record<string, any>;
+}
+
 export interface AnalysisRequest {
     document_id: string;
     document_content: string;
@@ -81,7 +89,7 @@ export interface ProactiveAlert {
     message: string;
     details?: Record<string, any>;
     location?: string;
-    suggested_actions?: string[];
+    suggested_actions?: SuggestedAction[];
     is_read?: boolean;
     is_dismissed?: boolean;
     created_at?: string;
@@ -346,7 +354,7 @@ export interface PaginatedResponse<T> {
 // ============================================================================
 
 class IntelligenceService {
-    private baseURL = '/api/v1/intelligence';
+    private baseURL = '/intelligence';
 
     // ========================================================================
     // ANÁLISE DE DOCUMENTOS
@@ -446,7 +454,7 @@ class IntelligenceService {
      * POST /api/v1/intelligence/alerts/:id/mark_read/
      */
     async markAlertAsRead(id: string): Promise<ProactiveAlert> {
-        const response = await apiClient.post<ProactiveAlert>(`${this.baseURL}/alerts/${id}/mark_read/`);
+        const response = await apiClient.post<ProactiveAlert>(`${this.baseURL}/alerts/${id}/mark_as_read/`);
         return response.data;
     }
 
@@ -455,7 +463,8 @@ class IntelligenceService {
      * POST /api/v1/intelligence/alerts/:id/dismiss/
      */
     async dismissAlert(id: string): Promise<ProactiveAlert> {
-        const response = await apiClient.post<ProactiveAlert>(`${this.baseURL}/alerts/${id}/dismiss/`);
+        // O backend usa mark_as_read para ambos lido e descartado (setando para 'dismissed')
+        const response = await apiClient.post<ProactiveAlert>(`${this.baseURL}/alerts/${id}/mark_as_read/`);
         return response.data;
     }
 
@@ -547,11 +556,20 @@ class IntelligenceService {
      * GET /api/v1/intelligence/ranking/
      */
     async getRanking(params: {
-        ranking_type: 'most_analyzed' | 'most_active_users' | 'document_types' | 'alert_types';
-        period?: 'day' | 'week' | 'month' | 'year';
+        entity_type?: 'document' | 'task' | 'procedure';
+        view_mode?: 'personal' | 'team';
         limit?: number;
-    }): Promise<Array<{ name: string; count: number; metadata?: Record<string, any> }>> {
-        const response = await apiClient.get<Array<{ name: string; count: number; metadata?: Record<string, any> }>>(
+    }): Promise<Array<{
+        entity_type: string;
+        entity_id: string;
+        score: number;
+        personal_score: number;
+        department_score: number;
+        organization_score: number;
+        sector_score: number;
+        last_updated: string;
+    }>> {
+        const response = await apiClient.get<Array<any>>(
             `${this.baseURL}/ranking/`,
             { params }
         );

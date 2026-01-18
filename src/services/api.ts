@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/a
 // Criar instância do Axios
 export const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000,
+    timeout: 120000,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -47,10 +47,11 @@ apiClient.interceptors.response.use(
                     }
                     break;
                 case 403:
-                    console.error('Acesso negado');
+                    console.error('Acesso negado (403)');
                     break;
                 case 404:
-                    console.error('Recurso não encontrado');
+                    // Silenciado para evitar ruído no console em recursos opcionais (ex: análise de IA)
+                    console.debug('Recurso não encontrado (404)');
                     break;
                 case 500:
                     console.error('Erro interno do servidor');

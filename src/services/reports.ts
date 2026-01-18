@@ -131,7 +131,7 @@ class ReportService {
     // ==================== REPORT TEMPLATES ====================
 
     /**
-     * Listar templates de relatórios
+     * Listar templates de relatrios
      */
     async listTemplates(filters?: {
         category?: string;
@@ -145,7 +145,7 @@ class ReportService {
     }
 
     /**
-     * Obter template de relatório
+     * Obter template de relatrio
      */
     async getTemplate(id: string): Promise<ReportTemplate> {
         const response = await apiClient.get<ReportTemplate>(`/ordoc-reports/api/templates/${id}/`);
@@ -153,7 +153,7 @@ class ReportService {
     }
 
     /**
-     * Criar template de relatório
+     * Criar template de relatrio
      */
     async createTemplate(data: Partial<ReportTemplate>): Promise<ReportTemplate> {
         const response = await apiClient.post<ReportTemplate>('/ordoc-reports/api/templates/', data);
@@ -161,7 +161,7 @@ class ReportService {
     }
 
     /**
-     * Atualizar template de relatório
+     * Atualizar template de relatrio
      */
     async updateTemplate(id: string, data: Partial<ReportTemplate>): Promise<ReportTemplate> {
         const response = await apiClient.patch<ReportTemplate>(`/ordoc-reports/api/templates/${id}/`, data);
@@ -169,7 +169,7 @@ class ReportService {
     }
 
     /**
-     * Deletar template de relatório
+     * Deletar template de relatrio
      */
     async deleteTemplate(id: string): Promise<void> {
         await apiClient.delete(`/ordoc-reports/api/templates/${id}/`);
@@ -200,7 +200,7 @@ class ReportService {
     }
 
     /**
-     * Prévia do relatório
+     * Prvia do relatrio
      */
     async previewTemplate(id: string, filters?: any): Promise<any> {
         const response = await apiClient.get<any>(`/ordoc-reports/api/templates/${id}/preview/`, {
@@ -210,7 +210,7 @@ class ReportService {
     }
 
     /**
-     * Listar categorias disponíveis
+     * Listar categorias disponveis
      */
     async getCategories(): Promise<Array<{ value: string; label: string }>> {
         const response = await apiClient.get<any>('/ordoc-reports/api/templates/categories/');
@@ -218,7 +218,7 @@ class ReportService {
     }
 
     /**
-     * Listar tipos disponíveis
+     * Listar tipos disponveis
      */
     async getTypes(): Promise<Array<{ value: string; label: string }>> {
         const response = await apiClient.get<any>('/ordoc-reports/api/templates/types/');
@@ -228,7 +228,7 @@ class ReportService {
     // ==================== REPORTS ====================
 
     /**
-     * Listar relatórios
+     * Listar relatrios
      */
     async listReports(filters?: {
         status?: string;
@@ -241,7 +241,7 @@ class ReportService {
     }
 
     /**
-     * Obter relatório
+     * Obter relatrio
      */
     async getReport(id: string): Promise<Report> {
         const response = await apiClient.get<Report>(`/ordoc-reports/api/reports/${id}/`);
@@ -249,7 +249,7 @@ class ReportService {
     }
 
     /**
-     * Gerar relatório
+     * Gerar relatrio
      */
     async generateReport(data: ReportGenerationRequest): Promise<Report> {
         const response = await apiClient.post<Report>('/ordoc-reports/api/reports/generate/', data);
@@ -257,14 +257,14 @@ class ReportService {
     }
 
     /**
-     * Deletar relatório
+     * Deletar relatrio
      */
     async deleteReport(id: string): Promise<void> {
         await apiClient.delete(`/ordoc-reports/api/reports/${id}/`);
     }
 
     /**
-     * Baixar relatório
+     * Baixar relatrio
      */
     async downloadReport(id: string): Promise<Blob> {
         const response = await apiClient.get(`/ordoc-reports/api/reports/${id}/download/`, {
@@ -274,7 +274,7 @@ class ReportService {
     }
 
     /**
-     * Exportar relatório em formato específico
+     * Exportar relatrio em formato especfico
      */
     async exportReport(id: string, format: 'pdf' | 'excel' | 'csv'): Promise<Blob> {
         const response = await apiClient.post(
@@ -286,7 +286,7 @@ class ReportService {
     }
 
     /**
-     * Reprocessar relatório com falha
+     * Reprocessar relatrio com falha
      */
     async retryReport(id: string): Promise<Report> {
         const response = await apiClient.post<Report>(`/ordoc-reports/api/reports/${id}/retry/`);
@@ -294,7 +294,7 @@ class ReportService {
     }
 
     /**
-     * Cancelar geração de relatório
+     * Cancelar gerao de relatrio
      */
     async cancelReport(id: string): Promise<void> {
         await apiClient.post(`/ordoc-reports/api/reports/${id}/cancel/`);
@@ -303,7 +303,7 @@ class ReportService {
     // ==================== REPORT SCHEDULES ====================
 
     /**
-     * Listar agendamentos de relatórios
+     * Listar agendamentos de relatrios
      */
     async listSchedules(filters?: {
         template?: string;
@@ -372,7 +372,7 @@ class ReportService {
     // ==================== REPORT SHARES ====================
 
     /**
-     * Listar compartilhamentos de relatórios
+     * Listar compartilhamentos de relatrios
      */
     async listShares(filters?: {
         report?: string;
@@ -418,7 +418,7 @@ class ReportService {
     }
 
     /**
-     * Acessar relatório via token público
+     * Acessar relatrio via token pblico
      */
     async accessSharedReport(token: string): Promise<any> {
         const response = await apiClient.get(`/ordoc-reports/shared/${token}/`);
@@ -428,7 +428,7 @@ class ReportService {
     // ==================== REPORT METRICS ====================
 
     /**
-     * Listar métricas de relatórios
+     * Listar mtricas de relatrios
      */
     async listMetrics(filters?: {
         entity_type?: string;
@@ -440,7 +440,7 @@ class ReportService {
     }
 
     /**
-     * Obter métrica
+     * Obter mtrica
      */
     async getMetric(id: string): Promise<ReportMetric> {
         const response = await apiClient.get<ReportMetric>(`/ordoc-reports/api/metrics/${id}/`);
@@ -448,7 +448,7 @@ class ReportService {
     }
 
     /**
-     * Criar métrica
+     * Criar mtrica
      */
     async createMetric(data: Partial<ReportMetric>): Promise<ReportMetric> {
         const response = await apiClient.post<ReportMetric>('/ordoc-reports/api/metrics/', data);
@@ -456,7 +456,7 @@ class ReportService {
     }
 
     /**
-     * Atualizar métrica
+     * Atualizar mtrica
      */
     async updateMetric(id: string, data: Partial<ReportMetric>): Promise<ReportMetric> {
         const response = await apiClient.patch<ReportMetric>(`/ordoc-reports/api/metrics/${id}/`, data);
@@ -464,14 +464,14 @@ class ReportService {
     }
 
     /**
-     * Deletar métrica
+     * Deletar mtrica
      */
     async deleteMetric(id: string): Promise<void> {
         await apiClient.delete(`/ordoc-reports/api/metrics/${id}/`);
     }
 
     /**
-     * Calcular métrica
+     * Calcular mtrica
      */
     async calculateMetric(id: string, filters?: any): Promise<any> {
         const response = await apiClient.post<any>(`/ordoc-reports/api/metrics/${id}/calculate/`, {
@@ -505,7 +505,7 @@ class ReportService {
     }
 
     /**
-     * Obter métricas por período
+     * Obter mtricas por perodo
      */
     async getMetricsByPeriod(filters?: {
         metric_type?: string;
@@ -521,7 +521,7 @@ class ReportService {
     }
 
     /**
-     * Obter estatísticas de tendência
+     * Obter estatsticas de tendncia
      */
     async getTrendingStats(filters?: {
         entity_type?: string;

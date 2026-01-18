@@ -163,7 +163,7 @@ class IntegrationService_Class {
     // ==================== INTEGRATION SERVICES ====================
 
     /**
-     * Listar serviços de integração
+     * Listar servios de integrao
      */
     async listServices(filters?: {
         service_type?: string;
@@ -176,7 +176,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Obter serviço de integração
+     * Obter servio de integrao
      */
     async getService(id: string): Promise<IntegrationService> {
         const response = await apiClient.get<IntegrationService>(`/integrations/services/${id}/`);
@@ -184,7 +184,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Criar serviço de integração (admin only)
+     * Criar servio de integrao (admin only)
      */
     async createService(data: Partial<IntegrationService>): Promise<IntegrationService> {
         const response = await apiClient.post<IntegrationService>('/integrations/services/', data);
@@ -192,7 +192,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Atualizar serviço de integração (admin only)
+     * Atualizar servio de integrao (admin only)
      */
     async updateService(id: string, data: Partial<IntegrationService>): Promise<IntegrationService> {
         const response = await apiClient.patch<IntegrationService>(`/integrations/services/${id}/`, data);
@@ -200,14 +200,14 @@ class IntegrationService_Class {
     }
 
     /**
-     * Deletar serviço de integração (admin only)
+     * Deletar servio de integrao (admin only)
      */
     async deleteService(id: string): Promise<void> {
         await apiClient.delete(`/integrations/services/${id}/`);
     }
 
     /**
-     * Obter estatísticas do serviço
+     * Obter estatsticas do servio
      */
     async getServiceStats(id: string): Promise<any> {
         const response = await apiClient.get(`/integrations/services/${id}/stats/`);
@@ -215,7 +215,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Ativar/Desativar serviço
+     * Ativar/Desativar servio
      */
     async toggleServiceStatus(id: string): Promise<IntegrationService> {
         const response = await apiClient.post<IntegrationService>(`/integrations/services/${id}/toggle_status/`);
@@ -225,7 +225,7 @@ class IntegrationService_Class {
     // ==================== INTEGRATION REQUESTS ====================
 
     /**
-     * Listar requisições de integração
+     * Listar requisies de integrao
      */
     async listRequests(filters?: {
         service?: string;
@@ -239,7 +239,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Obter requisição de integração
+     * Obter requisio de integrao
      */
     async getRequest(id: string): Promise<IntegrationRequest> {
         const response = await apiClient.get<IntegrationRequest>(`/integrations/requests/${id}/`);
@@ -247,7 +247,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Minhas requisições
+     * Minhas requisies
      */
     async getMyRequests(filters?: {
         status?: string;
@@ -260,7 +260,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Requisições recentes (últimas 24h)
+     * Requisies recentes (ltimas 24h)
      */
     async getRecentRequests(): Promise<IntegrationRequest[]> {
         const response = await apiClient.get<any>('/integrations/requests/recent/');
@@ -268,7 +268,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Requisições que falharam
+     * Requisies que falharam
      */
     async getFailedRequests(): Promise<IntegrationRequest[]> {
         const response = await apiClient.get<any>('/integrations/requests/failed/');
@@ -278,7 +278,7 @@ class IntegrationService_Class {
     // ==================== INTEGRATION CACHE ====================
 
     /**
-     * Listar cache de integrações
+     * Listar cache de integraes
      */
     async listCache(filters?: {
         service?: string;
@@ -289,7 +289,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Obter cache específico
+     * Obter cache especfico
      */
     async getCache(id: string): Promise<IntegrationCache> {
         const response = await apiClient.get<IntegrationCache>(`/integrations/cache/${id}/`);
@@ -305,7 +305,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Invalidar cache específico
+     * Invalidar cache especfico
      */
     async invalidateCache(cacheKey: string): Promise<any> {
         const response = await apiClient.post('/integrations/cache/invalidate/', {
@@ -317,7 +317,7 @@ class IntegrationService_Class {
     // ==================== INTEGRATION EXECUTE ====================
 
     /**
-     * Executar integração genérica
+     * Executar integrao genrica
      */
     async execute(request: IntegrationExecuteRequest): Promise<IntegrationExecuteResponse> {
         const response = await apiClient.post<IntegrationExecuteResponse>(
@@ -350,7 +350,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Consultar crédito
+     * Consultar crdito
      */
     async checkCredit(request: CreditCheckRequest): Promise<CreditCheckResponse> {
         const response = await apiClient.post<CreditCheckResponse>(
@@ -363,7 +363,7 @@ class IntegrationService_Class {
     // ==================== GOV.BR AUTH ====================
 
     /**
-     * Obter configuração de autenticação Gov.br
+     * Obter configurao de autenticao Gov.br
      */
     async getGovBrConfig(): Promise<GovBrAuthConfig> {
         const response = await apiClient.get<GovBrAuthConfig>('/integrations/auth/govbr/config/');
@@ -372,7 +372,7 @@ class IntegrationService_Class {
 
     /**
      * Iniciar fluxo de login Gov.br
-     * Retorna a URL de autorização para redirecionamento
+     * Retorna a URL de autorizao para redirecionamento
      */
     async initiateGovBrLogin(redirectUri?: string): Promise<{ authorization_url: string }> {
         const response = await apiClient.get('/integrations/auth/govbr/login/', {
@@ -382,8 +382,8 @@ class IntegrationService_Class {
     }
 
     /**
-     * Callback do login Gov.br (processar código de autorização)
-     * Normalmente chamado automaticamente pelo backend após redirect
+     * Callback do login Gov.br (processar cdigo de autorizao)
+     * Normalmente chamado automaticamente pelo backend aps redirect
      */
     async handleGovBrCallback(code: string, state?: string): Promise<{
         access_token: string;
@@ -396,7 +396,7 @@ class IntegrationService_Class {
     }
 
     /**
-     * Obter informações do usuário Gov.br
+     * Obter informaes do usurio Gov.br
      */
     async getGovBrUserInfo(accessToken: string): Promise<GovBrUserInfo> {
         const response = await apiClient.get('/integrations/auth/govbr/userinfo/', {
