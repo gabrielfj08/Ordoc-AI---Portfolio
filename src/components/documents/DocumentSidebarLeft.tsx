@@ -17,7 +17,8 @@ import {
 import { CreateFolderDialog } from './CreateFolderDialog';
 // Removed unused useFileUpload import since we use prop now
 import { processInputFiles } from '@/utils/file-upload';
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { documentService } from '@/services/documents';
 
 interface SidebarProps {
   activeContext?: string;
@@ -60,6 +61,14 @@ export const DocumentSidebarLeft = ({
   const folderInputRef = useRef<HTMLInputElement>(null);
   // Removed local useFileUpload
   const queryClient = useQueryClient();
+
+  // Fetch storage stats
+  const { data: storageStats } = useQuery({
+    queryKey: ['storage-stats'],
+    queryFn: () => documentService.getStorageStats(),
+    staleTime: 60000, // 1 minute
+    refetchInterval: 300000, // Refetch every 5 minutes
+  });
 
   // Force webkitdirectory attribute (React support is inconsistent)
   useEffect(() => {
@@ -195,10 +204,28 @@ export const DocumentSidebarLeft = ({
           <HardDrive size={14} className="text-slate-400" />
           <span className="text-xs text-slate-500 font-medium">Armazenamento</span>
         </div>
-        <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
-          <div className="bg-[#f97316] h-full w-[65%]" />
-        </div>
-        <p className="text-[10px] text-slate-400 mt-2">24,35 GB de 4 TB usados</p>
+        {storageStats ? (
+          <>
+            <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
+              <div
+                className="bg-[#f97316] h-full transition-all"
+                style={{
+                  width: `${Math.min((storageStats.total_size_gb / 1000) * 100, 100)}%`
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2">
+              {storageStats.total_size_gb.toFixed(2)} GB usados • {storageStats.total_documents} arquivos
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden animate-pulse">
+              <div className="bg-slate-200 h-full w-[50%]" />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2">Carregando...</p>
+          </>
+        )}
       </div>
     </div>
   );
