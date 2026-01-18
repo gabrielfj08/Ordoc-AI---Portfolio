@@ -7,7 +7,12 @@ import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 
 export const OngoingProcessesCard = () => {
+  const [mounted, setMounted] = React.useState(false);
   const { sealedDocuments } = useSignatureStore();
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="bg-background rounded-2xl border border-border p-6 shadow-sm flex flex-col h-full">
@@ -22,7 +27,12 @@ export const OngoingProcessesCard = () => {
       </div>
 
       <div className="space-y-5 flex-1 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-        {sealedDocuments.length > 0 ? (
+        {!mounted ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Clock size={32} className="text-muted-foreground/30 animate-pulse mb-2" />
+            <p className="text-xs text-muted-foreground font-medium">Carregando...</p>
+          </div>
+        ) : sealedDocuments.length > 0 ? (
           sealedDocuments.map((doc) => (
             <div key={doc.id} className="group cursor-pointer">
               <div className="flex items-center justify-between mb-2">

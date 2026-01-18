@@ -20,8 +20,14 @@ import {
   useActivityFeed,
 } from "@/hooks/queries/useIntelligence";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export const AIInsightsCard = () => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   // Queries para dados em tempo real
   const { data: alertCounts } = useAlertSeverityCounts();
   const { data: recentAnalyses, isLoading: loadingAnalyses } = useAnalysesList({
@@ -35,7 +41,7 @@ export const AIInsightsCard = () => {
   const { data: activities } = useActivityFeed({ limit: 5, hours: 24 });
 
   const criticalCount = alertCounts?.critical || 0;
-  const highCount = alertCounts?.high || 0;
+  const highCount = (alertCounts?.high || 0) + (alertCounts?.error || 0);
   const totalAlerts = alertCounts
     ? Object.values(alertCounts).reduce((a, b) => a + b, 0)
     : 0;
@@ -163,14 +169,14 @@ export const AIInsightsCard = () => {
             Insights Rápidos
           </h4>
 
-          {loadingAnalyses ? (
+          {mounted && loadingAnalyses ? (
             <div className="flex items-center gap-2 p-3 bg-white rounded-lg">
               <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
               <span className="text-xs text-muted-foreground">
                 Analisando documentos...
               </span>
             </div>
-          ) : (
+          ) : mounted ? (
             <>
               {/* Análises recentes */}
               {analyses.length > 0 && (
@@ -239,7 +245,7 @@ export const AIInsightsCard = () => {
                 </div>
               )}
             </>
-          )}
+          ) : null}
         </div>
 
         {/* CTA */}

@@ -6,6 +6,7 @@ import { ShieldAlert, CheckCircle2, AlertTriangle, Brain, Loader2, ChevronRight 
 import { useCriticalAlerts, useAlertsList, useDismissAlert } from "@/hooks/queries/useIntelligence";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
 
 const SEVERITY_CONFIG = {
   critical: {
@@ -26,6 +27,12 @@ const SEVERITY_CONFIG = {
 };
 
 export const IARecommendations = () => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Buscar alertas críticos e de alta severidade
   const { data: criticalData, isLoading: loadingCritical } = useCriticalAlerts();
   const { data: highData, isLoading: loadingHigh } = useAlertsList({
@@ -64,7 +71,12 @@ export const IARecommendations = () => {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {isLoading ? (
+        {!mounted ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-600 mb-2" />
+            <p className="text-xs text-muted-foreground">Inicializando...</p>
+          </div>
+        ) : isLoading ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-purple-600 mb-2" />
             <p className="text-xs text-muted-foreground">Analisando riscos...</p>
@@ -113,8 +125,8 @@ export const IARecommendations = () => {
                         className="flex-1 h-7 text-xs border-2 border-orange-300 text-orange-600 bg-transparent hover:bg-orange-500 hover:text-white transition-all font-semibold"
                       >
                         <CheckCircle2 size={12} className="mr-1.5" />
-                        {alert.suggested_actions[0].substring(0, 20)}
-                        {alert.suggested_actions[0].length > 20 ? '...' : ''}
+                        {alert.suggested_actions[0].label.substring(0, 20)}
+                        {alert.suggested_actions[0].label.length > 20 ? '...' : ''}
                       </Button>
                       <Button
                         size="sm"
