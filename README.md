@@ -1,6 +1,6 @@
 # 🩺 Ordoc AI — Frontend Dashboard
 
-> **Ordoc AI** é uma plataforma inteligente voltada para a gestão de processos, análise de dados e fluxos de documentos médicos e administrativos. Este repositório contém a aplicação **Frontend** construída sob uma arquitetura moderna, escalável e focada na melhor experiência de uso (UX) e performance.
+> **Ordoc AI** é uma plataforma inteligente voltada para a gestão de processos, análise de dados e fluxos de documentos e rotinas corporativas. Este repositório contém a aplicação **Frontend** construída sob uma arquitetura moderna, escalável e focada na melhor experiência de uso (UX) e performance.
 
 Este projeto serve como um showcase técnico pessoal, demonstrando a aplicação prática de padrões modernos de desenvolvimento Web e engenharia de software com **React 19** e **Next.js 14+**.
 
